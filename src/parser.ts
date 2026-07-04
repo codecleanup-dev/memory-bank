@@ -1,4 +1,5 @@
 import readline from 'readline';
+import path from 'path';
 import { ConversationExchange, ToolCall } from './types.js';
 import crypto from 'crypto';
 import { createArchiveReadStream } from './archive-io.js';
@@ -24,7 +25,20 @@ interface JSONLMessage {
   };
 }
 
+// Router: detect harness (Claude vs Codex) then dispatch to the right parser.
 export async function parseConversation(
+  filePath: string,
+  projectName: string,
+  archivePath: string
+): Promise<ConversationExchange[]> {
+  const harness = await detectConversationHarness(filePath);
+  if (harness === 'codex') {
+    return parseCodexConversation(filePath, projectName, archivePath);
+  }
+  return parseClaudeConversation(filePath, projectName, archivePath);
+}
+
+async function parseClaudeConversation(
   filePath: string,
   projectName: string,
   archivePath: string
@@ -208,6 +222,283 @@ export async function parseConversation(
   // Finalize last exchange
   finalizeExchange();
 
+  return exchanges;
+}
+
+// ── Codex rollout support (ported from episodic-memory 1.4.2) ───────────────
+// Codex writes ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl with a different
+// line schema: {type: 'response_item'|'session_meta'|'turn_context', payload}.
+// We map it onto the same ConversationExchange shape; coding_agent='codex'.
+interface CodexRolloutLine {
+  timestamp?: string;
+  type?: string;
+  payload?: any;
+}
+
+async function detectConversationHarness(filePath: string): Promise<'claude' | 'codex'> {
+  const fileStream = createArchiveReadStream(filePath);
+  const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+  try {
+    for await (const line of rl) {
+      if (!line.trim()) continue;
+      try {
+        const parsed = JSON.parse(line) as CodexRolloutLine;
+        if (
+          parsed.payload &&
+          (parsed.type === 'session_meta' ||
+            parsed.type === 'turn_context' ||
+            parsed.type === 'response_item' ||
+            parsed.type === 'event_msg' ||
+            parsed.type === 'compacted')
+        ) {
+          return 'codex';
+        }
+        return 'claude';
+      } catch {
+        continue;
+      }
+    }
+  } finally {
+    // Detection returns early after the first non-empty line, so the readline
+    // interface never drains the stream. rl.close() alone leaves the underlying
+    // file descriptor open — destroy the stream too, or a large backfill
+    // (hundreds of codex sessions) exhausts the FD ulimit and crashes (EMFILE).
+    rl.close();
+    (fileStream as NodeJS.ReadableStream & { destroy?: () => void }).destroy?.();
+  }
+  return 'claude';
+}
+
+function extractTextFromContent(content: unknown): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (!Array.isArray(content)) {
+    return '';
+  }
+  return content
+    .filter(block => block && typeof block === 'object' && typeof (block as any).text === 'string')
+    .map(block => (block as any).text)
+    .join('\n');
+}
+
+function safeParseJson(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function stringifyToolOutput(output: unknown): string | undefined {
+  if (output === undefined || output === null) {
+    return undefined;
+  }
+  if (typeof output === 'string') {
+    return output;
+  }
+  const text = extractTextFromContent(output);
+  if (text.trim()) {
+    return text;
+  }
+  return JSON.stringify(output);
+}
+
+function projectFromCwd(cwd?: string): string | undefined {
+  if (!cwd) {
+    return undefined;
+  }
+  const project = path.basename(cwd);
+  return project || undefined;
+}
+
+interface CodexExchangeBuilder {
+  project: string;
+  userMessage: string;
+  userLine: number;
+  assistantMessages: string[];
+  lastAssistantLine: number;
+  timestamp: string;
+  sessionId?: string;
+  cwd?: string;
+  gitBranch?: string;
+  toolCalls: ToolCall[];
+}
+
+async function parseCodexConversation(
+  filePath: string,
+  projectName: string,
+  archivePath: string
+): Promise<ConversationExchange[]> {
+  const exchanges: ConversationExchange[] = [];
+  const fileStream = createArchiveReadStream(filePath);
+  const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+
+  let lineNumber = 0;
+  let sessionId: string | undefined;
+  let cwd: string | undefined;
+  let gitBranch: string | undefined;
+  let currentExchange: CodexExchangeBuilder | null = null;
+  const toolCallsByCallId = new Map<string, ToolCall>();
+
+  const currentProject = () => projectFromCwd(cwd) || projectName;
+
+  const applyMetadataToCurrentExchange = () => {
+    if (!currentExchange) return;
+    currentExchange.project = currentProject();
+    currentExchange.sessionId = sessionId;
+    currentExchange.cwd = cwd;
+    currentExchange.gitBranch = gitBranch;
+  };
+
+  const finalizeExchange = () => {
+    if (currentExchange && currentExchange.assistantMessages.length > 0) {
+      applyMetadataToCurrentExchange();
+      const exchangeId = crypto
+        .createHash('md5')
+        .update(`${archivePath}:${currentExchange.userLine}-${currentExchange.lastAssistantLine}`)
+        .digest('hex');
+
+      const toolCalls = currentExchange.toolCalls.map(tc => ({ ...tc, exchangeId }));
+
+      exchanges.push({
+        id: exchangeId,
+        project: currentExchange.project,
+        timestamp: currentExchange.timestamp,
+        userMessage: currentExchange.userMessage,
+        assistantMessage: currentExchange.assistantMessages.join('\n\n'),
+        archivePath,
+        lineStart: currentExchange.userLine,
+        lineEnd: currentExchange.lastAssistantLine,
+        sessionId: currentExchange.sessionId,
+        cwd: currentExchange.cwd,
+        gitBranch: currentExchange.gitBranch,
+        codingAgent: 'codex',
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined
+      });
+    }
+    currentExchange = null;
+    toolCallsByCallId.clear();
+  };
+
+  const startExchange = (text: string, timestamp: string) => {
+    finalizeExchange();
+    currentExchange = {
+      project: currentProject(),
+      userMessage: text,
+      userLine: lineNumber,
+      assistantMessages: [],
+      lastAssistantLine: lineNumber,
+      timestamp,
+      sessionId,
+      cwd,
+      gitBranch,
+      toolCalls: []
+    };
+  };
+
+  const appendToolCall = (payload: any, timestamp: string) => {
+    if (!currentExchange) return;
+    const callId = payload.call_id || crypto.randomUUID();
+    let toolInput: unknown = payload.arguments;
+    if (typeof toolInput === 'string') {
+      toolInput = safeParseJson(toolInput);
+    } else if (payload.input !== undefined) {
+      toolInput = payload.input;
+    } else if (payload.action !== undefined) {
+      toolInput = payload.action;
+    }
+    const toolCall: ToolCall = {
+      id: callId,
+      exchangeId: '',
+      toolName: payload.name || payload.namespace || payload.type || 'unknown',
+      toolInput,
+      isError: false,
+      timestamp
+    };
+    currentExchange.toolCalls.push(toolCall);
+    toolCallsByCallId.set(callId, toolCall);
+    currentExchange.lastAssistantLine = lineNumber;
+  };
+
+  const appendToolResult = (payload: any) => {
+    const callId = payload.call_id;
+    if (!callId) return;
+    const toolCall = toolCallsByCallId.get(callId);
+    if (!toolCall) return;
+    const output = stringifyToolOutput(payload.output);
+    if (output !== undefined) {
+      toolCall.toolResult = output;
+    }
+    if (currentExchange) {
+      currentExchange.lastAssistantLine = lineNumber;
+    }
+  };
+
+  for await (const line of rl) {
+    lineNumber++;
+    if (!line.trim()) continue;
+
+    try {
+      const parsed = JSON.parse(line) as CodexRolloutLine;
+      const payload = parsed.payload;
+      const timestamp = parsed.timestamp || new Date().toISOString();
+
+      if (parsed.type === 'session_meta' && payload) {
+        sessionId = payload.id || sessionId;
+        cwd = payload.cwd || cwd;
+        gitBranch = payload.git?.branch || gitBranch;
+        applyMetadataToCurrentExchange();
+        continue;
+      }
+
+      if (parsed.type === 'turn_context' && payload) {
+        cwd = payload.cwd || cwd;
+        applyMetadataToCurrentExchange();
+        continue;
+      }
+
+      if (parsed.type !== 'response_item' || !payload) {
+        continue;
+      }
+
+      if (payload.type === 'message') {
+        const text = extractTextFromContent(payload.content);
+        if (!text.trim()) continue;
+
+        if (payload.role === 'user') {
+          startExchange(text, timestamp);
+        } else if (payload.role === 'assistant') {
+          // Assertion mirrors episodic-memory: closures above defeat TS's
+          // control-flow narrowing, leaving currentExchange typed as never.
+          const exchange = currentExchange as CodexExchangeBuilder | null;
+          if (exchange) {
+            exchange.assistantMessages.push(text);
+            exchange.lastAssistantLine = lineNumber;
+            exchange.timestamp = timestamp;
+          }
+        }
+      } else if (
+        payload.type === 'function_call' ||
+        payload.type === 'custom_tool_call' ||
+        payload.type === 'tool_search_call' ||
+        payload.type === 'local_shell_call'
+      ) {
+        appendToolCall(payload, timestamp);
+      } else if (
+        payload.type === 'function_call_output' ||
+        payload.type === 'custom_tool_call_output' ||
+        payload.type === 'tool_search_output' ||
+        payload.type === 'local_shell_call_output'
+      ) {
+        appendToolResult(payload);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  finalizeExchange();
   return exchanges;
 }
 

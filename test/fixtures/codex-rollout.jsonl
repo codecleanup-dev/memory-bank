@@ -1,0 +1,6 @@
+{"timestamp":"2026-07-01T10:00:00Z","type":"session_meta","payload":{"id":"sess-abc","cwd":"/Users/me/dev/proj","git":{"branch":"main"},"cli_version":"0.130.0","model_provider":"openai"}}
+{"timestamp":"2026-07-01T10:00:01Z","type":"turn_context","payload":{"cwd":"/Users/me/dev/proj","model":"gpt-5"}}
+{"timestamp":"2026-07-01T10:00:02Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"list the files please"}]}}
+{"timestamp":"2026-07-01T10:00:03Z","type":"response_item","payload":{"type":"function_call","name":"shell","call_id":"c1","arguments":"{\"cmd\":\"ls\"}"}}
+{"timestamp":"2026-07-01T10:00:04Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c1","output":"file1.ts\nfile2.ts"}}
+{"timestamp":"2026-07-01T10:00:05Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Here are the files: file1.ts and file2.ts"}]}}
