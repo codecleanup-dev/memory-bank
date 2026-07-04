@@ -104,7 +104,10 @@ console.log(`Destination: ${destDir}\n`);
   for (const source of sources) {
     // codingAgent override ties every exchange from this source to its agent,
     // so Codex rollouts are stamped coding_agent=codex regardless of parse order.
-    const result = await syncConversations(source.sourceDir, destDir, { codingAgent: source.name });
+    const result = await syncConversations(source.sourceDir, destDir, {
+      codingAgent: source.name,
+      recursive: source.recursive,
+    });
     totals.copied += result.copied;
     totals.skipped += result.skipped;
     totals.indexed += result.indexed;

@@ -33,6 +33,7 @@ export interface SyncOptions {
   skipSummaries?: boolean;
   summaryLimit?: number; // Max summaries to generate per run (default: 10)
   codingAgent?: string;  // Override coding agent detection (e.g., 'codex', 'opencode')
+  recursive?: boolean;   // Walk sourceDir recursively (Codex nests under YYYY/MM/DD)
 }
 
 function copyIfNewer(src: string, dest: string): boolean {
@@ -100,15 +101,39 @@ export async function syncConversations(
   const filesToIndex: string[] = [];
   const filesToSummarize: Array<{ path: string; sessionId: string }> = [];
 
-  // Walk source directory recursively. Handles flat Claude project dirs
-  // (`<project>/<file>.jsonl`) and nested Codex sessions (`YYYY/MM/DD/rollout-*.jsonl`)
-  // alike; the archive mirrors the source's relative layout.
-  const relFiles = findJsonlFiles(sourceDir);
+  // Discover source files as paths relative to sourceDir. Claude keeps a flat
+  // <project>/<file>.jsonl layout, so it uses the original one-level walk (and
+  // must NOT newly index nested sidechains or stray root-level files). Codex
+  // nests under YYYY/MM/DD, so codex sources opt into recursive discovery.
   const excludedProjects = getExcludedProjects();
+  let relFiles: string[];
+  if (options.recursive) {
+    relFiles = findJsonlFiles(sourceDir);
+  } else {
+    relFiles = [];
+    for (const project of fs.readdirSync(sourceDir)) {
+      if (excludedProjects.includes(project)) {
+        console.error('\nSkipping excluded project: ' + project);
+        continue;
+      }
+      const projectPath = path.join(sourceDir, project);
+      let stat: fs.Stats;
+      try {
+        stat = fs.statSync(projectPath);
+      } catch {
+        continue;
+      }
+      if (!stat.isDirectory()) continue;
+      for (const file of fs.readdirSync(projectPath)) {
+        if (file.endsWith('.jsonl')) relFiles.push(path.join(project, file));
+      }
+    }
+  }
 
   for (const relPath of relFiles) {
-    const topSegment = relPath.split(path.sep)[0];
-    if (excludedProjects.includes(topSegment)) {
+    // Recursive (codex) discovery hasn't applied exclusion yet; the one-level
+    // walk already filtered by project above.
+    if (options.recursive && excludedProjects.includes(relPath.split(path.sep)[0])) {
       continue;
     }
 

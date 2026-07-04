@@ -86,6 +86,7 @@ export function getExcludeConfigPath(): string {
 export interface AgentSource {
   name: string;        // e.g., 'claude-code', 'codex', 'opencode'
   sourceDir: string;   // e.g., '~/.claude/projects/'
+  recursive?: boolean; // walk sourceDir recursively (Codex nests under YYYY/MM/DD)
 }
 
 /**
@@ -105,7 +106,7 @@ export function getAgentSources(): AgentSource[] {
   // when present so Codex conversations are indexed alongside Claude ones.
   const codexSessions = path.join(home, '.codex', 'sessions');
   if (fs.existsSync(codexSessions)) {
-    defaultSources.push({ name: 'codex', sourceDir: codexSessions });
+    defaultSources.push({ name: 'codex', sourceDir: codexSessions, recursive: true });
   }
 
   // Check env variable for additional sources

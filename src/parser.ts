@@ -235,28 +235,36 @@ interface CodexRolloutLine {
   payload?: any;
 }
 
+const CODEX_LINE_TYPES = new Set([
+  'session_meta', 'turn_context', 'response_item', 'event_msg', 'compacted',
+]);
+
 async function detectConversationHarness(filePath: string): Promise<'claude' | 'codex'> {
   const fileStream = createArchiveReadStream(filePath);
   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+  // Scan a bounded window of lines rather than deciding on the first one: a
+  // single leading line that matches neither shape (format drift, blank-ish
+  // preamble) must not misclassify and silently drop the whole session.
+  let scanned = 0;
   try {
     for await (const line of rl) {
       if (!line.trim()) continue;
+      let parsed: any;
       try {
-        const parsed = JSON.parse(line) as CodexRolloutLine;
-        if (
-          parsed.payload &&
-          (parsed.type === 'session_meta' ||
-            parsed.type === 'turn_context' ||
-            parsed.type === 'response_item' ||
-            parsed.type === 'event_msg' ||
-            parsed.type === 'compacted')
-        ) {
-          return 'codex';
-        }
-        return 'claude';
+        parsed = JSON.parse(line) as CodexRolloutLine;
       } catch {
         continue;
       }
+      // Codex rollout lines carry a payload and a codex-specific type.
+      if (parsed && parsed.payload && CODEX_LINE_TYPES.has(parsed.type)) {
+        return 'codex';
+      }
+      // Claude transcript lines are type 'user'/'assistant' with a message.
+      if (parsed && (parsed.type === 'user' || parsed.type === 'assistant') && parsed.message) {
+        return 'claude';
+      }
+      // Neither shape yet — keep scanning up to a bounded number of lines.
+      if (++scanned >= 40) break;
     }
   } finally {
     // Detection returns early after the first non-empty line, so the readline
