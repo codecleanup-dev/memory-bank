@@ -5,7 +5,8 @@
  */
 
 import { spawn } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
+import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -15,11 +16,39 @@ const __dirname = dirname(__filename);
 // Determine plugin root directory
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || join(__dirname, '..');
 
+// [fork] Native deps (better-sqlite3) are ABI-built for the runtime pinned in .nvmrc,
+// so the server must start on a matching node even when PATH points at a newer one.
+// Resolution: MEMORY_BANK_NODE_BIN → .nvmrc (exact, then same-major highest) → process.execPath
+function resolveNodeBin() {
+  const envBin = process.env.MEMORY_BANK_NODE_BIN;
+  if (envBin && existsSync(envBin)) return envBin;
+  try {
+    const pin = readFileSync(join(PLUGIN_ROOT, '.nvmrc'), 'utf8').trim().replace(/^v/, '');
+    const nvmDir = join(homedir(), '.nvm', 'versions', 'node');
+    const exact = join(nvmDir, `v${pin}`, 'bin', 'node');
+    if (existsSync(exact)) return exact;
+    const major = pin.split('.')[0];
+    const sameMajor = readdirSync(nvmDir)
+      .filter((d) => d.startsWith(`v${major}.`))
+      .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+    for (const d of sameMajor) {
+      const candidate = join(nvmDir, d, 'bin', 'node');
+      if (existsSync(candidate)) return candidate;
+    }
+  } catch {
+    // no .nvmrc or no nvm install — fall back to the invoking runtime
+  }
+  return process.execPath;
+}
+
+const NODE_BIN = resolveNodeBin();
+
 // Helper function to run npm install
 function runNpmInstall() {
   return new Promise((resolve, reject) => {
     const isWindows = process.platform === 'win32';
-    const npmCommand = isWindows ? 'npm.cmd' : 'npm';
+    const npmFromPin = join(dirname(NODE_BIN), 'npm');
+    const npmCommand = isWindows ? 'npm.cmd' : existsSync(npmFromPin) ? npmFromPin : 'npm';
 
     console.error('Installing memory-bank dependencies (first run only)...');
     console.error('This may take 30-60 seconds...');
@@ -76,7 +105,7 @@ async function main() {
     }
 
     // Use spawn with shell: false for better cross-platform compatibility
-    const child = spawn(process.execPath, [mcpServerPath], {
+    const child = spawn(NODE_BIN, [mcpServerPath], {
       stdio: 'inherit',
       shell: false
     });
