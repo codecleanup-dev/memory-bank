@@ -511,6 +511,39 @@ async function parseCodexConversation(
 }
 
 /**
+ * Cheaply determine a Codex rollout's project from its recorded cwd, without a
+ * full parse. Needed because Codex files live under YYYY/MM/DD (the path carries
+ * no project name) — the real project comes from session_meta/turn_context cwd.
+ * Returns undefined if no cwd is found in the leading window. Used to enforce the
+ * exclude list before copying/indexing excluded projects.
+ */
+export async function sniffCodexProject(filePath: string): Promise<string | undefined> {
+  const fileStream = createArchiveReadStream(filePath);
+  const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+  let scanned = 0;
+  try {
+    for await (const line of rl) {
+      if (!line.trim()) continue;
+      let parsed: any;
+      try {
+        parsed = JSON.parse(line) as CodexRolloutLine;
+      } catch {
+        continue;
+      }
+      const cwd = parsed?.payload?.cwd;
+      if (typeof cwd === 'string' && cwd) {
+        return projectFromCwd(cwd);
+      }
+      if (++scanned >= 40) break;
+    }
+  } finally {
+    rl.close();
+    (fileStream as NodeJS.ReadableStream & { destroy?: () => void }).destroy?.();
+  }
+  return undefined;
+}
+
+/**
  * Convenience function to parse a conversation file
  * Extracts project name from the file path and returns exchanges with metadata
  */

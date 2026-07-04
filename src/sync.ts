@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { SUMMARIZER_CONTEXT_MARKER } from './constants.js';
 import { getExcludedProjects, detectCodingAgent, findJsonlFiles } from './paths.js';
+import { sniffCodexProject } from './parser.js';
 import { archiveFileExists, readArchiveFile, statArchiveFile } from './archive-io.js';
 
 const EXCLUSION_MARKERS = [
@@ -131,13 +132,19 @@ export async function syncConversations(
   }
 
   for (const relPath of relFiles) {
-    // Recursive (codex) discovery hasn't applied exclusion yet; the one-level
-    // walk already filtered by project above.
-    if (options.recursive && excludedProjects.includes(relPath.split(path.sep)[0])) {
-      continue;
+    const srcFile = path.join(sourceDir, relPath);
+
+    // Recursive (codex) discovery can't exclude by path — the path segment is a
+    // year, not a project. Codex records its project in the rollout's cwd, so
+    // sniff it and honor the exclude list before copying/indexing. (The one-level
+    // Claude walk already filtered excluded projects above.)
+    if (options.recursive) {
+      const proj = await sniffCodexProject(srcFile);
+      if (proj && excludedProjects.includes(proj)) {
+        continue;
+      }
     }
 
-    const srcFile = path.join(sourceDir, relPath);
     const destFile = path.join(destDir, relPath);
 
     try {
@@ -187,6 +194,12 @@ export async function syncConversations(
         const exchanges = await parseConversation(file, project, file);
 
         for (const exchange of exchanges) {
+          // Definitive exclude-list guard. Codex derives its project from the
+          // rollout's cwd (set by the parser), which the path-based filters
+          // above cannot see; enforce exclusion here regardless of agent, and
+          // catch any mid-session cwd switch to an excluded project.
+          if (excludedProjects.includes(exchange.project)) continue;
+
           // Tag each exchange with the coding agent
           exchange.codingAgent = codingAgent;
 
