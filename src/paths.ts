@@ -101,6 +101,13 @@ export function getAgentSources(): AgentSource[] {
     { name: 'claude-code', sourceDir: path.join(home, '.claude', 'projects') },
   ];
 
+  // Codex writes rollout transcripts under ~/.codex/sessions. Auto-register it
+  // when present so Codex conversations are indexed alongside Claude ones.
+  const codexSessions = path.join(home, '.codex', 'sessions');
+  if (fs.existsSync(codexSessions)) {
+    defaultSources.push({ name: 'codex', sourceDir: codexSessions });
+  }
+
   // Check env variable for additional sources
   if (process.env.MEMORY_BANK_AGENT_SOURCES) {
     try {
@@ -138,6 +145,32 @@ export function detectCodingAgent(sourcePath: string): string {
     }
   }
   return 'claude-code';
+}
+
+/**
+ * Recursively find all .jsonl files under a directory, returning paths relative
+ * to it. Handles both flat Claude project dirs (`<project>/<file>.jsonl`) and
+ * nested Codex session dirs (`YYYY/MM/DD/rollout-*.jsonl`). Ported from
+ * episodic-memory 1.4.2.
+ */
+export function findJsonlFiles(dir: string): string[] {
+  const results: string[] = [];
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.endsWith('.jsonl')) {
+        results.push(entry.name);
+      } else if (entry.isDirectory()) {
+        const subDir = path.join(dir, entry.name);
+        for (const f of findJsonlFiles(subDir)) {
+          results.push(path.join(entry.name, f));
+        }
+      }
+    }
+  } catch {
+    // Directory might not be readable
+  }
+  return results;
 }
 
 /**

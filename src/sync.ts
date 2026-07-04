@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { SUMMARIZER_CONTEXT_MARKER } from './constants.js';
-import { getExcludedProjects, detectCodingAgent } from './paths.js';
+import { getExcludedProjects, detectCodingAgent, findJsonlFiles } from './paths.js';
 import { archiveFileExists, readArchiveFile, statArchiveFile } from './archive-io.js';
 
 const EXCLUSION_MARKERS = [
@@ -100,52 +100,45 @@ export async function syncConversations(
   const filesToIndex: string[] = [];
   const filesToSummarize: Array<{ path: string; sessionId: string }> = [];
 
-  // Walk source directory
-  const projects = fs.readdirSync(sourceDir);
+  // Walk source directory recursively. Handles flat Claude project dirs
+  // (`<project>/<file>.jsonl`) and nested Codex sessions (`YYYY/MM/DD/rollout-*.jsonl`)
+  // alike; the archive mirrors the source's relative layout.
+  const relFiles = findJsonlFiles(sourceDir);
   const excludedProjects = getExcludedProjects();
 
-  for (const project of projects) {
-    if (excludedProjects.includes(project)) {
-      console.error("\nSkipping excluded project: " + project);
+  for (const relPath of relFiles) {
+    const topSegment = relPath.split(path.sep)[0];
+    if (excludedProjects.includes(topSegment)) {
       continue;
     }
 
-    const projectPath = path.join(sourceDir, project);
-    const stat = fs.statSync(projectPath);
+    const srcFile = path.join(sourceDir, relPath);
+    const destFile = path.join(destDir, relPath);
 
-    if (!stat.isDirectory()) continue;
+    try {
+      const wasCopied = copyIfNewer(srcFile, destFile);
+      if (wasCopied) {
+        result.copied++;
+        filesToIndex.push(destFile);
+      } else {
+        result.skipped++;
+      }
 
-    const files = fs.readdirSync(projectPath).filter(f => f.endsWith('.jsonl'));
-
-    for (const file of files) {
-      const srcFile = path.join(projectPath, file);
-      const destFile = path.join(destDir, project, file);
-
-      try {
-        const wasCopied = copyIfNewer(srcFile, destFile);
-        if (wasCopied) {
-          result.copied++;
-          filesToIndex.push(destFile);
-        } else {
-          result.skipped++;
-        }
-
-        // Check if this file needs a summary (whether newly copied or existing)
-        if (!options.skipSummaries) {
-          const summaryPath = destFile.replace('.jsonl', '-summary.txt');
-          if (!archiveFileExists(summaryPath) && !shouldSkipConversation(destFile)) {
-            const sessionId = extractSessionIdFromPath(destFile);
-            if (sessionId) {
-              filesToSummarize.push({ path: destFile, sessionId });
-            }
+      // Check if this file needs a summary (whether newly copied or existing)
+      if (!options.skipSummaries) {
+        const summaryPath = destFile.replace('.jsonl', '-summary.txt');
+        if (!archiveFileExists(summaryPath) && !shouldSkipConversation(destFile)) {
+          const sessionId = extractSessionIdFromPath(destFile);
+          if (sessionId) {
+            filesToSummarize.push({ path: destFile, sessionId });
           }
         }
-      } catch (error) {
-        result.errors.push({
-          file: srcFile,
-          error: error instanceof Error ? error.message : String(error)
-        });
       }
+    } catch (error) {
+      result.errors.push({
+        file: srcFile,
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   }
 
