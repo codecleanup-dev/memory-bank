@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { SUMMARIZER_CONTEXT_MARKER } from './constants.js';
 import { getExcludedProjects, detectCodingAgent, findJsonlFiles } from './paths.js';
-import { sniffCodexProject } from './parser.js';
+import { sniffCodexProject, encodeProjectPath } from './parser.js';
 import { archiveFileExists, readArchiveFile, statArchiveFile } from './archive-io.js';
 
 const EXCLUSION_MARKERS = [
@@ -133,21 +133,22 @@ export async function syncConversations(
 
   for (const relPath of relFiles) {
     const srcFile = path.join(sourceDir, relPath);
-
-    // Recursive (codex) discovery can't exclude by path — the path segment is a
-    // year, not a project. Codex records its project in the rollout's cwd, so
-    // sniff it and honor the exclude list before copying/indexing. (The one-level
-    // Claude walk already filtered excluded projects above.)
-    if (options.recursive) {
-      const proj = await sniffCodexProject(srcFile);
-      if (proj && excludedProjects.includes(proj)) {
-        continue;
-      }
-    }
-
     const destFile = path.join(destDir, relPath);
 
     try {
+      // Recursive (codex) discovery can't exclude by path — the path segment is
+      // a year, not a project. Codex records its project in the rollout's cwd, so
+      // sniff it and honor the exclude list before copying/indexing. (The one-level
+      // Claude walk already filtered excluded projects above.) Kept inside the
+      // per-file try so a sniff stream/I/O error is recorded in result.errors and
+      // skips only this file, matching the Claude path — not the whole run.
+      if (options.recursive) {
+        const proj = await sniffCodexProject(srcFile, excludedProjects);
+        if (proj && excludedProjects.includes(proj)) {
+          continue;
+        }
+      }
+
       const wasCopied = copyIfNewer(srcFile, destFile);
       if (wasCopied) {
         result.copied++;
@@ -196,9 +197,15 @@ export async function syncConversations(
         for (const exchange of exchanges) {
           // Definitive exclude-list guard. Codex derives its project from the
           // rollout's cwd (set by the parser), which the path-based filters
-          // above cannot see; enforce exclusion here regardless of agent, and
-          // catch any mid-session cwd switch to an excluded project.
-          if (excludedProjects.includes(exchange.project)) continue;
+          // above cannot see; enforce exclusion here and catch any mid-session
+          // cwd switch to an excluded project. Codex matches on the canonical
+          // encoded cwd (same key form as the non-codex projects dir-name);
+          // the non-codex path keeps its already-encoded project name. No
+          // basename matching — it would collide across unrelated paths.
+          const exKey = (codingAgent === 'codex' && exchange.cwd)
+            ? encodeProjectPath(exchange.cwd)
+            : exchange.project;
+          if (excludedProjects.includes(exKey)) continue;
 
           // Tag each exchange with the coding agent
           exchange.codingAgent = codingAgent;

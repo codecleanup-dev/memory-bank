@@ -320,6 +320,27 @@ function projectFromCwd(cwd?: string): string | undefined {
   return project || undefined;
 }
 
+/**
+ * Encode an absolute path to the canonical project key used across the index —
+ * the same transform the non-codex projects directory uses: every
+ * non-alphanumeric character (including '/' and '.') becomes '-'. So
+ * /Users/me/my.project → -Users-me-my-project, matching the projects dir-name
+ * form. Codex records only a cwd; this maps it to the shared key so a single
+ * exclude entry (in that canonical form) applies across agents. Basename is
+ * deliberately NOT used as a key — it collides across unrelated paths.
+ *
+ * Trailing slashes are stripped so /x/secret and /x/secret/ yield one key.
+ * Matching is otherwise on the recorded path string: NO symlink/realpath
+ * resolution and NO case folding — on purpose. The non-codex projects key
+ * encodes the literal project path the same way; resolving symlinks or folding
+ * case here would DIVERGE from that key and break cross-agent exclusion, so an
+ * exclude entry must use the same canonical path the agent records.
+ */
+export function encodeProjectPath(absPath: string): string {
+  const trimmed = absPath.replace(/\/+$/, '') || absPath;
+  return trimmed.replace(/[^a-zA-Z0-9]/g, '-');
+}
+
 interface CodexExchangeBuilder {
   project: string;
   userMessage: string;
@@ -511,16 +532,27 @@ async function parseCodexConversation(
 }
 
 /**
- * Cheaply determine a Codex rollout's project from its recorded cwd, without a
- * full parse. Needed because Codex files live under YYYY/MM/DD (the path carries
- * no project name) — the real project comes from session_meta/turn_context cwd.
- * Returns undefined if no cwd is found in the leading window. Used to enforce the
- * exclude list before copying/indexing excluded projects.
+ * Determine a Codex rollout's project from its recorded cwd. Needed because
+ * Codex files live under YYYY/MM/DD (the path carries no project name) — the
+ * real project comes from session_meta/turn_context cwd.
+ *
+ * Privacy-critical: scans the ENTIRE file, not a leading window. A rollout can
+ * run in an allowed project for many lines and then `cd` into an excluded one;
+ * a bounded window would miss that and let copyIfNewer write the raw transcript
+ * (post-cd secret content included) into the archive, where it stays reachable
+ * via the `read` tool even though the index-time guard hides the exchanges. So:
+ * if ANY cwd anywhere resolves to an excluded project, return it immediately
+ * (early-out — excluded files stay cheap) so the caller skips the whole file:
+ * archive copy, summary, and index. Files with no excluded cwd are read fully
+ * to confirm that; the first cwd's project is the fallback, undefined if none.
  */
-export async function sniffCodexProject(filePath: string): Promise<string | undefined> {
+export async function sniffCodexProject(
+  filePath: string,
+  excludedProjects: readonly string[] = []
+): Promise<string | undefined> {
   const fileStream = createArchiveReadStream(filePath);
   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
-  let scanned = 0;
+  let firstProject: string | undefined;
   try {
     for await (const line of rl) {
       if (!line.trim()) continue;
@@ -532,15 +564,20 @@ export async function sniffCodexProject(filePath: string): Promise<string | unde
       }
       const cwd = parsed?.payload?.cwd;
       if (typeof cwd === 'string' && cwd) {
-        return projectFromCwd(cwd);
+        // Exclude by the canonical encoded cwd (same form as the projects
+        // dir-name used across agents), never by basename.
+        const encoded = encodeProjectPath(cwd);
+        if (excludedProjects.includes(encoded)) {
+          return encoded;
+        }
+        if (firstProject === undefined) firstProject = projectFromCwd(cwd);
       }
-      if (++scanned >= 40) break;
     }
   } finally {
     rl.close();
     (fileStream as NodeJS.ReadableStream & { destroy?: () => void }).destroy?.();
   }
-  return undefined;
+  return firstProject;
 }
 
 /**
