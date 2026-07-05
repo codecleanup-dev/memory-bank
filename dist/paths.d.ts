@@ -32,6 +32,7 @@ export declare function getExcludeConfigPath(): string;
 export interface AgentSource {
     name: string;
     sourceDir: string;
+    recursive?: boolean;
 }
 /**
  * Get the list of coding agent sources to sync from.
@@ -46,6 +47,13 @@ export declare function getAgentSources(): AgentSource[];
  * Returns the agent name if the path matches a known source, 'claude-code' otherwise.
  */
 export declare function detectCodingAgent(sourcePath: string): string;
+/**
+ * Recursively find all .jsonl files under a directory, returning paths relative
+ * to it. Handles both flat Claude project dirs (`<project>/<file>.jsonl`) and
+ * nested Codex session dirs (`YYYY/MM/DD/rollout-*.jsonl`). Ported from
+ * episodic-memory 1.4.2.
+ */
+export declare function findJsonlFiles(dir: string): string[];
 /**
  * Get list of projects to exclude from indexing
  * Configurable via env var or config file

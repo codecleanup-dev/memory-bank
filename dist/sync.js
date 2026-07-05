@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { SUMMARIZER_CONTEXT_MARKER } from './constants.js';
-import { getExcludedProjects, detectCodingAgent } from './paths.js';
+import { getExcludedProjects, detectCodingAgent, findJsonlFiles } from './paths.js';
+import { sniffCodexProject, encodeProjectPath } from './parser.js';
 import { archiveFileExists, readArchiveFile, statArchiveFile } from './archive-io.js';
 const EXCLUSION_MARKERS = [
     '<INSTRUCTIONS-TO-EPISODIC-MEMORY>DO NOT INDEX THIS CHAT</INSTRUCTIONS-TO-EPISODIC-MEMORY>',
@@ -75,48 +76,78 @@ export async function syncConversations(sourceDir, destDir, options = {}) {
     // Collect files to index and summarize
     const filesToIndex = [];
     const filesToSummarize = [];
-    // Walk source directory
-    const projects = fs.readdirSync(sourceDir);
+    // Discover source files as paths relative to sourceDir. Claude keeps a flat
+    // <project>/<file>.jsonl layout, so it uses the original one-level walk (and
+    // must NOT newly index nested sidechains or stray root-level files). Codex
+    // nests under YYYY/MM/DD, so codex sources opt into recursive discovery.
     const excludedProjects = getExcludedProjects();
-    for (const project of projects) {
-        if (excludedProjects.includes(project)) {
-            console.error("\nSkipping excluded project: " + project);
-            continue;
-        }
-        const projectPath = path.join(sourceDir, project);
-        const stat = fs.statSync(projectPath);
-        if (!stat.isDirectory())
-            continue;
-        const files = fs.readdirSync(projectPath).filter(f => f.endsWith('.jsonl'));
-        for (const file of files) {
-            const srcFile = path.join(projectPath, file);
-            const destFile = path.join(destDir, project, file);
+    let relFiles;
+    if (options.recursive) {
+        relFiles = findJsonlFiles(sourceDir);
+    }
+    else {
+        relFiles = [];
+        for (const project of fs.readdirSync(sourceDir)) {
+            if (excludedProjects.includes(project)) {
+                console.error('\nSkipping excluded project: ' + project);
+                continue;
+            }
+            const projectPath = path.join(sourceDir, project);
+            let stat;
             try {
-                const wasCopied = copyIfNewer(srcFile, destFile);
-                if (wasCopied) {
-                    result.copied++;
-                    filesToIndex.push(destFile);
+                stat = fs.statSync(projectPath);
+            }
+            catch {
+                continue;
+            }
+            if (!stat.isDirectory())
+                continue;
+            for (const file of fs.readdirSync(projectPath)) {
+                if (file.endsWith('.jsonl'))
+                    relFiles.push(path.join(project, file));
+            }
+        }
+    }
+    for (const relPath of relFiles) {
+        const srcFile = path.join(sourceDir, relPath);
+        const destFile = path.join(destDir, relPath);
+        try {
+            // Recursive (codex) discovery can't exclude by path — the path segment is
+            // a year, not a project. Codex records its project in the rollout's cwd, so
+            // sniff it and honor the exclude list before copying/indexing. (The one-level
+            // Claude walk already filtered excluded projects above.) Kept inside the
+            // per-file try so a sniff stream/I/O error is recorded in result.errors and
+            // skips only this file, matching the Claude path — not the whole run.
+            if (options.recursive) {
+                const proj = await sniffCodexProject(srcFile, excludedProjects);
+                if (proj && excludedProjects.includes(proj)) {
+                    continue;
                 }
-                else {
-                    result.skipped++;
-                }
-                // Check if this file needs a summary (whether newly copied or existing)
-                if (!options.skipSummaries) {
-                    const summaryPath = destFile.replace('.jsonl', '-summary.txt');
-                    if (!archiveFileExists(summaryPath) && !shouldSkipConversation(destFile)) {
-                        const sessionId = extractSessionIdFromPath(destFile);
-                        if (sessionId) {
-                            filesToSummarize.push({ path: destFile, sessionId });
-                        }
+            }
+            const wasCopied = copyIfNewer(srcFile, destFile);
+            if (wasCopied) {
+                result.copied++;
+                filesToIndex.push(destFile);
+            }
+            else {
+                result.skipped++;
+            }
+            // Check if this file needs a summary (whether newly copied or existing)
+            if (!options.skipSummaries) {
+                const summaryPath = destFile.replace('.jsonl', '-summary.txt');
+                if (!archiveFileExists(summaryPath) && !shouldSkipConversation(destFile)) {
+                    const sessionId = extractSessionIdFromPath(destFile);
+                    if (sessionId) {
+                        filesToSummarize.push({ path: destFile, sessionId });
                     }
                 }
             }
-            catch (error) {
-                result.errors.push({
-                    file: srcFile,
-                    error: error instanceof Error ? error.message : String(error)
-                });
-            }
+        }
+        catch (error) {
+            result.errors.push({
+                file: srcFile,
+                error: error instanceof Error ? error.message : String(error)
+            });
         }
     }
     // Index copied files (unless skipIndex is set)
@@ -135,6 +166,18 @@ export async function syncConversations(sourceDir, destDir, options = {}) {
                 const project = path.basename(path.dirname(file));
                 const exchanges = await parseConversation(file, project, file);
                 for (const exchange of exchanges) {
+                    // Definitive exclude-list guard. Codex derives its project from the
+                    // rollout's cwd (set by the parser), which the path-based filters
+                    // above cannot see; enforce exclusion here and catch any mid-session
+                    // cwd switch to an excluded project. Codex matches on the canonical
+                    // encoded cwd (same key form as the non-codex projects dir-name);
+                    // the non-codex path keeps its already-encoded project name. No
+                    // basename matching — it would collide across unrelated paths.
+                    const exKey = (codingAgent === 'codex' && exchange.cwd)
+                        ? encodeProjectPath(exchange.cwd)
+                        : exchange.project;
+                    if (excludedProjects.includes(exKey))
+                        continue;
                     // Tag each exchange with the coding agent
                     exchange.codingAgent = codingAgent;
                     const toolNames = exchange.toolCalls?.map(tc => tc.toolName);

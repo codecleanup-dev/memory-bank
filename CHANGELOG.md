@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-07-05
+
+### Changed
+- **Ontology backfill batching**: `backfill-ontology-worker` now classifies facts in
+  batches (default 20 per LLM call, `BACKFILL_BATCH_SIZE` env, ceiling 50) — one
+  headless Agent SDK spawn per batch instead of per fact. Measured on live data:
+  40 facts in 19s vs ~8min with per-fact calls (~25× wall-clock, 20× fewer spawns).
+- **Headless LLM spawn isolation** (`llm.ts`): Agent SDK sessions now run with
+  `maxTurns: 1`, `settingSources: []`, and a dedicated tmp `cwd` — worker LLM calls
+  no longer fire user SessionStart/End hooks (which re-spawned sync/backfill workers
+  per call) and no longer drop transcripts into user project dirs (where
+  `claude --resume` could pick up a worker session).
+- **Backfill relation detection defaults OFF** (`BACKFILL_RELATIONS=1` to opt in):
+  each relation probe costs an extra LLM call; insert-time detection is unchanged.
+
+### Added
+- **Ontology attempt ledger** (`facts.ontology_attempts` / `ontology_last_attempt_at`,
+  idempotent migration): failed classifications are counted per fact; after
+  3 attempts the fact is parked in General/Misc and permanently leaves the backfill
+  queue (it stays fully searchable — ontology is an overlay). Ends the
+  re-select-and-re-bill-forever loop for permanently failing facts.
+- `scripts/measure-det-gate.mjs` — live-data measurement harness for the
+  deterministic category-reuse gate. The gate ships DISABLED by default
+  (opt-in via `MEMORY_BANK_ONTOLOGY_DET_GATE`): measured top-1 agreement with LLM
+  assignments was only 72% at sim≥0.93 (n=800 sample) — insufficient for auto-assign.
+
+### Fixed
+- **Fallback classification was never persisted**: on unparseable LLM output the
+  classifier built General/Misc but returned without writing the fact's
+  `ontology_category_id`, leaving it NULL — re-selected (and re-billed) by every
+  backfill run. Classification failure now raises, feeds the attempt ledger, and
+  the fallback is actually persisted at the attempt cap.
+- **Honest failure counts** in the backfill log: errors were swallowed inside
+  `classifyAndLinkFact`, so the log always reported `failed 0`. The batch pipeline
+  reports llm/deterministic/fallback/failed separately.
+
+## [1.2.2] - 2026-07-04
+
+### Documentation
+- **README**: "What's New" refreshed for v1.2.x, new **Context Injection** section
+  (per-prompt injection pipeline, baseline-margin relevance gate, 1-hop ontology
+  expansion, observability log locations, troubleshooting), Context Injection
+  added to the feature list and data-flow diagram.
+
+## [1.2.1] - 2026-07-04
+
+### Added
+- **Injection observability (fail-loud)**: the UserPromptSubmit context-injection
+  pipeline now records every run as a JSONL entry
+  (`<config>/conversation-index/logs/inject-context.jsonl` — status
+  injected/no-match/skipped/error, candidate/injected counts, duration), and the
+  hook wrapper routes node-level crash output to `logs/inject-context.err.log`
+  instead of discarding it. A silently broken install (stale plugin, missing
+  `node_modules`) is now measurable instead of invisible — the previous
+  silent-failure mode went unnoticed for months.
+
+### Fixed
+- Injection error paths now log the failure reason (truncated to 300 chars)
+  alongside the existing stderr message.
+
 ## [1.2.0] - 2026-07-03
 
 ### Added

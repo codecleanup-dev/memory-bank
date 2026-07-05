@@ -1,6 +1,6 @@
 {
   "name": "memory-bank",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Semantic search for Claude Code conversations. Remember past discussions, decisions, and patterns.",
   "author": {
     "name": "Jung-Wan Kim"
@@ -8,13 +8,23 @@
   "homepage": "https://github.com/jung-wan-kim/memory-bank",
   "repository": "https://github.com/jung-wan-kim/memory-bank",
   "license": "MIT",
-  "keywords": ["memory", "search", "conversations", "semantic-search", "memory-bank"],
-  "agents": ["./agents/search-conversations.md"],
+  "keywords": [
+    "memory",
+    "search",
+    "conversations",
+    "semantic-search",
+    "memory-bank"
+  ],
+  "agents": [
+    "./agents/search-conversations.md"
+  ],
   "commands": "./commands/",
   "mcpServers": {
     "memory-bank": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/cli/mcp-server-wrapper.js"],
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/cli/mcp-server-wrapper.js"
+      ],
       "env": {}
     }
   }

@@ -1,8 +1,28 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+
+// Isolated working directory for headless Agent SDK sessions. The CLI that
+// query() spawns persists a transcript under ~/.claude/projects/<cwd-slug>/;
+// running it from the caller's cwd drops worker transcripts into that
+// project's dir, where a user `claude --resume` can pick one up as their own
+// session (observed 2026-07-05). A dedicated cwd keeps them in their own slug.
+const LLM_WORKDIR = path.join(os.tmpdir(), 'memory-bank-llm');
+function llmWorkdir(): string {
+  try {
+    fs.mkdirSync(LLM_WORKDIR, { recursive: true });
+  } catch {
+    /* fall through — SDK will spawn in process cwd */
+  }
+  return LLM_WORKDIR;
+}
 
 /**
- * Call Haiku via Claude Agent SDK (no API key needed inside Claude Code).
- * Falls back to direct Anthropic SDK if ANTHROPIC_API_KEY is set (for standalone use).
+ * Call Haiku via Claude Agent SDK (no API key needed inside Claude Code —
+ * billed to the local subscription, NOT a metered API key).
+ * Falls back to direct Anthropic SDK only if ANTHROPIC_API_KEY is set
+ * (standalone use outside Claude Code).
  */
 export async function callHaiku(
   systemPrompt: string,
@@ -19,6 +39,13 @@ export async function callHaiku(
         model,
         max_tokens: maxTokens,
         systemPrompt,
+        // One-shot classification calls: no tools/turn loops needed, and the
+        // spawned session must NOT load user settings/plugins — otherwise its
+        // own SessionStart/End hooks re-spawn sync/backfill workers and every
+        // LLM call cascades into more sessions (observed as a proxy flood).
+        maxTurns: 1,
+        settingSources: [],
+        cwd: llmWorkdir(),
       } as any,
     })) {
       if (message && typeof message === 'object' && 'type' in message && (message as any).type === 'result') {

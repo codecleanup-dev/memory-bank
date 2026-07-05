@@ -55,9 +55,19 @@ if [[ ! -f "$INJECT_SCRIPT" ]]; then
   exit 0
 fi
 
+# Error log: node-level crashes (missing node_modules, import failures) must be
+# visible somewhere — discarding stderr let a broken install go unnoticed for months.
+LOG_DIR="${MEMORY_BANK_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/superpowers}/conversation-index/logs"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+ERR_LOG="$LOG_DIR/inject-context.err.log"
+# Keep the error log bounded (~1MB): truncate before append when oversized.
+if [[ -f "$ERR_LOG" ]] && [[ $(wc -c < "$ERR_LOG" 2>/dev/null || echo 0) -gt 1048576 ]]; then
+  : > "$ERR_LOG"
+fi
+
 # Run the Node.js injection script
 # It reads USER_PROMPT from env, writes context to stdout
-CONTEXT=$(CWD="$CWD" USER_PROMPT="$USER_PROMPT" node "$INJECT_SCRIPT" 2>/dev/null || true)
+CONTEXT=$(CWD="$CWD" USER_PROMPT="$USER_PROMPT" node "$INJECT_SCRIPT" 2>>"$ERR_LOG" || true)
 
 if [[ -n "$CONTEXT" ]]; then
   # Output the context block; Claude Code will prepend it to the user prompt

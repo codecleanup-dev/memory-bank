@@ -380,6 +380,18 @@ export function initDatabase(): Database.Database {
   if (!factColumnNames.has('embedding_version')) {
     db.prepare('ALTER TABLE facts ADD COLUMN embedding_version INTEGER NOT NULL DEFAULT 1').run();
   }
+  // Ontology classification attempt ledger: without it, a fact whose
+  // classification permanently fails (unparseable LLM output, oversized
+  // content) stays NULL forever and is re-selected by every backfill run —
+  // one wasted LLM call per run per stuck fact. After MAX attempts the
+  // classifier persists the General/Misc fallback so the fact leaves the
+  // queue for good (it stays fully searchable — ontology is an overlay).
+  if (!factColumnNames.has('ontology_attempts')) {
+    db.prepare('ALTER TABLE facts ADD COLUMN ontology_attempts INTEGER NOT NULL DEFAULT 0').run();
+  }
+  if (!factColumnNames.has('ontology_last_attempt_at')) {
+    db.prepare('ALTER TABLE facts ADD COLUMN ontology_last_attempt_at TEXT').run();
+  }
   const exchangeColumns = db.prepare(
     `SELECT name FROM pragma_table_info('exchanges')`
   ).all() as Array<{ name: string }>;

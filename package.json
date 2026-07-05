@@ -1,6 +1,9 @@
 {
   "name": "memory-bank",
-  "version": "1.3.0",
+  "version": "1.4.0",
+  "engines": {
+    "node": ">=22.15"
+  },
   "description": "Semantic search for Claude Code conversations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
