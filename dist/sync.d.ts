@@ -13,5 +13,6 @@ export interface SyncOptions {
     skipSummaries?: boolean;
     summaryLimit?: number;
     codingAgent?: string;
+    recursive?: boolean;
 }
 export declare function syncConversations(sourceDir: string, destDir: string, options?: SyncOptions): Promise<SyncResult>;

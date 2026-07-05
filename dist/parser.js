@@ -1,7 +1,16 @@
 import readline from 'readline';
+import path from 'path';
 import crypto from 'crypto';
 import { createArchiveReadStream } from './archive-io.js';
+// Router: detect harness (Claude vs Codex) then dispatch to the right parser.
 export async function parseConversation(filePath, projectName, archivePath) {
+    const harness = await detectConversationHarness(filePath);
+    if (harness === 'codex') {
+        return parseCodexConversation(filePath, projectName, archivePath);
+    }
+    return parseClaudeConversation(filePath, projectName, archivePath);
+}
+async function parseClaudeConversation(filePath, projectName, archivePath) {
     const exchanges = [];
     const fileStream = createArchiveReadStream(filePath);
     const rl = readline.createInterface({
@@ -153,6 +162,322 @@ export async function parseConversation(filePath, projectName, archivePath) {
     // Finalize last exchange
     finalizeExchange();
     return exchanges;
+}
+const CODEX_LINE_TYPES = new Set([
+    'session_meta', 'turn_context', 'response_item', 'event_msg', 'compacted',
+]);
+async function detectConversationHarness(filePath) {
+    const fileStream = createArchiveReadStream(filePath);
+    const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+    // Scan a bounded window of lines rather than deciding on the first one: a
+    // single leading line that matches neither shape (format drift, blank-ish
+    // preamble) must not misclassify and silently drop the whole session.
+    let scanned = 0;
+    try {
+        for await (const line of rl) {
+            if (!line.trim())
+                continue;
+            let parsed;
+            try {
+                parsed = JSON.parse(line);
+            }
+            catch {
+                continue;
+            }
+            // Codex rollout lines carry a payload and a codex-specific type.
+            if (parsed && parsed.payload && CODEX_LINE_TYPES.has(parsed.type)) {
+                return 'codex';
+            }
+            // Claude transcript lines are type 'user'/'assistant' with a message.
+            if (parsed && (parsed.type === 'user' || parsed.type === 'assistant') && parsed.message) {
+                return 'claude';
+            }
+            // Neither shape yet — keep scanning up to a bounded number of lines.
+            if (++scanned >= 40)
+                break;
+        }
+    }
+    finally {
+        // Detection returns early after the first non-empty line, so the readline
+        // interface never drains the stream. rl.close() alone leaves the underlying
+        // file descriptor open — destroy the stream too, or a large backfill
+        // (hundreds of codex sessions) exhausts the FD ulimit and crashes (EMFILE).
+        rl.close();
+        fileStream.destroy?.();
+    }
+    return 'claude';
+}
+function extractTextFromContent(content) {
+    if (typeof content === 'string') {
+        return content;
+    }
+    if (!Array.isArray(content)) {
+        return '';
+    }
+    return content
+        .filter(block => block && typeof block === 'object' && typeof block.text === 'string')
+        .map(block => block.text)
+        .join('\n');
+}
+function safeParseJson(value) {
+    try {
+        return JSON.parse(value);
+    }
+    catch {
+        return value;
+    }
+}
+function stringifyToolOutput(output) {
+    if (output === undefined || output === null) {
+        return undefined;
+    }
+    if (typeof output === 'string') {
+        return output;
+    }
+    const text = extractTextFromContent(output);
+    if (text.trim()) {
+        return text;
+    }
+    return JSON.stringify(output);
+}
+function projectFromCwd(cwd) {
+    if (!cwd) {
+        return undefined;
+    }
+    const project = path.basename(cwd);
+    return project || undefined;
+}
+/**
+ * Encode an absolute path to the canonical project key used across the index —
+ * the same transform the non-codex projects directory uses: every
+ * non-alphanumeric character (including '/' and '.') becomes '-'. So
+ * /Users/me/my.project → -Users-me-my-project, matching the projects dir-name
+ * form. Codex records only a cwd; this maps it to the shared key so a single
+ * exclude entry (in that canonical form) applies across agents. Basename is
+ * deliberately NOT used as a key — it collides across unrelated paths.
+ *
+ * Trailing slashes are stripped so /x/secret and /x/secret/ yield one key.
+ * Matching is otherwise on the recorded path string: NO symlink/realpath
+ * resolution and NO case folding — on purpose. The non-codex projects key
+ * encodes the literal project path the same way; resolving symlinks or folding
+ * case here would DIVERGE from that key and break cross-agent exclusion, so an
+ * exclude entry must use the same canonical path the agent records.
+ */
+export function encodeProjectPath(absPath) {
+    const trimmed = absPath.replace(/\/+$/, '') || absPath;
+    return trimmed.replace(/[^a-zA-Z0-9]/g, '-');
+}
+async function parseCodexConversation(filePath, projectName, archivePath) {
+    const exchanges = [];
+    const fileStream = createArchiveReadStream(filePath);
+    const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+    let lineNumber = 0;
+    let sessionId;
+    let cwd;
+    let gitBranch;
+    let currentExchange = null;
+    const toolCallsByCallId = new Map();
+    const currentProject = () => projectFromCwd(cwd) || projectName;
+    const applyMetadataToCurrentExchange = () => {
+        if (!currentExchange)
+            return;
+        currentExchange.project = currentProject();
+        currentExchange.sessionId = sessionId;
+        currentExchange.cwd = cwd;
+        currentExchange.gitBranch = gitBranch;
+    };
+    const finalizeExchange = () => {
+        if (currentExchange && currentExchange.assistantMessages.length > 0) {
+            applyMetadataToCurrentExchange();
+            const exchangeId = crypto
+                .createHash('md5')
+                .update(`${archivePath}:${currentExchange.userLine}-${currentExchange.lastAssistantLine}`)
+                .digest('hex');
+            const toolCalls = currentExchange.toolCalls.map(tc => ({ ...tc, exchangeId }));
+            exchanges.push({
+                id: exchangeId,
+                project: currentExchange.project,
+                timestamp: currentExchange.timestamp,
+                userMessage: currentExchange.userMessage,
+                assistantMessage: currentExchange.assistantMessages.join('\n\n'),
+                archivePath,
+                lineStart: currentExchange.userLine,
+                lineEnd: currentExchange.lastAssistantLine,
+                sessionId: currentExchange.sessionId,
+                cwd: currentExchange.cwd,
+                gitBranch: currentExchange.gitBranch,
+                codingAgent: 'codex',
+                toolCalls: toolCalls.length > 0 ? toolCalls : undefined
+            });
+        }
+        currentExchange = null;
+        toolCallsByCallId.clear();
+    };
+    const startExchange = (text, timestamp) => {
+        finalizeExchange();
+        currentExchange = {
+            project: currentProject(),
+            userMessage: text,
+            userLine: lineNumber,
+            assistantMessages: [],
+            lastAssistantLine: lineNumber,
+            timestamp,
+            sessionId,
+            cwd,
+            gitBranch,
+            toolCalls: []
+        };
+    };
+    const appendToolCall = (payload, timestamp) => {
+        if (!currentExchange)
+            return;
+        const callId = payload.call_id || crypto.randomUUID();
+        let toolInput = payload.arguments;
+        if (typeof toolInput === 'string') {
+            toolInput = safeParseJson(toolInput);
+        }
+        else if (payload.input !== undefined) {
+            toolInput = payload.input;
+        }
+        else if (payload.action !== undefined) {
+            toolInput = payload.action;
+        }
+        const toolCall = {
+            id: callId,
+            exchangeId: '',
+            toolName: payload.name || payload.namespace || payload.type || 'unknown',
+            toolInput,
+            isError: false,
+            timestamp
+        };
+        currentExchange.toolCalls.push(toolCall);
+        toolCallsByCallId.set(callId, toolCall);
+        currentExchange.lastAssistantLine = lineNumber;
+    };
+    const appendToolResult = (payload) => {
+        const callId = payload.call_id;
+        if (!callId)
+            return;
+        const toolCall = toolCallsByCallId.get(callId);
+        if (!toolCall)
+            return;
+        const output = stringifyToolOutput(payload.output);
+        if (output !== undefined) {
+            toolCall.toolResult = output;
+        }
+        if (currentExchange) {
+            currentExchange.lastAssistantLine = lineNumber;
+        }
+    };
+    for await (const line of rl) {
+        lineNumber++;
+        if (!line.trim())
+            continue;
+        try {
+            const parsed = JSON.parse(line);
+            const payload = parsed.payload;
+            const timestamp = parsed.timestamp || new Date().toISOString();
+            if (parsed.type === 'session_meta' && payload) {
+                sessionId = payload.id || sessionId;
+                cwd = payload.cwd || cwd;
+                gitBranch = payload.git?.branch || gitBranch;
+                applyMetadataToCurrentExchange();
+                continue;
+            }
+            if (parsed.type === 'turn_context' && payload) {
+                cwd = payload.cwd || cwd;
+                applyMetadataToCurrentExchange();
+                continue;
+            }
+            if (parsed.type !== 'response_item' || !payload) {
+                continue;
+            }
+            if (payload.type === 'message') {
+                const text = extractTextFromContent(payload.content);
+                if (!text.trim())
+                    continue;
+                if (payload.role === 'user') {
+                    startExchange(text, timestamp);
+                }
+                else if (payload.role === 'assistant') {
+                    // Assertion mirrors episodic-memory: closures above defeat TS's
+                    // control-flow narrowing, leaving currentExchange typed as never.
+                    const exchange = currentExchange;
+                    if (exchange) {
+                        exchange.assistantMessages.push(text);
+                        exchange.lastAssistantLine = lineNumber;
+                        exchange.timestamp = timestamp;
+                    }
+                }
+            }
+            else if (payload.type === 'function_call' ||
+                payload.type === 'custom_tool_call' ||
+                payload.type === 'tool_search_call' ||
+                payload.type === 'local_shell_call') {
+                appendToolCall(payload, timestamp);
+            }
+            else if (payload.type === 'function_call_output' ||
+                payload.type === 'custom_tool_call_output' ||
+                payload.type === 'tool_search_output' ||
+                payload.type === 'local_shell_call_output') {
+                appendToolResult(payload);
+            }
+        }
+        catch {
+            continue;
+        }
+    }
+    finalizeExchange();
+    return exchanges;
+}
+/**
+ * Determine a Codex rollout's project from its recorded cwd. Needed because
+ * Codex files live under YYYY/MM/DD (the path carries no project name) — the
+ * real project comes from session_meta/turn_context cwd.
+ *
+ * Privacy-critical: scans the ENTIRE file, not a leading window. A rollout can
+ * run in an allowed project for many lines and then `cd` into an excluded one;
+ * a bounded window would miss that and let copyIfNewer write the raw transcript
+ * (post-cd secret content included) into the archive, where it stays reachable
+ * via the `read` tool even though the index-time guard hides the exchanges. So:
+ * if ANY cwd anywhere resolves to an excluded project, return it immediately
+ * (early-out — excluded files stay cheap) so the caller skips the whole file:
+ * archive copy, summary, and index. Files with no excluded cwd are read fully
+ * to confirm that; the first cwd's project is the fallback, undefined if none.
+ */
+export async function sniffCodexProject(filePath, excludedProjects = []) {
+    const fileStream = createArchiveReadStream(filePath);
+    const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+    let firstProject;
+    try {
+        for await (const line of rl) {
+            if (!line.trim())
+                continue;
+            let parsed;
+            try {
+                parsed = JSON.parse(line);
+            }
+            catch {
+                continue;
+            }
+            const cwd = parsed?.payload?.cwd;
+            if (typeof cwd === 'string' && cwd) {
+                // Exclude by the canonical encoded cwd (same form as the projects
+                // dir-name used across agents), never by basename.
+                const encoded = encodeProjectPath(cwd);
+                if (excludedProjects.includes(encoded)) {
+                    return encoded;
+                }
+                if (firstProject === undefined)
+                    firstProject = projectFromCwd(cwd);
+            }
+        }
+    }
+    finally {
+        rl.close();
+        fileStream.destroy?.();
+    }
+    return firstProject;
 }
 /**
  * Convenience function to parse a conversation file
