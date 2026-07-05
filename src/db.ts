@@ -410,6 +410,26 @@ export function initDatabase(): Database.Database {
     )
   `);
 
+  // Relation dedup + cross-process uniqueness (idempotent migration) — on
+  // the TRIPLE (source, type, target), never the pair: distinct relation
+  // TYPES between the same facts (a SUPPORTS b + a CONTRADICTS b) are valid,
+  // user-visible graph data and must not be collapsed. Only EXACT duplicate
+  // triples (same type re-written by pre-idempotency retries) are removed,
+  // keeping the earliest row. A short-lived 2026-07-05 build shipped a
+  // pair-level index by mistake — drop it so the triple index governs.
+  db.exec(`DROP INDEX IF EXISTS idx_ontology_relations_pair`);
+  db.exec(`
+    DELETE FROM ontology_relations
+    WHERE rowid NOT IN (
+      SELECT MIN(rowid) FROM ontology_relations
+      GROUP BY source_fact_id, relation_type, target_fact_id
+    )
+  `);
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ontology_relations_triple
+    ON ontology_relations(source_fact_id, relation_type, target_fact_id)
+  `);
+
   db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_source ON ontology_relations(source_fact_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_target ON ontology_relations(target_fact_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_ontology ON facts(ontology_category_id)`);

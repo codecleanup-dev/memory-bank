@@ -193,12 +193,44 @@ export function createRelation(
   targetFactId: string,
   reasoning?: string,
 ): OntologyRelation {
+  // Idempotent on the TRIPLE (source, type, target) — matching the UNIQUE
+  // index. Retries (classification re-runs under a held-back
+  // IndexRepairError, backfill re-selection) must not stack duplicate rows
+  // of the SAME type; distinct relation TYPES between the same facts remain
+  // valid, user-visible graph data (a SUPPORTS b + a CONTRADICTS b) and are
+  // deliberately NOT collapsed — an LLM type-flap across retries therefore
+  // adds at most one row per type (bounded by the 4-type enum).
+  const existing = db
+    .prepare(
+      `SELECT * FROM ontology_relations
+       WHERE source_fact_id = ? AND relation_type = ? AND target_fact_id = ?`,
+    )
+    .get(sourceFactId, relationType, targetFactId) as OntologyRelation | undefined;
+  if (existing) return existing;
+
   const id = randomUUID();
   const now = new Date().toISOString();
-  db.prepare(
-    `INSERT INTO ontology_relations (id, source_fact_id, relation_type, target_fact_id, reasoning, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(id, sourceFactId, relationType, targetFactId, reasoning ?? null, now);
+  try {
+    db.prepare(
+      `INSERT INTO ontology_relations (id, source_fact_id, relation_type, target_fact_id, reasoning, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(id, sourceFactId, relationType, targetFactId, reasoning ?? null, now);
+  } catch (error) {
+    // Recover ONLY from the expected unique-constraint race (another process
+    // inserted the same triple between our check and insert) — any other
+    // failure (schema, CHECK violation, corruption) must surface, not be
+    // laundered into a fake winner lookup.
+    const code = (error as { code?: string }).code ?? '';
+    if (!code.startsWith('SQLITE_CONSTRAINT')) throw error;
+    const winner = db
+      .prepare(
+        `SELECT * FROM ontology_relations
+         WHERE source_fact_id = ? AND relation_type = ? AND target_fact_id = ?`,
+      )
+      .get(sourceFactId, relationType, targetFactId) as OntologyRelation | undefined;
+    if (winner) return winner;
+    throw error;
+  }
   return {
     id,
     source_fact_id: sourceFactId,
@@ -245,37 +277,64 @@ export function getRelatedFacts(
     const nextFrontier: string[] = [];
 
     for (const currentId of frontier) {
-      // Outgoing relations (source → target)
+      // Outgoing relations (source → target).
+      // Multiple relation TYPES may connect the same pair; the visited-set is
+      // keyed by fact id, so exactly ONE edge per neighbour is surfaced. The
+      // ORDER BY makes that choice DETERMINISTIC and belief-safety-first:
+      // CONTRADICTS/SUPERSEDES must never be silently hidden behind an
+      // affirmative SUPPORTS/INFLUENCES row that happened to come first.
       const outgoing = db
         .prepare(
           `SELECT r.*, f.*,
                   r.id as rel_id, r.created_at as rel_created_at
            FROM ontology_relations r
            JOIN facts f ON r.target_fact_id = f.id
-           WHERE r.source_fact_id = ? AND f.is_active = 1`,
+           WHERE r.source_fact_id = ? AND f.is_active = 1
+           ORDER BY CASE r.relation_type
+             WHEN 'CONTRADICTS' THEN 0 WHEN 'SUPERSEDES' THEN 1
+             WHEN 'SUPPORTS' THEN 2 ELSE 3 END, r.created_at`,
         )
         .all(currentId) as Array<Record<string, unknown>>;
 
+      // Group candidate edges per neighbour (rows arrive in belief-safety
+      // order): the surfaced edge is the FIRST one whose relevance clears
+      // minRelevance — a safety edge that fails the floor must not consume
+      // the neighbour's single slot and hide a qualifying affirmative edge.
+      const outByNeighbour = new Map<string, Array<Record<string, unknown>>>();
       for (const row of outgoing) {
         const targetId = row['target_fact_id'] as string;
         if (visited.has(targetId)) continue;
-
-        const relation = rowToRelation(row);
-        const fact = rowToFact(row);
+        const rows = outByNeighbour.get(targetId);
+        if (rows) rows.push(row);
+        else outByNeighbour.set(targetId, [row]);
+      }
+      for (const [targetId, rows] of outByNeighbour) {
+        const fact = rowToFact(rows[0]);
 
         // Scope filter: skip facts from other projects (unless scopeProject is null)
         if (scopeProject && fact.scope_type === 'project' && fact.scope_project !== scopeProject) continue;
 
+        // Select the surfaced edge FIRST: a neighbour with no qualifying
+        // edge is PRUNED — it must not enter the frontier, or traversal
+        // would leak paths through edges the relevance floor rejected
+        // ("Facts below minRelevance are pruned" is a path contract, not
+        // just a display filter).
+        let chosen: { relation: OntologyRelation; relevance: number } | null = null;
+        for (const row of rows) {
+          const relation = rowToRelation(row);
+          // Relation type weight: SUPPORTS/INFLUENCES stronger than CONTRADICTS/SUPERSEDES
+          const typeWeight = (relation.relation_type === 'SUPPORTS' || relation.relation_type === 'INFLUENCES') ? 1.0 : 0.7;
+          const relevance = hopRelevance * typeWeight;
+          if (relevance >= minRelevance) {
+            chosen = { relation, relevance };
+            break;
+          }
+        }
+        if (!chosen) continue;
+
         visited.add(targetId);
         nextFrontier.push(targetId);
-
-        // Relation type weight: SUPPORTS/INFLUENCES stronger than CONTRADICTS/SUPERSEDES
-        const typeWeight = (relation.relation_type === 'SUPPORTS' || relation.relation_type === 'INFLUENCES') ? 1.0 : 0.7;
-        const relevance = hopRelevance * typeWeight;
-
-        if (relevance >= minRelevance) {
-          results.push({ fact, relation, relevance, hop: hop + 1 });
-        }
+        results.push({ fact, relation: chosen.relation, relevance: chosen.relevance, hop: hop + 1 });
       }
 
       // Incoming relations (target ← source)
@@ -285,29 +344,45 @@ export function getRelatedFacts(
                   r.id as rel_id, r.created_at as rel_created_at
            FROM ontology_relations r
            JOIN facts f ON r.source_fact_id = f.id
-           WHERE r.target_fact_id = ? AND f.is_active = 1`,
+           WHERE r.target_fact_id = ? AND f.is_active = 1
+           ORDER BY CASE r.relation_type
+             WHEN 'CONTRADICTS' THEN 0 WHEN 'SUPERSEDES' THEN 1
+             WHEN 'SUPPORTS' THEN 2 ELSE 3 END, r.created_at`,
         )
         .all(currentId) as Array<Record<string, unknown>>;
 
+      // Same per-neighbour grouping as the outgoing side (see comment above).
+      const inByNeighbour = new Map<string, Array<Record<string, unknown>>>();
       for (const row of incoming) {
         const sourceId = row['source_fact_id'] as string;
         if (visited.has(sourceId)) continue;
-
-        const relation = rowToRelation(row);
-        const fact = rowToFact(row);
+        const rows = inByNeighbour.get(sourceId);
+        if (rows) rows.push(row);
+        else inByNeighbour.set(sourceId, [row]);
+      }
+      for (const [sourceId, rows] of inByNeighbour) {
+        const fact = rowToFact(rows[0]);
 
         // Scope filter: skip facts from other projects
         if (scopeProject && fact.scope_type === 'project' && fact.scope_project !== scopeProject) continue;
 
+        // Same pruning contract as the outgoing side: no qualifying edge →
+        // no frontier entry, no path leak.
+        let chosen: { relation: OntologyRelation; relevance: number } | null = null;
+        for (const row of rows) {
+          const relation = rowToRelation(row);
+          const typeWeight = (relation.relation_type === 'SUPPORTS' || relation.relation_type === 'INFLUENCES') ? 1.0 : 0.7;
+          const relevance = hopRelevance * typeWeight;
+          if (relevance >= minRelevance) {
+            chosen = { relation, relevance };
+            break;
+          }
+        }
+        if (!chosen) continue;
+
         visited.add(sourceId);
         nextFrontier.push(sourceId);
-
-        const typeWeight = (relation.relation_type === 'SUPPORTS' || relation.relation_type === 'INFLUENCES') ? 1.0 : 0.7;
-        const relevance = hopRelevance * typeWeight;
-
-        if (relevance >= minRelevance) {
-          results.push({ fact, relation, relevance, hop: hop + 1 });
-        }
+        results.push({ fact, relation: chosen.relation, relevance: chosen.relevance, hop: hop + 1 });
       }
     }
 

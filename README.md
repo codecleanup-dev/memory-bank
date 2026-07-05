@@ -4,11 +4,14 @@
 
 ![Memory Bank](docs/memory-bank.gif)
 
-## What's New in v1.2.2
+## What's New in v1.3.0
 
-- 🔎 **Context injection observability (fail-loud, v1.2.1)** — every UserPromptSubmit injection run is recorded to `<config>/conversation-index/logs/inject-context.jsonl` (status, candidate/injected counts, duration), and node-level crash output goes to `logs/inject-context.err.log` instead of being discarded. A silently broken install (stale plugin, missing `node_modules`) is now measurable instead of invisible
-- 📖 **Context Injection documented** — the automatic per-prompt injection pipeline now has its own section below (how it works, relevance gating, how to verify it is alive)
-- Earlier releases: see [CHANGELOG](CHANGELOG.md) — v1.2.0 added the `analyze` command + `analyzing-all-conversations` skill, transparent `.jsonl.zst` archives, FTS5 (BM25) text search, and fact-extraction quality/cost controls
+- ⚡ **Ontology backfill batching (20 facts per LLM call)** — the backfill worker used to spawn one headless Claude session *per fact* (~10–14s each, plus auxiliary calls and hook cascades). It now classifies in batches: measured 40 facts in 19s vs ~8min before (~25× wall-clock, 20× fewer spawns). Relation detection during backfill is off by default (`BACKFILL_RELATIONS=1` to opt in)
+- 🔇 **Headless LLM spawn isolation** — worker LLM calls run with `maxTurns: 1`, `settingSources: []`, and a dedicated tmp cwd, so they no longer fire your SessionStart/End hooks (which used to re-spawn sync/backfill workers on every call) and no longer drop transcripts into your project dirs where `claude --resume` could pick one up
+- 📒 **Classification attempt ledger** — failures are counted per fact (`ontology_attempts`); after 3 content failures the fact is parked in General/Misc and permanently leaves the backfill queue (it stays fully searchable — ontology is an overlay). Fixes the old bug where unparseable LLM output left facts NULL and re-selected (re-billed) forever. Failure taxonomy is typed: transient (runtime down — no attempt burned), content (the fact's own text — ledgered), index-repair-failed (surfaces loudly, never parks innocent facts)
+- 🛠️ **Category vec-index self-heal** — exact id set-diff reconciliation (add missing + purge stale rows, bounded per call) with candidate-starvation refusal: classification never runs blind against an incomplete index, so duplicate-taxonomy sprawl can't silently regrow. Relation edges are idempotent per (source, type, target) with a DB UNIQUE index; graph traversal deterministically prefers belief-safety edges (CONTRADICTS/SUPERSEDES) without hiding qualifying neighbours or leaking pruned paths
+- 🚱 **Per-run worker caps hardened** — detached backfill workers have finite per-run defaults + absolute ceilings + strict integer env parsing + a transient circuit breaker, so an orphaned worker can never flood the LLM proxy again
+- Earlier releases: see [CHANGELOG](CHANGELOG.md) — v1.2.2 documented Context Injection + fail-loud injection observability; v1.2.0 added the `analyze` command, transparent `.jsonl.zst` archives, and FTS5 (BM25) text search
 
 ## Features
 
@@ -304,6 +307,18 @@ export MEMORY_BANK_MAX_EXTRACT_CALLS=12
 
 # Decompression cap for .zst archives (bytes; lowering only, default 256 MiB)
 export MEMORY_BANK_MAX_DECOMPRESSED_BYTES=268435456
+
+# Ontology backfill worker (per-run caps; absolute ceilings apply regardless)
+export BACKFILL_ONTOLOGY_MAX=200      # facts per run (ceiling 1000; 0 disables)
+export BACKFILL_EXTRACT_MAX=40        # sessions per run (ceiling 200; 0 disables)
+export BACKFILL_BATCH_SIZE=20         # facts per LLM call (ceiling 50)
+export BACKFILL_CONCURRENCY=4         # concurrent batch calls (clamped to [1, 8])
+export BACKFILL_RELATIONS=0           # 1 = also detect relations during backfill
+
+# Deterministic category-reuse gate (DISABLED by default — live measurement
+# showed only 72% top-1 agreement at sim>=0.93; opt in after re-measuring
+# with scripts/measure-det-gate.mjs)
+# export MEMORY_BANK_ONTOLOGY_DET_GATE=0.94
 ```
 
 ## 3D Knowledge Graph

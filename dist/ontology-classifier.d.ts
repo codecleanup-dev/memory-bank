@@ -21,6 +21,16 @@ export declare class FactContentError extends Error {
     constructor(message: string);
 }
 /**
+ * The category vec index is broken in a way self-heal cannot fix (table
+ * unscannable / rejects writes). Neither the fact's fault (no ledger burn —
+ * parking innocents in General/Misc under corruption would be wrong) nor
+ * transient (retry won't fix it): it must surface LOUDLY — worker logs a
+ * batch ERROR and circuit-breaks; manual repair is required.
+ */
+export declare class IndexRepairError extends Error {
+    constructor(message: string);
+}
+/**
  * Record one failed classification attempt; returns the new attempt count.
  * When the count reaches MAX_CLASSIFY_ATTEMPTS the caller should persist the
  * fallback so the fact permanently leaves the backfill queue.

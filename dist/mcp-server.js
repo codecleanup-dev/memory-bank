@@ -23676,6 +23676,18 @@ function initDatabase() {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
+  db.exec(`DROP INDEX IF EXISTS idx_ontology_relations_pair`);
+  db.exec(`
+    DELETE FROM ontology_relations
+    WHERE rowid NOT IN (
+      SELECT MIN(rowid) FROM ontology_relations
+      GROUP BY source_fact_id, relation_type, target_fact_id
+    )
+  `);
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ontology_relations_triple
+    ON ontology_relations(source_fact_id, relation_type, target_fact_id)
+  `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_source ON ontology_relations(source_fact_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_target ON ontology_relations(target_fact_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_ontology ON facts(ontology_category_id)`);
@@ -23809,42 +23821,72 @@ function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance = 0.2, 
                   r.id as rel_id, r.created_at as rel_created_at
            FROM ontology_relations r
            JOIN facts f ON r.target_fact_id = f.id
-           WHERE r.source_fact_id = ? AND f.is_active = 1`
+           WHERE r.source_fact_id = ? AND f.is_active = 1
+           ORDER BY CASE r.relation_type
+             WHEN 'CONTRADICTS' THEN 0 WHEN 'SUPERSEDES' THEN 1
+             WHEN 'SUPPORTS' THEN 2 ELSE 3 END, r.created_at`
       ).all(currentId);
+      const outByNeighbour = /* @__PURE__ */ new Map();
       for (const row of outgoing) {
         const targetId = row["target_fact_id"];
         if (visited.has(targetId)) continue;
-        const relation = rowToRelation(row);
-        const fact = rowToFact2(row);
+        const rows = outByNeighbour.get(targetId);
+        if (rows) rows.push(row);
+        else outByNeighbour.set(targetId, [row]);
+      }
+      for (const [targetId, rows] of outByNeighbour) {
+        const fact = rowToFact2(rows[0]);
         if (scopeProject && fact.scope_type === "project" && fact.scope_project !== scopeProject) continue;
+        let chosen = null;
+        for (const row of rows) {
+          const relation = rowToRelation(row);
+          const typeWeight = relation.relation_type === "SUPPORTS" || relation.relation_type === "INFLUENCES" ? 1 : 0.7;
+          const relevance = hopRelevance * typeWeight;
+          if (relevance >= minRelevance) {
+            chosen = { relation, relevance };
+            break;
+          }
+        }
+        if (!chosen) continue;
         visited.add(targetId);
         nextFrontier.push(targetId);
-        const typeWeight = relation.relation_type === "SUPPORTS" || relation.relation_type === "INFLUENCES" ? 1 : 0.7;
-        const relevance = hopRelevance * typeWeight;
-        if (relevance >= minRelevance) {
-          results.push({ fact, relation, relevance, hop: hop + 1 });
-        }
+        results.push({ fact, relation: chosen.relation, relevance: chosen.relevance, hop: hop + 1 });
       }
       const incoming = db.prepare(
         `SELECT r.*, f.*,
                   r.id as rel_id, r.created_at as rel_created_at
            FROM ontology_relations r
            JOIN facts f ON r.source_fact_id = f.id
-           WHERE r.target_fact_id = ? AND f.is_active = 1`
+           WHERE r.target_fact_id = ? AND f.is_active = 1
+           ORDER BY CASE r.relation_type
+             WHEN 'CONTRADICTS' THEN 0 WHEN 'SUPERSEDES' THEN 1
+             WHEN 'SUPPORTS' THEN 2 ELSE 3 END, r.created_at`
       ).all(currentId);
+      const inByNeighbour = /* @__PURE__ */ new Map();
       for (const row of incoming) {
         const sourceId = row["source_fact_id"];
         if (visited.has(sourceId)) continue;
-        const relation = rowToRelation(row);
-        const fact = rowToFact2(row);
+        const rows = inByNeighbour.get(sourceId);
+        if (rows) rows.push(row);
+        else inByNeighbour.set(sourceId, [row]);
+      }
+      for (const [sourceId, rows] of inByNeighbour) {
+        const fact = rowToFact2(rows[0]);
         if (scopeProject && fact.scope_type === "project" && fact.scope_project !== scopeProject) continue;
+        let chosen = null;
+        for (const row of rows) {
+          const relation = rowToRelation(row);
+          const typeWeight = relation.relation_type === "SUPPORTS" || relation.relation_type === "INFLUENCES" ? 1 : 0.7;
+          const relevance = hopRelevance * typeWeight;
+          if (relevance >= minRelevance) {
+            chosen = { relation, relevance };
+            break;
+          }
+        }
+        if (!chosen) continue;
         visited.add(sourceId);
         nextFrontier.push(sourceId);
-        const typeWeight = relation.relation_type === "SUPPORTS" || relation.relation_type === "INFLUENCES" ? 1 : 0.7;
-        const relevance = hopRelevance * typeWeight;
-        if (relevance >= minRelevance) {
-          results.push({ fact, relation, relevance, hop: hop + 1 });
-        }
+        results.push({ fact, relation: chosen.relation, relevance: chosen.relevance, hop: hop + 1 });
       }
     }
     frontier = nextFrontier;
