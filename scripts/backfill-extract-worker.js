@@ -23,8 +23,29 @@ import { canonicalizeProject } from '../dist/project-canon.js';
 import { getIndexDir } from '../dist/paths.js';
 
 const maxArg = process.argv.indexOf('--max');
-const MAX_SESSIONS = maxArg > -1 ? parseInt(process.argv[maxArg + 1], 10) : Infinity;
-const CONCURRENCY = parseInt(process.env.BACKFILL_CONCURRENCY || '4', 10);
+// Per-run cap (env-overridable). Bounded by DEFAULT — NOT Infinity — so a single
+// run (including a detached run whose session has ended) can never flood the LLM
+// proxy: it processes at most this many sessions, then exits cleanly. The
+// SessionStart hook re-spawns to drain the rest across sessions (resumable via
+// extraction_log). Garbage --max/env values must not silently fall back to
+// unbounded, so validate to a finite non-negative integer.
+// (def, cap): validate to a finite non-negative int, then clamp to an absolute
+// per-run ceiling so NO invocation path — explicit --max, hook-inherited env, or
+// default — can exceed `cap` and flood the proxy.
+function boundedInt(raw, def, cap) {
+  // Strict: only an all-digits string is a valid override; malformed input
+  // ('', '1e9', '200.9', '999abc', undefined) falls back to the default rather
+  // than being partially parsed by parseInt. Then clamp to the absolute ceiling.
+  const s = raw == null ? '' : String(raw);
+  const v = /^\d+$/.test(s) ? parseInt(s, 10) : def;
+  return Math.min(v, cap);
+}
+const MAX_SESSIONS = maxArg > -1
+  ? boundedInt(process.argv[maxArg + 1], 40, 200)
+  : boundedInt(process.env.BACKFILL_EXTRACT_MAX, 40, 200);
+// Strict + clamped to [1, 8]: BACKFILL_CONCURRENCY=0/'abc'/'-1' must not yield
+// zero workers (silent no-op) or overspawn.
+const CONCURRENCY = Math.max(1, boundedInt(process.env.BACKFILL_CONCURRENCY, 4, 8));
 
 // Exclude self-referential repo conversations (memory-bank's own monitoring /
 // cron sessions). These are ~98% 1-exchange noise that the backfill itself
@@ -139,7 +160,7 @@ function pendingSessions(db, limit) {
     HAVING COUNT(*) >= ${MIN_EXCHANGES}
     ORDER BY ts DESC
     LIMIT ?
-  `).all(...exTerms, Number.isFinite(limit) ? limit : 1000000);
+  `).all(...exTerms, limit);
 }
 
 /** Simple concurrency pool — LLM latency dominates, DB writes are sync-safe. */

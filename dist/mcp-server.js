@@ -3225,8 +3225,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path5) {
-      let input = path5;
+    function removeDotSegments(path6) {
+      let input = path6;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3425,8 +3425,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path5, query2] = wsComponent.resourceName.split("?");
-        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
+        const [path6, query2] = wsComponent.resourceName.split("?");
+        wsComponent.path = path6 && path6 !== "/" ? path6 : void 0;
         wsComponent.query = query2;
         wsComponent.resourceName = void 0;
       }
@@ -6788,12 +6788,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs6, exportName) {
+    function addFormats(ajv, list, fs7, exportName) {
       var _a2;
       var _b;
       (_a2 = (_b = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs6[f]);
+        ajv.addFormat(f, fs7[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8280,12 +8280,12 @@ var init_path = __esm({
   "node_modules/@anthropic-ai/sdk/internal/utils/path.mjs"() {
     init_error();
     EMPTY = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.create(null));
-    createPathTagFunction = (pathEncoder = encodeURIPath) => function path5(statics, ...params) {
+    createPathTagFunction = (pathEncoder = encodeURIPath) => function path6(statics, ...params) {
       if (statics.length === 1)
         return statics[0];
       let postPath = false;
       const invalidSegments = [];
-      const path6 = statics.reduce((previousValue, currentValue, index) => {
+      const path7 = statics.reduce((previousValue, currentValue, index) => {
         if (/[?#]/.test(currentValue)) {
           postPath = true;
         }
@@ -8302,7 +8302,7 @@ var init_path = __esm({
         }
         return previousValue + currentValue + (index === params.length ? "" : encoded);
       }, "");
-      const pathOnly = path6.split(/[?#]/, 1)[0];
+      const pathOnly = path7.split(/[?#]/, 1)[0];
       const invalidSegmentPattern = /(?<=^|\/)(?:\.|%2e){1,2}(?=\/|$)/gi;
       let match;
       while ((match = invalidSegmentPattern.exec(pathOnly)) !== null) {
@@ -8323,10 +8323,10 @@ var init_path = __esm({
         }, "");
         throw new AnthropicError(`Path parameters result in path with invalid segments:
 ${invalidSegments.map((e) => e.error).join("\n")}
-${path6}
+${path7}
 ${underline}`);
       }
-      return path6;
+      return path7;
     };
     path3 = /* @__PURE__ */ createPathTagFunction(encodeURIPath);
   }
@@ -11628,9 +11628,9 @@ var init_client = __esm({
       makeStatusError(status, error2, message, headers) {
         return APIError.generate(status, error2, message, headers);
       }
-      buildURL(path5, query2, defaultBaseURL) {
+      buildURL(path6, query2, defaultBaseURL) {
         const baseURL = !__classPrivateFieldGet(this, _BaseAnthropic_instances, "m", _BaseAnthropic_baseURLOverridden).call(this) && defaultBaseURL || this.baseURL;
-        const url = isAbsoluteURL(path5) ? new URL(path5) : new URL(baseURL + (baseURL.endsWith("/") && path5.startsWith("/") ? path5.slice(1) : path5));
+        const url = isAbsoluteURL(path6) ? new URL(path6) : new URL(baseURL + (baseURL.endsWith("/") && path6.startsWith("/") ? path6.slice(1) : path6));
         const defaultQuery = this.defaultQuery();
         if (!isEmptyObj(defaultQuery)) {
           query2 = { ...defaultQuery, ...query2 };
@@ -11661,24 +11661,24 @@ var init_client = __esm({
        */
       async prepareRequest(request, { url, options }) {
       }
-      get(path5, opts) {
-        return this.methodRequest("get", path5, opts);
+      get(path6, opts) {
+        return this.methodRequest("get", path6, opts);
       }
-      post(path5, opts) {
-        return this.methodRequest("post", path5, opts);
+      post(path6, opts) {
+        return this.methodRequest("post", path6, opts);
       }
-      patch(path5, opts) {
-        return this.methodRequest("patch", path5, opts);
+      patch(path6, opts) {
+        return this.methodRequest("patch", path6, opts);
       }
-      put(path5, opts) {
-        return this.methodRequest("put", path5, opts);
+      put(path6, opts) {
+        return this.methodRequest("put", path6, opts);
       }
-      delete(path5, opts) {
-        return this.methodRequest("delete", path5, opts);
+      delete(path6, opts) {
+        return this.methodRequest("delete", path6, opts);
       }
-      methodRequest(method, path5, opts) {
+      methodRequest(method, path6, opts) {
         return this.request(Promise.resolve(opts).then((opts2) => {
-          return { method, path: path5, ...opts2 };
+          return { method, path: path6, ...opts2 };
         }));
       }
       request(options, remainingRetries = null) {
@@ -11782,8 +11782,8 @@ var init_client = __esm({
         }));
         return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
       }
-      getAPIList(path5, Page2, opts) {
-        return this.requestAPIList(Page2, opts && "then" in opts ? opts.then((opts2) => ({ method: "get", path: path5, ...opts2 })) : { method: "get", path: path5, ...opts });
+      getAPIList(path6, Page2, opts) {
+        return this.requestAPIList(Page2, opts && "then" in opts ? opts.then((opts2) => ({ method: "get", path: path6, ...opts2 })) : { method: "get", path: path6, ...opts });
       }
       requestAPIList(Page2, options) {
         const request = this.makeRequest(options, null, void 0);
@@ -11871,8 +11871,8 @@ var init_client = __esm({
       }
       async buildRequest(inputOptions, { retryCount = 0 } = {}) {
         const options = { ...inputOptions };
-        const { method, path: path5, query: query2, defaultBaseURL } = options;
-        const url = this.buildURL(path5, query2, defaultBaseURL);
+        const { method, path: path6, query: query2, defaultBaseURL } = options;
+        const url = this.buildURL(path6, query2, defaultBaseURL);
         if ("timeout" in options)
           validatePositiveInteger("timeout", options.timeout);
         options.timeout = options.timeout ?? this.timeout;
@@ -12496,8 +12496,8 @@ function getErrorMap() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path5, errorMaps, issueData } = params;
-  const fullPath = [...path5, ...issueData.path || []];
+  const { data, path: path6, errorMaps, issueData } = params;
+  const fullPath = [...path6, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -12613,11 +12613,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path5, key) {
+  constructor(parent, value, path6, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path5;
+    this._path = path6;
     this._key = key;
   }
   get path() {
@@ -16255,10 +16255,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path5) {
-  if (!path5)
+function getElementAtPath(obj, path6) {
+  if (!path6)
     return obj;
-  return path5.reduce((acc, key) => acc?.[key], obj);
+  return path6.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -16578,11 +16578,11 @@ function aborted(x2, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path5, issues) {
+function prefixIssues(path6, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path5);
+    iss.path.unshift(path6);
     return iss;
   });
 }
@@ -23548,6 +23548,12 @@ function initDatabase() {
   if (!factColumnNames.has("embedding_version")) {
     db.prepare("ALTER TABLE facts ADD COLUMN embedding_version INTEGER NOT NULL DEFAULT 1").run();
   }
+  if (!factColumnNames.has("ontology_attempts")) {
+    db.prepare("ALTER TABLE facts ADD COLUMN ontology_attempts INTEGER NOT NULL DEFAULT 0").run();
+  }
+  if (!factColumnNames.has("ontology_last_attempt_at")) {
+    db.prepare("ALTER TABLE facts ADD COLUMN ontology_last_attempt_at TEXT").run();
+  }
   const exchangeColumns = db.prepare(
     `SELECT name FROM pragma_table_info('exchanges')`
   ).all();
@@ -25757,6 +25763,17 @@ ${JSON.stringify(value, null, 2)}
 
 // src/llm.ts
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import fs5 from "node:fs";
+import path4 from "node:path";
+import os2 from "node:os";
+var LLM_WORKDIR = path4.join(os2.tmpdir(), "memory-bank-llm");
+function llmWorkdir() {
+  try {
+    fs5.mkdirSync(LLM_WORKDIR, { recursive: true });
+  } catch {
+  }
+  return LLM_WORKDIR;
+}
 async function callHaiku(systemPrompt, userMessage, maxTokens = 2048) {
   const model = process.env.MEMORY_BANK_FACT_MODEL || "haiku";
   try {
@@ -25767,7 +25784,14 @@ ${userMessage}`,
       options: {
         model,
         max_tokens: maxTokens,
-        systemPrompt
+        systemPrompt,
+        // One-shot classification calls: no tools/turn loops needed, and the
+        // spawned session must NOT load user settings/plugins — otherwise its
+        // own SessionStart/End hooks re-spawn sync/backfill workers and every
+        // LLM call cascades into more sessions (observed as a proxy flood).
+        maxTurns: 1,
+        settingSources: [],
+        cwd: llmWorkdir()
       }
     })) {
       if (message && typeof message === "object" && "type" in message && message.type === "result") {
@@ -25915,9 +25939,9 @@ async function askAvatar(db, question, project) {
 }
 
 // src/mcp-server.ts
-import path4 from "path";
-import fs5 from "fs";
-import os2 from "os";
+import path5 from "path";
+import fs6 from "fs";
+import os3 from "os";
 var SearchModeEnum = external_exports.enum(["vector", "text", "both"]);
 var ResponseFormatEnum = external_exports.enum(["markdown", "json"]);
 var SearchInputSchema = external_exports.object({
@@ -26253,7 +26277,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
     if (name === "read") {
       const params = ShowConversationInputSchema.parse(args);
-      const resolvedPath = path4.resolve(params.path);
+      const resolvedPath = path5.resolve(params.path);
       if (!resolvedPath.endsWith(".jsonl") && !resolvedPath.endsWith(".jsonl.zst")) {
         throw new Error(`Invalid file type: only .jsonl files are supported`);
       }
@@ -26261,19 +26285,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!resolvedFile) {
         throw new Error(`File not found: ${resolvedPath}`);
       }
-      const realFile = fs5.realpathSync(resolvedFile);
+      const realFile = fs6.realpathSync(resolvedFile);
       const allowedRoots = [
         getArchiveDir(),
-        path4.join(os2.homedir(), ".claude", "projects")
+        path5.join(os3.homedir(), ".claude", "projects")
       ].map((root) => {
         try {
-          return fs5.realpathSync(root);
+          return fs6.realpathSync(root);
         } catch {
-          return path4.resolve(root);
+          return path5.resolve(root);
         }
       });
       const isAllowed = allowedRoots.some(
-        (root) => realFile === root || realFile.startsWith(root + path4.sep)
+        (root) => realFile === root || realFile.startsWith(root + path5.sep)
       );
       if (!isAllowed) {
         throw new Error("Access denied: path is outside the conversation archive");

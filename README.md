@@ -4,14 +4,11 @@
 
 ![Memory Bank](docs/memory-bank.gif)
 
-## What's New in v1.2.0
+## What's New in v1.2.2
 
-- 🆕 **`analyzing-all-conversations` skill** — new plugin skill that analyzes and organizes your ENTIRE indexed conversation history into one report, and kicks off backfill for unanalyzed sessions
-- 🆕 **`memory-bank analyze` command** — the deterministic engine behind the skill: coverage, per-project rollups, fact/domain breakdowns, monthly timeline, backfill recommendations
-- 🆕 **Transparent `.jsonl.zst` archive support** — archives compressed out-of-band keep working across every read path (no extra dependency; requires Node >= 22.15 for built-in zstd)
-- ⚡ **FTS5 text search** — BM25-ranked full-text search replaces the LIKE full scan (recall@10 0.93 → 1.00, FTS index 2.9GB → 407MB)
-- ⚡ **Search-path performance** — cached DB connection, int8 vector quantization (dual-dtype), query-embedding memoization
-- 🧹 **Fact extraction quality/cost controls** — trivial-exchange filtering, in-session dedup, strict confidence gating, per-session LLM call budget
+- 🔎 **Context injection observability (fail-loud, v1.2.1)** — every UserPromptSubmit injection run is recorded to `<config>/conversation-index/logs/inject-context.jsonl` (status, candidate/injected counts, duration), and node-level crash output goes to `logs/inject-context.err.log` instead of being discarded. A silently broken install (stale plugin, missing `node_modules`) is now measurable instead of invisible
+- 📖 **Context Injection documented** — the automatic per-prompt injection pipeline now has its own section below (how it works, relevance gating, how to verify it is alive)
+- Earlier releases: see [CHANGELOG](CHANGELOG.md) — v1.2.0 added the `analyze` command + `analyzing-all-conversations` skill, transparent `.jsonl.zst` archives, FTS5 (BM25) text search, and fact-extraction quality/cost controls
 
 ## Features
 
@@ -19,6 +16,7 @@
 - **RAG Search** -- Search results auto-enriched with related facts and ontology context
 - **Conversation Search** -- Semantic vector search + FTS5 (BM25) full-text search across all past conversations
 - **Full-History Analysis** -- `memory-bank analyze` + `analyzing-all-conversations` skill: coverage-checked report over the entire conversation *index* (projects, facts, domains, timeline, backfill gaps) — run `memory-bank sync` first so new conversations are indexed
+- **Context Injection** -- Related past decisions are automatically prepended to every prompt (UserPromptSubmit hook): baseline-margin relevance gate + 1-hop ontology expansion, with fail-loud JSONL observability logs
 - **Fact Extraction** -- Automatic extraction of decisions, preferences, patterns from conversations (trivial-exchange filtering, in-session dedup, confidence gating, LLM call budgeting)
 - **Fact Consolidation** -- Duplicate detection, contradiction handling, evolution tracking
 - **Graph Traversal** -- Multi-hop exploration (up to 3 hops) to trace decision chains
@@ -67,6 +65,8 @@ graph LR
     L[Query] -->|search| D
     L -->|RAG| F
     L -->|traverse| H
+
+    M[User Prompt] -->|inject related facts 📌| F
 ```
 
 ![Architecture](docs/architecture.svg)
@@ -93,6 +93,28 @@ memory-bank search "React auth"  # Semantic search
 memory-bank stats     # Index statistics
 memory-bank analyze   # Full-history analysis report (coverage, projects, facts)
 ```
+
+## Context Injection
+
+Every user prompt (≥20 chars) triggers the `UserPromptSubmit` hook, which vector-searches your facts and prepends relevant past decisions to the prompt:
+
+```
+📌 관련 과거 결정:
+- [decision] Use keyset pagination for PostgREST list reads (2026-06-23)
+- [SUPPORTS] [constraint] All tables require RLS policies, no exceptions (2026-05-18)
+```
+
+- **Relevance gate** — a fact is injected only when its similarity to the query exceeds the query's own background baseline by a margin (absolute thresholds cannot separate relevant from irrelevant on compressed e5 scores)
+- **1-hop expansion** — top matches pull in related facts via typed ontology relations (max 8 facts total)
+- **Observability (v1.2.1)** — every run appends one JSONL line to `~/.config/superpowers/conversation-index/logs/inject-context.jsonl`:
+
+  ```json
+  {"ts":"2026-07-04T10:31:56Z","status":"injected","prompt_len":49,"candidates":5,"injected":8,"duration_ms":478}
+  ```
+
+  Node-level crashes (missing `node_modules`, import failures) land in `logs/inject-context.err.log` instead of being discarded.
+
+**Troubleshooting**: if injection never fires, check those two files — an empty/absent JSONL log means the hook isn't running at all (stale plugin install, restart pending), while `"status":"error"` entries or err.log content pinpoint the failure.
 
 ## Full-History Analysis
 

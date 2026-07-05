@@ -16,6 +16,7 @@ import { searchSimilarFacts } from '../dist/fact-db.js';
 import { generateEmbedding, initEmbeddings, queryBaseline } from '../dist/embeddings.js';
 import { getRelatedFacts } from '../dist/ontology-db.js';
 import { detectRepeat, formatRepeatContext } from '../dist/repeat-detector.js';
+import { appendInjectLog } from '../dist/inject-log.js';
 
 const TOP_K = 5;
 // Probe-baseline relevance gate (e5 scores are compressed, so absolute
@@ -30,8 +31,10 @@ const MAX_CONTEXT_FACTS = 8;
 async function main() {
   const project = process.env.CWD || process.cwd();
   const userPrompt = process.env.USER_PROMPT || '';
+  const t0 = Date.now();
 
   if (!userPrompt || userPrompt.length < 20) {
+    appendInjectLog({ status: 'skipped', project, prompt_len: userPrompt.length });
     process.exit(0);
   }
 
@@ -50,6 +53,14 @@ async function main() {
 
     if (results.length === 0) {
       db.close();
+      appendInjectLog({
+        status: 'no-match',
+        project,
+        prompt_len: userPrompt.length,
+        candidates: candidates.length,
+        injected: 0,
+        duration_ms: Date.now() - t0,
+      });
       process.exit(0);
     }
 
@@ -70,6 +81,14 @@ async function main() {
     db.close();
 
     if (expandedFacts.length === 0) {
+      appendInjectLog({
+        status: 'no-match',
+        project,
+        prompt_len: userPrompt.length,
+        candidates: candidates.length,
+        injected: 0,
+        duration_ms: Date.now() - t0,
+      });
       process.exit(0);
     }
 
@@ -93,9 +112,25 @@ async function main() {
     }
 
     process.stdout.write(lines.join('\n') + '\n');
+    appendInjectLog({
+      status: 'injected',
+      project,
+      prompt_len: userPrompt.length,
+      candidates: candidates.length,
+      injected: expandedFacts.length,
+      duration_ms: Date.now() - t0,
+    });
   } catch (error) {
     // Non-fatal: don't disrupt user workflow
-    process.stderr.write(`inject-context: error: ${error instanceof Error ? error.message : error}\n`);
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`inject-context: error: ${message}\n`);
+    appendInjectLog({
+      status: 'error',
+      project,
+      prompt_len: userPrompt.length,
+      duration_ms: Date.now() - t0,
+      error: message.slice(0, 300),
+    });
     process.exit(0);
   }
 }
