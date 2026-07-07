@@ -125,7 +125,23 @@ export interface OntologyCategory {
   created_at: string;
 }
 
-export type RelationType = 'INFLUENCES' | 'SUPERSEDES' | 'SUPPORTS' | 'CONTRADICTS';
+/**
+ * Relation vocabulary. The original four types skew heavily toward SUPPORTS
+ * (measured 83% of 8,948 relations, 2026-07-07) because candidates come from
+ * embedding-similar pairs. DEPENDS_ON / DERIVED_FROM cover the
+ * prerequisite/derivation axis surfaced by the co-extraction channel.
+ * Single source of truth — the DB CHECK constraint is generated from this list.
+ */
+export const RELATION_TYPES = [
+  'INFLUENCES',
+  'SUPERSEDES',
+  'SUPPORTS',
+  'CONTRADICTS',
+  'DEPENDS_ON',
+  'DERIVED_FROM',
+] as const;
+
+export type RelationType = (typeof RELATION_TYPES)[number];
 
 export interface OntologyRelation {
   id: string;

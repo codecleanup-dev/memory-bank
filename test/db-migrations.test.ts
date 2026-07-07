@@ -49,6 +49,25 @@ describe('facts.category vocabulary migration', () => {
     ins.run('f-echo', 'enum echo row', 'decision|preference|pattern|knowledge|constraint');
     ins.run('f-null', 'null category row', null);
     ins.run('f-ok', 'valid row', 'decision');
+
+    // Child rows referencing facts — the production shape (8,948 relations,
+    // 83 revisions). The facts rebuild must survive dropping a referenced
+    // parent (better-sqlite3 enforces foreign_keys by default).
+    raw.exec(`
+      CREATE TABLE ontology_relations (
+        id TEXT PRIMARY KEY,
+        source_fact_id TEXT NOT NULL REFERENCES facts(id),
+        relation_type TEXT NOT NULL CHECK(relation_type IN ('INFLUENCES','SUPERSEDES','SUPPORTS','CONTRADICTS')),
+        target_fact_id TEXT NOT NULL REFERENCES facts(id),
+        reasoning TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+    raw
+      .prepare(
+        `INSERT INTO ontology_relations (id, source_fact_id, relation_type, target_fact_id, reasoning) VALUES ('rel-legacy', 'f-ok', 'SUPPORTS', 'f-req', 'child row across the rebuild')`,
+      )
+      .run();
     raw.close();
   }
 
@@ -88,6 +107,13 @@ describe('facts.category vocabulary migration', () => {
       ).map((r) => r.name);
       expect(indexes).toContain('idx_facts_category');
       expect(indexes).toContain('idx_facts_scope');
+
+      // Child rows survived the parent rebuild, and FK enforcement is back on
+      const rel = db.prepare(`SELECT reasoning FROM ontology_relations WHERE id = 'rel-legacy'`).get() as {
+        reasoning: string;
+      };
+      expect(rel.reasoning).toBe('child row across the rebuild');
+      expect((db.pragma('foreign_keys', { simple: true }) as number)).toBe(1);
     } finally {
       db.close();
     }
@@ -99,6 +125,67 @@ describe('facts.category vocabulary migration', () => {
       expect(count).toBe(4);
     } finally {
       db2.close();
+    }
+  });
+
+  it('extends the ontology_relations CHECK to the new relation vocabulary', () => {
+    // Legacy 4-type table with a row, as shipped before DEPENDS_ON/DERIVED_FROM
+    const raw = new Database(dbPath);
+    raw.exec(`
+      CREATE TABLE ontology_relations (
+        id TEXT PRIMARY KEY,
+        source_fact_id TEXT NOT NULL,
+        relation_type TEXT NOT NULL CHECK(relation_type IN ('INFLUENCES','SUPERSEDES','SUPPORTS','CONTRADICTS')),
+        target_fact_id TEXT NOT NULL,
+        reasoning TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+    raw
+      .prepare(
+        `INSERT INTO ontology_relations (id, source_fact_id, relation_type, target_fact_id, reasoning) VALUES ('r1', 'a', 'SUPPORTS', 'b', 'legacy row')`,
+      )
+      .run();
+    raw.close();
+
+    const db = initDatabase();
+    try {
+      const sql = (
+        db
+          .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='ontology_relations'`)
+          .get() as { sql: string }
+      ).sql;
+      expect(sql).toContain("'DEPENDS_ON'");
+      expect(sql).toContain("'DERIVED_FROM'");
+
+      const legacy = db.prepare(`SELECT reasoning FROM ontology_relations WHERE id = 'r1'`).get() as {
+        reasoning: string;
+      };
+      expect(legacy.reasoning).toBe('legacy row');
+
+      // New inserts run under FK enforcement — reference a real fact
+      const factId = insertFact(db, {
+        fact: 'anchor fact for relation inserts',
+        category: 'decision',
+        scope_type: 'global',
+        scope_project: null,
+        source_exchange_ids: [],
+        embedding: null,
+      });
+
+      db.prepare(
+        `INSERT INTO ontology_relations (id, source_fact_id, relation_type, target_fact_id) VALUES ('r2', ?, 'DEPENDS_ON', ?)`,
+      ).run(factId, factId); // new type accepted after the rebuild
+
+      expect(() =>
+        db
+          .prepare(
+            `INSERT INTO ontology_relations (id, source_fact_id, relation_type, target_fact_id) VALUES ('r3', ?, 'BOGUS', ?)`,
+          )
+          .run(factId, factId),
+      ).toThrow();
+    } finally {
+      db.close();
     }
   });
 

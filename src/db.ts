@@ -7,6 +7,9 @@ import { getDbPath } from './paths.js';
 import { autoHealScopeProjects } from './project-canon.js';
 import { EMBEDDING_VERSION } from './embeddings.js';
 import { FACT_CATEGORY_CHECK_SQL, normalizeFactCategory } from './fact-category.js';
+import { RELATION_TYPES } from './types.js';
+
+const RELATION_TYPE_CHECK_SQL = `relation_type IN (${RELATION_TYPES.map((t) => `'${t}'`).join(',')})`;
 
 // === vec_exchanges dtype support (float32 legacy / int8 quantized) ===
 // int8 quantization: q = clamp(round(x*127)). e5 embeddings are L2-normalized
@@ -105,6 +108,63 @@ export function migrateSchema(db: Database.Database): void {
  * only and enforcement is off (better-sqlite3 default), so drop+rename is
  * safe.
  */
+/**
+ * Run a table-rebuild transaction with foreign_keys OFF.
+ *
+ * better-sqlite3 enables FK enforcement by default, and DROP TABLE on a
+ * referenced parent performs an implicit DELETE that trips child constraints
+ * (facts is referenced by fact_revisions and ontology_relations — 8,948 rows
+ * live). The standard SQLite rebuild procedure toggles the pragma around the
+ * transaction; toggling inside one is a no-op, hence this wrapper.
+ */
+function withForeignKeysOff(db: Database.Database, fn: () => void): void {
+  const wasOn = (db.pragma('foreign_keys', { simple: true }) as number) === 1;
+  if (wasOn) db.pragma('foreign_keys = OFF');
+  try {
+    fn();
+  } finally {
+    if (wasOn) db.pragma('foreign_keys = ON');
+  }
+}
+
+/**
+ * Extend the ontology_relations CHECK to the current relation vocabulary.
+ * SQLite cannot alter a CHECK, so legacy tables (4-type constraint) are
+ * rebuilt once; existing rows are all valid under the extended list, so this
+ * is a pure schema copy. Idempotent: guarded on every vocabulary member
+ * already appearing in the stored DDL.
+ */
+export function migrateRelationTypeVocabulary(db: Database.Database): void {
+  const tbl = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='ontology_relations'`)
+    .get() as { sql: string } | undefined;
+  if (!tbl?.sql) return;
+  if (RELATION_TYPES.every((t) => tbl.sql.includes(`'${t}'`))) return;
+
+  const rebuild = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE ontology_relations_vocab_rebuild (
+        id TEXT PRIMARY KEY,
+        source_fact_id TEXT NOT NULL REFERENCES facts(id),
+        relation_type TEXT NOT NULL CHECK(${RELATION_TYPE_CHECK_SQL}),
+        target_fact_id TEXT NOT NULL REFERENCES facts(id),
+        reasoning TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+    db.exec(`
+      INSERT INTO ontology_relations_vocab_rebuild (id, source_fact_id, relation_type, target_fact_id, reasoning, created_at)
+      SELECT id, source_fact_id, relation_type, target_fact_id, reasoning, created_at FROM ontology_relations
+    `);
+    db.exec(`DROP TABLE ontology_relations`);
+    db.exec(`ALTER TABLE ontology_relations_vocab_rebuild RENAME TO ontology_relations`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_source ON ontology_relations(source_fact_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_target ON ontology_relations(target_fact_id)`);
+  });
+  withForeignKeysOff(db, () => rebuild.immediate());
+  console.error('Migrated ontology_relations: vocabulary extended (DEPENDS_ON, DERIVED_FROM).');
+}
+
 export function migrateFactsCategoryVocabulary(db: Database.Database): void {
   const tbl = db
     .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facts'`)
@@ -150,7 +210,9 @@ export function migrateFactsCategoryVocabulary(db: Database.Database): void {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_ontology ON facts(ontology_category_id)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_coding_agent ON facts(coding_agent)`);
   });
-  rebuild.immediate();
+  // facts is a referenced parent (fact_revisions, ontology_relations) — the
+  // DROP inside the rebuild needs FK enforcement suspended.
+  withForeignKeysOff(db, () => rebuild.immediate());
   console.error('Migrated facts.category: vocabulary normalized, CHECK constraint added.');
 }
 
@@ -475,7 +537,7 @@ export function initDatabase(): Database.Database {
     CREATE TABLE IF NOT EXISTS ontology_relations (
       id TEXT PRIMARY KEY,
       source_fact_id TEXT NOT NULL REFERENCES facts(id),
-      relation_type TEXT NOT NULL CHECK(relation_type IN ('INFLUENCES','SUPERSEDES','SUPPORTS','CONTRADICTS')),
+      relation_type TEXT NOT NULL CHECK(${RELATION_TYPE_CHECK_SQL}),
       target_fact_id TEXT NOT NULL REFERENCES facts(id),
       reasoning TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -500,9 +562,10 @@ export function initDatabase(): Database.Database {
     )
   `);
 
-  // Enforce the facts.category controlled vocabulary (one-time rebuild on
-  // legacy DBs; fresh DBs already carry the CHECK from CREATE TABLE above).
-  // Runs after the ALTER block so the generic column copy sees every column.
+  // Vocabulary migrations (one-time rebuilds on legacy DBs; fresh DBs already
+  // carry both CHECKs from CREATE TABLE above). Run after the ALTER block so
+  // the generic column copy sees every column.
+  migrateRelationTypeVocabulary(db);
   migrateFactsCategoryVocabulary(db);
 
   // Self-heal slug-format scope_project rows (cheap probe; no-op when clean).

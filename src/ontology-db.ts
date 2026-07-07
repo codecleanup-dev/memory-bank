@@ -210,6 +210,29 @@ export function createRelation(
 }
 
 /**
+ * Whether ANY relation (either direction) already links the two facts.
+ * Both detection channels (similarity + co-extraction) can nominate the same
+ * pair across runs — checking first saves the LLM probe and prevents
+ * duplicate edges.
+ */
+export function relationExistsBetween(
+  db: Database.Database,
+  factIdA: string,
+  factIdB: string,
+): boolean {
+  return (
+    db
+      .prepare(
+        `SELECT 1 AS one FROM ontology_relations
+         WHERE (source_fact_id = ? AND target_fact_id = ?)
+            OR (source_fact_id = ? AND target_fact_id = ?)
+         LIMIT 1`,
+      )
+      .get(factIdA, factIdB, factIdB, factIdA) !== undefined
+  );
+}
+
+/**
  * Get related facts with relevance decay.
  *
  * Each hop reduces relevance by the decay factor:
@@ -269,8 +292,9 @@ export function getRelatedFacts(
         visited.add(targetId);
         nextFrontier.push(targetId);
 
-        // Relation type weight: SUPPORTS/INFLUENCES stronger than CONTRADICTS/SUPERSEDES
-        const typeWeight = (relation.relation_type === 'SUPPORTS' || relation.relation_type === 'INFLUENCES') ? 1.0 : 0.7;
+        // Conflict/retirement edges traverse weaker; every structural edge
+        // (SUPPORTS/INFLUENCES/DEPENDS_ON/DERIVED_FROM) traverses fully.
+        const typeWeight = (relation.relation_type === 'CONTRADICTS' || relation.relation_type === 'SUPERSEDES') ? 0.7 : 1.0;
         const relevance = hopRelevance * typeWeight;
 
         if (relevance >= minRelevance) {
