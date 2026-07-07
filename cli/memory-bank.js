@@ -43,6 +43,7 @@ COMMANDS:
   show        Display a conversation in readable format
   stats       Show index statistics
   analyze     Analyze full conversation history (coverage, projects, facts)
+  consistency Report knowledge-graph conflicts (active CONTRADICTS/SUPERSEDES pairs, orphans)
 
 Run 'memory-bank <command> --help' for command-specific help.
 
@@ -87,6 +88,10 @@ async function main() {
 
       case 'sync':
         await runScript(join(distDir, 'sync-cli.js'), args);
+        break;
+
+      case 'consistency':
+        await runScript(join(distDir, 'consistency-cli.js'), args);
         break;
 
       case '--help':

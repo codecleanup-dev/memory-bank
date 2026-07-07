@@ -27,6 +27,7 @@ import { initDatabase } from './db.js';
 import { searchSimilarFacts, searchAllFacts, getRevisions } from './fact-db.js';
 import { generateEmbedding, initEmbeddings } from './embeddings.js';
 import { getOntologyTree, listDomains, listCategories, getRelatedFacts } from './ontology-db.js';
+import { getConsistencyCounts, hasActiveConflicts } from './consistency.js';
 import { askAvatar } from './avatar-responder.js';
 import path from 'path';
 import fs from 'fs';
@@ -832,6 +833,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           for (const { relation_type, count } of relationBreakdown) output += `- ${relation_type}: ${count}\n`;
           output += '\n';
         }
+
+        // Graph health: coverage + consistency signals that were previously
+        // invisible (orphan islands, conflict pairs stored but never acted on).
+        const health = getConsistencyCounts(db);
+        output += `## Graph Health\n\n`;
+        output += `- Orphan facts (no relations): ${health.orphanFacts} / ${health.activeFacts} (${(health.orphanRate * 100).toFixed(1)}%)\n`;
+        output += `- Active CONTRADICTS pairs (both sides still active): ${health.activeContradictsPairs}\n`;
+        output += `- Active SUPERSEDES pairs (superseded fact still active): ${health.activeSupersedesPairs}\n`;
+        output += `- Single-fact categories: ${health.singleFactCategories} / ${health.totalCategories}\n`;
+        if (hasActiveConflicts(health)) {
+          output += `\n_Resolution queue available: run \`memory-bank consistency\` (\`--gate\` exits non-zero on violations)._\n`;
+        }
+        output += '\n';
 
         return { content: [{ type: 'text', text: output }] };
       } catch (error) {
