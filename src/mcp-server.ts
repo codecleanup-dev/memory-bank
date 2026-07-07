@@ -26,7 +26,8 @@ import { formatConversationAsMarkdown } from './show.js';
 import { initDatabase } from './db.js';
 import { searchSimilarFacts, searchAllFacts, getRevisions } from './fact-db.js';
 import { generateEmbedding, initEmbeddings } from './embeddings.js';
-import { getOntologyTree, listDomains, listCategories, getRelatedFacts } from './ontology-db.js';
+import { listDomains, listCategories, getRelatedFacts } from './ontology-db.js';
+import { buildOntologyView } from './ontology-view.js';
 import { getConsistencyCounts, hasActiveConflicts } from './consistency.js';
 import { askAvatar } from './avatar-responder.js';
 import path from 'path';
@@ -120,6 +121,13 @@ const SearchOntologyInputSchema = z
     domain: z.string().optional().describe('Filter by domain name (case-insensitive partial match)'),
     category: z.string().optional().describe('Filter by category name (case-insensitive partial match)'),
     include_relations: z.boolean().default(false).describe('Include 1-hop fact relations'),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(50)
+      .optional()
+      .describe('Max facts listed per category (default 5; only applies with domain/category filters)'),
   })
   .strict();
 
@@ -243,13 +251,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'search_ontology',
-        description: 'Browse the ontology hierarchy (Domain > Category > Facts). Use to understand how past decisions are organized, or to find all facts in a specific domain/category.',
+        description: 'Browse the ontology hierarchy (Domain > Category > Facts). Unfiltered calls return a bounded summary (counts only, no fact lines); pass domain and/or category to list facts. Use to understand how past decisions are organized, or to find all facts in a specific domain/category.',
         inputSchema: {
           type: 'object',
           properties: {
             domain: { type: 'string', description: 'Filter by domain name (partial, case-insensitive)' },
             category: { type: 'string', description: 'Filter by category name (partial, case-insensitive)' },
             include_relations: { type: 'boolean', default: false, description: 'Include 1-hop relations for each fact' },
+            limit: { type: 'number', minimum: 1, maximum: 50, description: 'Max facts listed per category (default 5; only applies with domain/category filters)' },
           },
           additionalProperties: false,
         },
@@ -587,62 +596,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       try {
         const db = initDatabase();
-        const tree = getOntologyTree(db);
-
-        // Apply domain/category filters
-        const domainFilter = params.domain?.toLowerCase();
-        const categoryFilter = params.category?.toLowerCase();
-
-        const filtered = tree.filter((entry) => {
-          if (domainFilter && !entry.domain.name.toLowerCase().includes(domainFilter)) return false;
-          return true;
-        });
-
-        let output = `# Ontology Tree\n\n`;
-
-        if (filtered.length === 0) {
-          output += '_No ontology data found. Facts are classified automatically as they are extracted._\n';
-        }
-
-        for (const { domain, categories } of filtered) {
-          output += `## ${domain.name}\n`;
-          if (domain.description) output += `> ${domain.description}\n`;
-          output += '\n';
-
-          const filteredCategories = categories.filter(({ category }) => {
-            if (categoryFilter && !category.name.toLowerCase().includes(categoryFilter)) return false;
-            return true;
+        try {
+          const output = buildOntologyView(db, {
+            domain: params.domain,
+            category: params.category,
+            includeRelations: params.include_relations,
+            limit: params.limit,
           });
-
-          if (filteredCategories.length === 0) {
-            output += '_No matching categories._\n\n';
-            continue;
-          }
-
-          for (const { category, facts } of filteredCategories) {
-            output += `### ${category.name}`;
-            if (category.description) output += ` — ${category.description}`;
-            output += `\n(${facts.length} facts)\n\n`;
-
-            for (const fact of facts) {
-              output += `- **[${fact.category}]** ${fact.fact}\n`;
-              output += `  - ID: ${fact.id} | Confirmed: ${fact.consolidated_count}x | ${fact.created_at.slice(0, 10)}\n`;
-
-              if (params.include_relations) {
-                const related = getRelatedFacts(db, fact.id, 1);
-                if (related.length > 0) {
-                  for (const { fact: relFact, relation } of related) {
-                    output += `  - ↔ [${relation.relation_type}] "${relFact.fact}"\n`;
-                  }
-                }
-              }
-            }
-            output += '\n';
-          }
+          return { content: [{ type: 'text', text: output }] };
+        } finally {
+          db.close();
         }
-
-        db.close();
-        return { content: [{ type: 'text', text: output }] };
       } catch (error) {
         return {
           content: [{ type: 'text', text: handleError(error) }],
