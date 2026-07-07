@@ -6,6 +6,7 @@ import * as sqliteVec from 'sqlite-vec';
 import { getDbPath } from './paths.js';
 import { autoHealScopeProjects } from './project-canon.js';
 import { EMBEDDING_VERSION } from './embeddings.js';
+import { FACT_CATEGORY_CHECK_SQL, normalizeFactCategory } from './fact-category.js';
 
 // === vec_exchanges dtype support (float32 legacy / int8 quantized) ===
 // int8 quantization: q = clamp(round(x*127)). e5 embeddings are L2-normalized
@@ -86,6 +87,71 @@ export function migrateSchema(db: Database.Database): void {
   if (migrated) {
     console.error('Migration complete.');
   }
+}
+
+/**
+ * Enforce the facts.category controlled vocabulary on legacy DBs.
+ *
+ * facts.category was plain TEXT with no constraint, so LLM output drift
+ * accumulated out-of-vocabulary values ('requirement' ×44, enum echoes,
+ * 'null', NULL — measured 2026-07-07). SQLite cannot ADD a CHECK constraint,
+ * so this rebuilds the table once: normalize existing rows through the same
+ * deterministic mapping the write path uses, then copy into a table that
+ * carries NOT NULL + CHECK. Generic column copy via pragma_table_info keeps
+ * the rebuild independent of which optional columns this DB already has.
+ *
+ * Idempotent: guarded on the CHECK already being present in sqlite_master.
+ * FK clauses in fact_revisions/ontology_relations reference the table name
+ * only and enforcement is off (better-sqlite3 default), so drop+rename is
+ * safe.
+ */
+export function migrateFactsCategoryVocabulary(db: Database.Database): void {
+  const tbl = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facts'`)
+    .get() as { sql: string } | undefined;
+  if (!tbl?.sql) return;
+  if (/CHECK\s*\(\s*category\s+IN/i.test(tbl.sql)) return; // already enforced
+
+  const cols = db
+    // NOTNULL is an SQLite keyword (IS NOTNULL), so the pragma column must be
+    // re-aliased to a neutral name.
+    .prepare(`SELECT name, type, "notnull" AS nn, dflt_value, pk FROM pragma_table_info('facts')`)
+    .all() as Array<{ name: string; type: string; nn: number; dflt_value: string | null; pk: number }>;
+
+  const rebuild = db.transaction(() => {
+    // 1) Normalize legacy rows first — the copy below must not violate the
+    //    new constraint. DISTINCT keeps this to a handful of UPDATEs.
+    const distinct = db.prepare(`SELECT DISTINCT category FROM facts`).all() as Array<{
+      category: string | null;
+    }>;
+    const update = db.prepare(`UPDATE facts SET category = ? WHERE category IS ?`);
+    for (const { category } of distinct) {
+      const normalized = normalizeFactCategory(category);
+      if (normalized !== category) update.run(normalized, category);
+    }
+
+    // 2) Rebuild with NOT NULL + CHECK, copying every existing column.
+    const defs = cols.map((c) => {
+      const notNull = c.name === 'category' ? ' NOT NULL' : c.nn ? ' NOT NULL' : '';
+      const pk = c.pk ? ' PRIMARY KEY' : '';
+      const dflt = c.dflt_value != null ? ` DEFAULT ${c.dflt_value}` : '';
+      return `${c.name} ${c.type}${pk}${notNull}${dflt}`;
+    });
+    const names = cols.map((c) => c.name).join(', ');
+    db.exec(`CREATE TABLE facts_vocab_rebuild (${defs.join(', ')}, CHECK (${FACT_CATEGORY_CHECK_SQL}))`);
+    db.exec(`INSERT INTO facts_vocab_rebuild (${names}) SELECT ${names} FROM facts`);
+    db.exec(`DROP TABLE facts`);
+    db.exec(`ALTER TABLE facts_vocab_rebuild RENAME TO facts`);
+
+    // 3) Indexes were dropped with the old table — recreate them.
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_scope ON facts(scope_type, scope_project)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_category ON facts(category)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_active ON facts(is_active)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_ontology ON facts(ontology_category_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_coding_agent ON facts(coding_agent)`);
+  });
+  rebuild.immediate();
+  console.error('Migrated facts.category: vocabulary normalized, CHECK constraint added.');
 }
 
 export function initDatabase(): Database.Database {
@@ -271,7 +337,7 @@ export function initDatabase(): Database.Database {
     CREATE TABLE IF NOT EXISTS facts (
       id TEXT PRIMARY KEY,
       fact TEXT NOT NULL,
-      category TEXT,
+      category TEXT NOT NULL CHECK (${FACT_CATEGORY_CHECK_SQL}),
       scope_type TEXT NOT NULL DEFAULT 'project',
       scope_project TEXT,
       source_exchange_ids TEXT,
@@ -427,6 +493,11 @@ export function initDatabase(): Database.Database {
       saved INTEGER NOT NULL DEFAULT 0
     )
   `);
+
+  // Enforce the facts.category controlled vocabulary (one-time rebuild on
+  // legacy DBs; fresh DBs already carry the CHECK from CREATE TABLE above).
+  // Runs after the ALTER block so the generic column copy sees every column.
+  migrateFactsCategoryVocabulary(db);
 
   // Self-heal slug-format scope_project rows (cheap probe; no-op when clean).
   // Keeps the canonical path format intact even when other devices sync in

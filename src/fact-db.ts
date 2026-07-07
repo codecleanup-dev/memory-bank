@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import type { Fact, FactRevision } from './types.js';
 import { canonicalizeProject } from './project-canon.js';
 import { EMBEDDING_VERSION } from './embeddings.js';
+import { normalizeFactCategory } from './fact-category.js';
 
 interface InsertFactParams {
   fact: string;
@@ -43,7 +44,10 @@ export function insertFact(db: Database.Database, params: InsertFactParams): str
   `).run(
     id,
     params.fact,
-    params.category,
+    // Chokepoint normalization: every caller (extractor, backfill, sync)
+    // funnels through here, so out-of-vocabulary LLM output is mapped to the
+    // controlled vocabulary instead of tripping the facts.category CHECK.
+    normalizeFactCategory(params.category),
     params.scope_type,
     scopeProject,
     JSON.stringify(params.source_exchange_ids),
