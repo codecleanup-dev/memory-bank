@@ -540,7 +540,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           output += `## [${fact.category}] ${fact.fact}\n`;
           const factAgent = fact.coding_agent || 'claude-code';
           output += `- Scope: ${fact.scope_type}${fact.scope_project ? ` (${fact.scope_project})` : ''} | Agent: ${factAgent}\n`;
-          output += `- Confirmed: ${fact.consolidated_count}x | Similarity: ${similarity}\n`;
+          const confidenceLabel =
+            fact.confidence != null ? ` | Extraction confidence: ${fact.confidence.toFixed(2)}` : '';
+          output += `- Confirmed: ${fact.consolidated_count}x | Similarity: ${similarity}${confidenceLabel}\n`;
           if (domainName) output += `- Ontology: ${domainName}/${catName}\n`;
           output += `- Created: ${fact.created_at}\n`;
 

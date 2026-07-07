@@ -73,6 +73,10 @@ export interface Fact {
   is_active: boolean;
   ontology_category_id?: string | null;
   coding_agent?: string | null; // e.g., 'claude-code', 'codex', 'opencode'
+  // Extraction confidence (0..1) captured at insert time. Null on rows
+  // created before the column existed (their confidence was gate-consumed
+  // and discarded). Complements consolidated_count as a reliability signal.
+  confidence?: number | null;
 }
 
 export interface FactRevision {

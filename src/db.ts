@@ -458,6 +458,12 @@ export function initDatabase(): Database.Database {
   if (!factColumnNames.has('ontology_last_attempt_at')) {
     db.prepare('ALTER TABLE facts ADD COLUMN ontology_last_attempt_at TEXT').run();
   }
+  // Extraction confidence (0..1). Previously consumed only as the extraction
+  // gate and discarded; persisting it gives each fact a reliability signal
+  // alongside consolidated_count. NULL on pre-migration rows (unknown).
+  if (!factColumnNames.has('confidence')) {
+    db.prepare('ALTER TABLE facts ADD COLUMN confidence REAL').run();
+  }
   const exchangeColumns = db.prepare(
     `SELECT name FROM pragma_table_info('exchanges')`
   ).all() as Array<{ name: string }>;

@@ -15,6 +15,7 @@ interface InsertFactParams {
   coding_agent?: string;       // e.g., 'claude-code', 'codex', 'opencode'
   fact_kr?: string | null;     // Korean translation — enables same-language matching for Korean queries
   embedding_kr?: number[] | null;
+  confidence?: number | null;  // extraction confidence 0..1 (clamped on insert)
 }
 
 interface UpdateFactParams {
@@ -38,9 +39,16 @@ export function insertFact(db: Database.Database, params: InsertFactParams): str
     ? canonicalizeProject(db, params.scope_project)
     : params.scope_project;
 
+  // Defensive clamp: extraction guarantees >= 0.7, but sync/import paths may
+  // carry arbitrary values — persist only a sane 0..1 number or NULL.
+  const confidence =
+    typeof params.confidence === 'number' && Number.isFinite(params.confidence)
+      ? Math.min(1, Math.max(0, params.confidence))
+      : null;
+
   db.prepare(`
-    INSERT INTO facts (id, fact, category, scope_type, scope_project, source_exchange_ids, embedding, created_at, updated_at, consolidated_count, is_active, coding_agent, fact_kr, embedding_version)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
+    INSERT INTO facts (id, fact, category, scope_type, scope_project, source_exchange_ids, embedding, created_at, updated_at, consolidated_count, is_active, coding_agent, fact_kr, embedding_version, confidence)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?)
   `).run(
     id,
     params.fact,
@@ -57,6 +65,7 @@ export function insertFact(db: Database.Database, params: InsertFactParams): str
     params.coding_agent || 'claude-code',
     params.fact_kr ?? null,
     EMBEDDING_VERSION,
+    confidence,
   );
 
   // Insert into vector index (atomic DELETE+INSERT via transaction)
@@ -362,5 +371,6 @@ function rowToFact(row: Record<string, unknown>): Fact {
     is_active: Boolean(row['is_active']),
     ontology_category_id: (row['ontology_category_id'] as string | null) ?? null,
     coding_agent: (row['coding_agent'] as string | null) ?? null,
+    confidence: (row['confidence'] as number | null) ?? null,
   };
 }

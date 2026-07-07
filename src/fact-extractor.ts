@@ -228,6 +228,7 @@ export async function saveExtractedFacts(
       coding_agent: codingAgent,
       fact_kr: fact.fact_kr ?? null,
       embedding_kr: embeddingKr,
+      confidence: fact.confidence,
     });
 
     savedIds.push(id);
