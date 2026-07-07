@@ -233,6 +233,12 @@ export function initDatabase(): Database.Database {
   // Enable WAL mode for better concurrency
   db.pragma('journal_mode = WAL');
   db.pragma('busy_timeout = 5000');
+  // Referential integrity is a pinned invariant, not a driver default:
+  // better-sqlite3 currently ships with foreign_keys ON, but the graph
+  // (facts ↔ fact_revisions/ontology_relations) and the rebuild migrations
+  // depend on it — enable explicitly so a driver-default change can never
+  // silently disable enforcement.
+  db.pragma('foreign_keys = ON');
   // Required so the exchanges_fts AFTER DELETE trigger fires when an exchange is
   // re-indexed via `INSERT OR REPLACE` (the REPLACE-induced delete does NOT fire
   // delete triggers unless recursive_triggers is on — verified: without it a

@@ -326,7 +326,9 @@ export function getRelatedFacts(
         visited.add(sourceId);
         nextFrontier.push(sourceId);
 
-        const typeWeight = (relation.relation_type === 'SUPPORTS' || relation.relation_type === 'INFLUENCES') ? 1.0 : 0.7;
+        // Conflict/retirement edges traverse weaker; every structural edge
+        // (SUPPORTS/INFLUENCES/DEPENDS_ON/DERIVED_FROM) traverses fully.
+        const typeWeight = (relation.relation_type === 'CONTRADICTS' || relation.relation_type === 'SUPERSEDES') ? 0.7 : 1.0;
         const relevance = hopRelevance * typeWeight;
 
         if (relevance >= minRelevance) {

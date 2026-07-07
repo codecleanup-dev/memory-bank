@@ -20,7 +20,7 @@ vi.mock('../src/embeddings.js', () => ({
 
 import { callHaiku, parseJsonResponse } from '../src/llm.js';
 import { detectCoExtractionRelations, MAX_COEXTRACT_PAIRS } from '../src/ontology-classifier.js';
-import { createRelation, getRelationsForFact } from '../src/ontology-db.js';
+import { createRelation, getRelatedFacts, getRelationsForFact } from '../src/ontology-db.js';
 import { initDatabase } from '../src/db.js';
 import { insertFact } from '../src/fact-db.js';
 import { suppressConsole } from './test-utils.js';
@@ -120,5 +120,29 @@ describe('co-extraction relation channel', () => {
     const a = mkFact('lonely fact');
     await detectCoExtractionRelations(db, [a]);
     expect(callHaiku).not.toHaveBeenCalled();
+  });
+
+  it('traversal weights treat DEPENDS_ON as structural in BOTH directions', () => {
+    const a = mkFact('service depends on vault');
+    const b = mkFact('vault is the secret store');
+    const c = mkFact('sessions use cookies');
+    createRelation(db, a, 'DEPENDS_ON', b, 'a depends on b');
+    createRelation(db, a, 'CONTRADICTS', c, 'conflict edge');
+
+    // Outgoing direction (from a): structural edge at full weight
+    const fromA = getRelatedFacts(db, a, 1);
+    const outDep = fromA.find((r) => r.fact.id === b);
+    expect(outDep?.relevance).toBe(1.0);
+
+    // Incoming direction (from b): must ALSO be full weight — the incoming
+    // branch previously kept the legacy SUPPORTS/INFLUENCES-only whitelist
+    const fromB = getRelatedFacts(db, b, 1);
+    const inDep = fromB.find((r) => r.fact.id === a);
+    expect(inDep?.relevance).toBe(1.0);
+
+    // Conflict edges stay dampened in the incoming direction too
+    const fromC = getRelatedFacts(db, c, 1);
+    const inConflict = fromC.find((r) => r.fact.id === a);
+    expect(inConflict?.relevance).toBeCloseTo(0.7);
   });
 });
