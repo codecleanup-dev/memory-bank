@@ -24,10 +24,11 @@ export function exportForSync(): { facts: number; domains: number; categories: n
   const syncDir = getSyncDir();
 
   try {
-    // Export facts (fact_kr included so other devices can build Korean vectors)
+    // Export facts (fact_kr included so other devices can build Korean
+    // vectors; confidence included so the reliability signal survives sync)
     const facts = db.prepare(`
       SELECT id, fact, fact_kr, category, scope_type, scope_project, source_exchange_ids,
-             created_at, updated_at, consolidated_count, ontology_category_id
+             created_at, updated_at, consolidated_count, ontology_category_id, confidence
       FROM facts WHERE is_active = 1
     `).all() as Array<Record<string, unknown>>;
 

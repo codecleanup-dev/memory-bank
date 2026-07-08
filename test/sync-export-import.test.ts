@@ -148,36 +148,42 @@ describe('sync-export/import', () => {
     const syncDir = getSyncDir();
     const now = new Date().toISOString();
 
-    const legacyRow = (id: string, category: string): string =>
+    const legacyRow = (id: string, category: string, confidence?: number): string =>
       JSON.stringify({
         id, fact: `legacy fact ${id}`, category,
         scope_type: 'global', scope_project: null, source_exchange_ids: '[]',
         created_at: now, updated_at: now, consolidated_count: 1, ontology_category_id: null,
+        ...(confidence !== undefined ? { confidence } : {}),
       }) + '\n';
 
     fs.writeFileSync(
       path.join(syncDir, 'facts.jsonl'),
       legacyRow('legacy-1', 'requirement') +
         legacyRow('legacy-2', 'decision|preference|pattern|knowledge|constraint') +
-        legacyRow('legacy-3', 'null'),
+        legacyRow('legacy-3', 'null') +
+        legacyRow('legacy-4', 'decision', 0.9),
     );
 
     const { importFromSync } = await import('../src/sync-import.js');
     const result = await importFromSync();
-    expect(result.newFacts).toBe(3); // none silently dropped
+    expect(result.newFacts).toBe(4); // none silently dropped
 
     const { initDatabase } = await import('../src/db.js');
     const db = initDatabase();
     try {
       const byId = new Map(
-        (db.prepare(`SELECT id, category FROM facts WHERE id LIKE 'legacy-%'`).all() as Array<{
+        (db.prepare(`SELECT id, category, confidence FROM facts WHERE id LIKE 'legacy-%'`).all() as Array<{
           id: string;
           category: string;
-        }>).map((r) => [r.id, r.category]),
+          confidence: number | null;
+        }>).map((r) => [r.id, r]),
       );
-      expect(byId.get('legacy-1')).toBe('constraint');
-      expect(byId.get('legacy-2')).toBe('decision');
-      expect(byId.get('legacy-3')).toBe('knowledge');
+      expect(byId.get('legacy-1')?.category).toBe('constraint');
+      expect(byId.get('legacy-2')?.category).toBe('decision');
+      expect(byId.get('legacy-3')?.category).toBe('knowledge');
+      // Reliability signal survives the sync; pre-confidence files stay NULL
+      expect(byId.get('legacy-4')?.confidence).toBe(0.9);
+      expect(byId.get('legacy-1')?.confidence).toBeNull();
     } finally {
       db.close();
     }
