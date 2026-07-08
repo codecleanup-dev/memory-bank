@@ -1,3 +1,5 @@
+export declare function llmWorkdir(): string;
+export declare function pruneLlmTranscripts(now?: number): void;
 /**
  * Call Haiku via Claude Agent SDK (no API key needed inside Claude Code —
  * billed to the local subscription, NOT a metered API key).

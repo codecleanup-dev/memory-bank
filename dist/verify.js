@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { parseConversation } from './parser.js';
 import { initDatabase, getAllExchanges, getFileLastIndexed } from './db.js';
-import { getArchiveDir, getExcludedProjects } from './paths.js';
+import { getArchiveDir, getExcludedProjects, isExcludedProject } from './paths.js';
 import { archiveFileExists, canonicalArchiveName, statArchiveFile } from './archive-io.js';
 export async function verifyIndex() {
     const result = {
@@ -24,7 +24,7 @@ export async function verifyIndex() {
     const excludedProjects = getExcludedProjects();
     let totalChecked = 0;
     for (const project of projects) {
-        if (excludedProjects.includes(project)) {
+        if (isExcludedProject(project, excludedProjects)) {
             console.log("\nSkipping excluded project: " + project);
             continue;
         }

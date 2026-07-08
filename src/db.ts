@@ -654,6 +654,16 @@ export function initDatabase(): Database.Database {
   if (!factColumnNames.has('ontology_attempts')) {
     db.prepare('ALTER TABLE facts ADD COLUMN ontology_attempts INTEGER NOT NULL DEFAULT 0').run();
   }
+  // Consolidation attempt ledger (cross-run): a driver fact whose comparison
+  // CALL keeps failing is held (retried) up to MAX attempts, then skipped so it
+  // can't wedge the cursor. This distinguishes a short/transient outage (a few
+  // attempts, then it succeeds and the counter resets) from a persistently
+  // un-processable fact (reaches MAX and is skipped) WITHOUT inspecting the
+  // provider-specific error — run-local counting alone can't, because a real
+  // outage spans separate worker runs.
+  if (!factColumnNames.has('consolidation_attempts')) {
+    db.prepare('ALTER TABLE facts ADD COLUMN consolidation_attempts INTEGER NOT NULL DEFAULT 0').run();
+  }
   if (!factColumnNames.has('ontology_last_attempt_at')) {
     db.prepare('ALTER TABLE facts ADD COLUMN ontology_last_attempt_at TEXT').run();
   }
@@ -705,6 +715,10 @@ export function initDatabase(): Database.Database {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_target ON ontology_relations(target_fact_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_ontology ON facts(ontology_category_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_coding_agent ON facts(coding_agent)`);
+  // Keyset pagination for the consolidation drain (getAllNewFactsSince): serves
+  // both `WHERE is_active = 1 AND (created_at, id) > cursor` and the
+  // `ORDER BY created_at, id` without a temp sort over the whole table.
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_active_created_id ON facts(is_active, created_at, id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_ontology_categories_domain ON ontology_categories(domain_id)`);
 
   // Tracks which sessions have been through fact extraction (SessionEnd hook

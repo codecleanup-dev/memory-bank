@@ -82,12 +82,6 @@ export function getAgentSources() {
     const defaultSources = [
         { name: 'claude-code', sourceDir: path.join(home, '.claude', 'projects') },
     ];
-    // Codex writes rollout transcripts under ~/.codex/sessions. Auto-register it
-    // when present so Codex conversations are indexed alongside Claude ones.
-    const codexSessions = path.join(home, '.codex', 'sessions');
-    if (fs.existsSync(codexSessions)) {
-        defaultSources.push({ name: 'codex', sourceDir: codexSessions, recursive: true });
-    }
     // Check env variable for additional sources
     if (process.env.MEMORY_BANK_AGENT_SOURCES) {
         try {
@@ -126,31 +120,34 @@ export function detectCodingAgent(sourcePath) {
     return 'claude-code';
 }
 /**
- * Recursively find all .jsonl files under a directory, returning paths relative
- * to it. Handles both flat Claude project dirs (`<project>/<file>.jsonl`) and
- * nested Codex session dirs (`YYYY/MM/DD/rollout-*.jsonl`). Ported from
- * episodic-memory 1.4.2.
+ * Claude Code transcripts root (~/.claude/projects). TEST_PROJECTS_DIR
+ * override matches the long-standing indexer test convention.
  */
-export function findJsonlFiles(dir) {
-    const results = [];
-    try {
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
-        for (const entry of entries) {
-            if (entry.isFile() && entry.name.endsWith('.jsonl')) {
-                results.push(entry.name);
-            }
-            else if (entry.isDirectory()) {
-                const subDir = path.join(dir, entry.name);
-                for (const f of findJsonlFiles(subDir)) {
-                    results.push(path.join(entry.name, f));
-                }
-            }
-        }
-    }
-    catch {
-        // Directory might not be readable
-    }
-    return results;
+export function getProjectsDir() {
+    return process.env.TEST_PROJECTS_DIR || path.join(os.homedir(), '.claude', 'projects');
+}
+/**
+ * Reserved basename of the isolated working directory that llm.ts gives to
+ * headless Agent SDK sessions (see LLM_WORKDIR in llm.ts). Every Haiku
+ * classification call spawns a one-shot CLI session whose transcript lands in
+ * ~/.claude/projects/<slug-of-that-cwd>/ — those slugs always end with this
+ * name (current fixed dir and legacy mkdtemp variants alike). They are
+ * ephemeral worker state, not knowledge: indexing them polluted the
+ * conversation index with 6.4k exchanges (observed 2026-07-08).
+ */
+export const LLM_WORKDIR_BASENAME = 'memory-bank-llm';
+/**
+ * True if a project slug (directory name under ~/.claude/projects) must be
+ * skipped by indexing/sync. Combines the user-configured exact-match list
+ * with the built-in exclusion of the plugin's own LLM worker sessions.
+ */
+export function isExcludedProject(project, excluded) {
+    const list = excluded ?? getExcludedProjects();
+    if (list.includes(project))
+        return true;
+    // Built-in: LLM worker session slugs (cwd path with '/' → '-'), e.g.
+    // -private-var-folders-…-T-memory-bank-llm or …-T-tmp-XXXX-memory-bank-llm.
+    return project === LLM_WORKDIR_BASENAME || project.endsWith(`-${LLM_WORKDIR_BASENAME}`);
 }
 /**
  * Get list of projects to exclude from indexing

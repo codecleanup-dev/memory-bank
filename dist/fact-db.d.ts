@@ -36,6 +36,27 @@ export declare function searchSimilarFacts(db: Database.Database, embedding: num
     distance: number;
 }>;
 /**
+ * Nearest active facts restricted to EXACTLY one scope — used by consolidation
+ * so a project-private fact and a global fact can never be compared/merged
+ * across the boundary (which would leak private text into global memory or let
+ * one project mutate shared global facts). The scope filter is applied to the
+ * FULL overfetched candidate list BEFORE truncation, so a same-scope match is
+ * not starved out by closer out-of-scope rows (which the general
+ * searchSimilarFacts truncates first).
+ *
+ * scope: { type:'global' } → global facts only.
+ *        { type:'project', project } → that project's own facts only (no global).
+ */
+export declare function searchSimilarFactsSameScope(db: Database.Database, embedding: number[], scope: {
+    type: 'global';
+} | {
+    type: 'project';
+    project: string;
+}, limit?: number, threshold?: number): Array<{
+    fact: Fact;
+    distance: number;
+}>;
+/**
  * Get top facts using a relevance score that combines:
  * - Confirmation count (consolidated_count) — how established is this fact
  * - Recency (updated_at) — how recent is this fact
@@ -55,6 +76,27 @@ export declare function getTopFacts(db: Database.Database, rawProject: string, l
  */
 export declare function getTopFactsByCount(db: Database.Database, project: string, limit?: number): Fact[];
 export declare function getNewFactsSince(db: Database.Database, project: string, since: string): Fact[];
+/**
+ * All active facts after a KEYSET cursor `(createdAt, id)`, EVERY scope/project,
+ * each row once, ordered by (created_at, id). The composite key is what makes
+ * the consolidate cursor strictly monotonic PER FACT: ordering by created_at
+ * alone stalls when a whole timestamp group is larger than the per-run budget
+ * (the cursor can't advance into a shared timestamp without risking a skip), so
+ * `id` is the unique tiebreaker that lets the drain progress one fact at a time.
+ *
+ * cursor null → from the beginning (all active facts).
+ *
+ * KNOWN LIMITATION (best-effort dedup): a fact IMPORTED mid-drain with an old
+ * `created_at` that sorts before the current cursor is not re-driven by this
+ * pass (it's still a similarity CANDIDATE for future facts, so a duplicate is
+ * still caught opportunistically). Consolidation is a background convenience,
+ * not an exhaustive guarantee, so this is accepted rather than adding a
+ * full re-scan on every import.
+ */
+export declare function getAllNewFactsSince(db: Database.Database, cursor: {
+    createdAt: string;
+    id: string;
+} | null, limit?: number): Fact[];
 /**
  * Search facts across ALL projects (no scope filter).
  * Used for cross-project knowledge transfer.

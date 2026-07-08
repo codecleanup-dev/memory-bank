@@ -159,4 +159,60 @@ describe('paths', () => {
       expect(getExcludedProjects()).toEqual(['valid-project']);
     });
   });
+
+  describe('isExcludedProject', () => {
+    it('should exclude the current LLM workdir slug (built-in)', async () => {
+      const { isExcludedProject } = await import('../src/paths.js');
+      expect(isExcludedProject('-private-var-folders-ms-q41xyz-T-memory-bank-llm', [])).toBe(true);
+    });
+
+    it('should exclude legacy mkdtemp LLM workdir slugs (built-in)', async () => {
+      const { isExcludedProject } = await import('../src/paths.js');
+      expect(isExcludedProject('-private-var-folders-ms-q41xyz-T-tmp-03lvGlu1k7-memory-bank-llm', [])).toBe(true);
+    });
+
+    it('should exclude the bare workdir basename (built-in)', async () => {
+      const { isExcludedProject } = await import('../src/paths.js');
+      expect(isExcludedProject('memory-bank-llm', [])).toBe(true);
+    });
+
+    it('should not exclude ordinary projects', async () => {
+      const { isExcludedProject } = await import('../src/paths.js');
+      expect(isExcludedProject('-Users-jung-wankim-Project-Claude-cc-sync', [])).toBe(false);
+      // Repo dir itself is not the worker slug
+      expect(isExcludedProject('-Users-jung-wankim-Project-Claude-memory-bank', [])).toBe(false);
+    });
+
+    it('should not exclude names merely containing the workdir basename mid-slug', async () => {
+      const { isExcludedProject } = await import('../src/paths.js');
+      expect(isExcludedProject('-Users-x-memory-bank-llm-docs', [])).toBe(false);
+    });
+
+    it('should honor the user-configured exact-match list', async () => {
+      const { isExcludedProject } = await import('../src/paths.js');
+      expect(isExcludedProject('some-project', ['some-project'])).toBe(true);
+      expect(isExcludedProject('other-project', ['some-project'])).toBe(false);
+    });
+
+    it('should fall back to getExcludedProjects when no list is given', async () => {
+      process.env.CONVERSATION_SEARCH_EXCLUDE_PROJECTS = 'env-excluded';
+      const { isExcludedProject } = await import('../src/paths.js');
+      expect(isExcludedProject('env-excluded')).toBe(true);
+      expect(isExcludedProject('env-included')).toBe(false);
+    });
+  });
+
+  describe('getProjectsDir', () => {
+    it('should honor TEST_PROJECTS_DIR override', async () => {
+      process.env.TEST_PROJECTS_DIR = tmpDir;
+      const { getProjectsDir } = await import('../src/paths.js');
+      expect(getProjectsDir()).toBe(tmpDir);
+    });
+
+    it('should default to ~/.claude/projects', async () => {
+      delete process.env.TEST_PROJECTS_DIR;
+      const { getProjectsDir } = await import('../src/paths.js');
+      expect(getProjectsDir()).toBe(path.join(os.homedir(), '.claude', 'projects'));
+    });
+  });
 });
