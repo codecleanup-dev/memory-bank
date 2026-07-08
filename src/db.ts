@@ -714,12 +714,38 @@ export function insertExchange(
   //     serializes against the swap, so we can never quantize for a schema
   //     that changed between the read and the write.
   const insertAll = db.transaction(() => {
+    // UPSERT, not INSERT OR REPLACE: REPLACE deletes the pre-existing row
+    // before reinserting, and with foreign_keys ON that implicit delete
+    // trips tool_calls.exchange_id on every re-index of an exchange that
+    // already has tool calls. ON CONFLICT DO UPDATE rewrites in place — no
+    // parent delete, and the exchanges_fts AFTER UPDATE trigger keeps the
+    // FTS index consistent.
     db.prepare(`
-      INSERT OR REPLACE INTO exchanges
+      INSERT INTO exchanges
       (id, project, timestamp, user_message, assistant_message, archive_path, line_start, line_end, last_indexed,
        parent_uuid, is_sidechain, session_id, cwd, git_branch, claude_version,
        thinking_level, thinking_disabled, thinking_triggers, coding_agent, embedding_version)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        project = excluded.project,
+        timestamp = excluded.timestamp,
+        user_message = excluded.user_message,
+        assistant_message = excluded.assistant_message,
+        archive_path = excluded.archive_path,
+        line_start = excluded.line_start,
+        line_end = excluded.line_end,
+        last_indexed = excluded.last_indexed,
+        parent_uuid = excluded.parent_uuid,
+        is_sidechain = excluded.is_sidechain,
+        session_id = excluded.session_id,
+        cwd = excluded.cwd,
+        git_branch = excluded.git_branch,
+        claude_version = excluded.claude_version,
+        thinking_level = excluded.thinking_level,
+        thinking_disabled = excluded.thinking_disabled,
+        thinking_triggers = excluded.thinking_triggers,
+        coding_agent = excluded.coding_agent,
+        embedding_version = excluded.embedding_version
     `).run(
       exchange.id,
       exchange.project,
@@ -796,6 +822,10 @@ export function getFileLastIndexed(db: Database.Database, archivePath: string): 
 export function deleteExchange(db: Database.Database, id: string): void {
   // Delete from vector table
   db.prepare(`DELETE FROM vec_exchanges WHERE id = ?`).run(id);
+
+  // Children first: tool_calls.exchange_id references exchanges(id) and
+  // foreign_keys is ON — deleting the parent first would throw.
+  db.prepare(`DELETE FROM tool_calls WHERE exchange_id = ?`).run(id);
 
   // Delete from main table
   db.prepare(`DELETE FROM exchanges WHERE id = ?`).run(id);

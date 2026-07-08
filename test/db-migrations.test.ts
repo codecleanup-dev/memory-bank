@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import Database from 'better-sqlite3';
-import { initDatabase } from '../src/db.js';
+import { deleteExchange, initDatabase, insertExchange } from '../src/db.js';
 import { insertFact } from '../src/fact-db.js';
 import { suppressConsole } from './test-utils.js';
 
@@ -188,6 +188,57 @@ describe('facts.category vocabulary migration', () => {
       // Degraded mode is explicit: legacy junk stays, write path still normalizes
       const row = db.prepare(`SELECT category FROM facts WHERE id = 'f-exotic'`).get() as { category: string };
       expect(row.category).toBe('requirement');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('re-indexes an exchange that has tool_calls under FK enforcement (upsert, no parent delete)', () => {
+    const db = initDatabase();
+    try {
+      const exchange = {
+        id: 'ex-reindex',
+        project: 'proj',
+        timestamp: new Date().toISOString(),
+        userMessage: 'first pass',
+        assistantMessage: 'answer',
+        archivePath: '/tmp/a.jsonl',
+        lineStart: 1,
+        lineEnd: 2,
+        toolCalls: [
+          {
+            id: 'tc-1',
+            exchangeId: 'ex-reindex',
+            toolName: 'Bash',
+            toolInput: { cmd: 'ls' },
+            toolResult: 'ok',
+            isError: false,
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      };
+      const embedding = new Array(384).fill(0.05);
+
+      insertExchange(db, exchange, embedding);
+      // Re-index the SAME id while a tool_calls child references it —
+      // INSERT OR REPLACE would delete the parent and trip the FK.
+      insertExchange(db, { ...exchange, userMessage: 'second pass' }, embedding);
+
+      const row = db.prepare(`SELECT user_message FROM exchanges WHERE id = 'ex-reindex'`).get() as {
+        user_message: string;
+      };
+      expect(row.user_message).toBe('second pass');
+      const tc = db.prepare(`SELECT COUNT(*) AS n FROM tool_calls WHERE exchange_id = 'ex-reindex'`).get() as {
+        n: number;
+      };
+      expect(tc.n).toBe(1);
+
+      // Deleting the exchange must clear its children first (FK is ON)
+      deleteExchange(db, 'ex-reindex');
+      const gone = db.prepare(`SELECT COUNT(*) AS n FROM exchanges WHERE id = 'ex-reindex'`).get() as {
+        n: number;
+      };
+      expect(gone.n).toBe(0);
     } finally {
       db.close();
     }
