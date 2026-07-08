@@ -193,6 +193,66 @@ describe('facts.category vocabulary migration', () => {
     }
   });
 
+  it('bails out on legacy facts tables carrying custom UNIQUE constraints', () => {
+    const raw = new Database(dbPath);
+    raw.exec(`
+      CREATE TABLE facts (
+        id TEXT PRIMARY KEY,
+        fact TEXT NOT NULL,
+        category TEXT,
+        scope_type TEXT NOT NULL DEFAULT 'project',
+        scope_project TEXT,
+        source_exchange_ids TEXT,
+        embedding BLOB,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        consolidated_count INTEGER DEFAULT 1,
+        is_active INTEGER DEFAULT 1,
+        UNIQUE (fact, scope_type)
+      )
+    `);
+    raw.close();
+
+    const db = initDatabase(); // must not throw
+    try {
+      const sql = (
+        db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facts'`).get() as { sql: string }
+      ).sql;
+      expect(sql).toMatch(/UNIQUE/i); // custom integrity constraint preserved…
+      expect(sql).not.toMatch(/CHECK\s*\(\s*category\s+IN/i); // …by skipping the rebuild
+    } finally {
+      db.close();
+    }
+  });
+
+  it('bails out on legacy relations tables carrying extra custom CHECKs', () => {
+    const raw = new Database(dbPath);
+    raw.exec(`
+      CREATE TABLE ontology_relations (
+        id TEXT PRIMARY KEY,
+        source_fact_id TEXT NOT NULL,
+        relation_type TEXT NOT NULL CHECK(relation_type IN ('INFLUENCES','SUPERSEDES','SUPPORTS','CONTRADICTS')),
+        target_fact_id TEXT NOT NULL,
+        reasoning TEXT CHECK(length(reasoning) < 500),
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+    raw.close();
+
+    const db = initDatabase(); // must not throw
+    try {
+      const sql = (
+        db
+          .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='ontology_relations'`)
+          .get() as { sql: string }
+      ).sql;
+      expect(sql).toContain('length(reasoning)'); // custom CHECK preserved…
+      expect(sql).not.toContain("'DEPENDS_ON'"); // …by keeping the legacy vocabulary
+    } finally {
+      db.close();
+    }
+  });
+
   it('extends the ontology_relations CHECK to the new relation vocabulary', () => {
     // Legacy 4-type table with a row — PLUS a custom column with data and a
     // custom index on it: the generic rebuild must preserve all of it.

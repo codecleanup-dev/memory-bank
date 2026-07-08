@@ -62,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parent (`facts`) tripped child constraints on live-shaped DBs.
 - `search_ontology` handler now closes the DB in `finally` (previously leaked
   the connection on error).
+- Sync import remaps relation endpoints through content-dedup survivors — an
+  edge whose fact was deduped onto an existing local fact used to be dropped
+  by the FK check; post-remap self-loops and already-present edges are
+  skipped instead of duplicated.
 
 ## [1.3.0] - 2026-07-05
 

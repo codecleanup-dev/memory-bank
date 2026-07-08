@@ -171,6 +171,16 @@ export function migrateRelationTypeVocabulary(db: Database.Database): void {
     );
     return;
   }
+  // Same fail-safe for other irreproducible constraint DDL: the shipped
+  // table has exactly ONE CHECK (the relation_type vocabulary this rebuild
+  // replaces) and no UNIQUE/GENERATED — anything beyond that is custom.
+  const checkCount = (tbl.sql.match(/CHECK/gi) ?? []).length;
+  if (checkCount > 1 || /UNIQUE|GENERATED/i.test(tbl.sql)) {
+    console.error(
+      'ontology_relations vocabulary migration skipped: custom constraint DDL present — legacy CHECK stays in place (new relation types are rejected on this DB).',
+    );
+    return;
+  }
 
   // Column-generic copy (custom columns and their data are preserved), plus
   // capture/replay of attached indexes/triggers — nothing outside a
@@ -247,13 +257,15 @@ export function migrateFactsCategoryVocabulary(db: Database.Database): void {
   if (/CHECK\s*\(\s*category\s+IN/i.test(tbl.sql)) return; // already enforced
 
   // Fail-safe for hand-modified DBs: a pragma-based column rebuild cannot
-  // reproduce arbitrary table-level constraints. No shipped facts schema
-  // ever carried FOREIGN KEY/REFERENCES, so this only trips on exotic DBs —
-  // there, leaving the vocabulary write-path-enforced-only beats silently
-  // dropping someone's constraints.
-  if (/FOREIGN\s+KEY|REFERENCES/i.test(tbl.sql)) {
+  // reproduce arbitrary table-level or custom column constraints (FKs,
+  // UNIQUE, custom CHECKs, generated columns). No shipped facts schema ever
+  // carried any of these — this guard runs only when the vocabulary CHECK is
+  // absent, so ANY constraint keyword here is custom DDL. Leaving the
+  // vocabulary write-path-enforced-only beats silently dropping someone's
+  // data-integrity constraints.
+  if (/FOREIGN\s+KEY|REFERENCES|UNIQUE|CHECK|GENERATED/i.test(tbl.sql)) {
     console.error(
-      'facts.category migration skipped: custom FOREIGN KEY/REFERENCES on facts — vocabulary stays write-path-enforced only.',
+      'facts.category migration skipped: custom constraint DDL on facts — vocabulary stays write-path-enforced only.',
     );
     return;
   }
