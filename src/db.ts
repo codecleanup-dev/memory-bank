@@ -6,7 +6,7 @@ import * as sqliteVec from 'sqlite-vec';
 import { getDbPath } from './paths.js';
 import { autoHealScopeProjects } from './project-canon.js';
 import { EMBEDDING_VERSION } from './embeddings.js';
-import { FACT_CATEGORY_CHECK_SQL, normalizeFactCategory } from './fact-category.js';
+import { FACT_CATEGORIES, FACT_CATEGORY_CHECK_SQL, normalizeFactCategory } from './fact-category.js';
 import { RELATION_TYPES } from './types.js';
 
 const RELATION_TYPE_CHECK_SQL = `relation_type IN (${RELATION_TYPES.map((t) => `'${t}'`).join(',')})`;
@@ -254,16 +254,25 @@ export function migrateFactsCategoryVocabulary(db: Database.Database): void {
     .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facts'`)
     .get() as { sql: string } | undefined;
   if (!tbl?.sql) return;
-  if (/CHECK\s*\(\s*category\s+IN/i.test(tbl.sql)) return; // already enforced
+  // Already enforced only when EVERY vocabulary member is present — a
+  // narrower prior CHECK (e.g. two categories) must be rebuilt, or valid
+  // writes like category='constraint' would trip the stale constraint.
+  if (
+    /CHECK\s*\(\s*category\s+IN/i.test(tbl.sql) &&
+    FACT_CATEGORIES.every((c) => tbl.sql.includes(`'${c}'`))
+  ) {
+    return;
+  }
 
   // Fail-safe for hand-modified DBs: a pragma-based column rebuild cannot
   // reproduce arbitrary table-level or custom column constraints (FKs,
   // UNIQUE, custom CHECKs, generated columns). No shipped facts schema ever
-  // carried any of these — this guard runs only when the vocabulary CHECK is
-  // absent, so ANY constraint keyword here is custom DDL. Leaving the
-  // vocabulary write-path-enforced-only beats silently dropping someone's
-  // data-integrity constraints.
-  if (/FOREIGN\s+KEY|REFERENCES|UNIQUE|CHECK|GENERATED/i.test(tbl.sql)) {
+  // carried any of these, so after excluding OUR vocabulary CHECK (which
+  // this migration owns and replaces), any remaining constraint keyword is
+  // custom DDL. Leaving the vocabulary write-path-enforced-only beats
+  // silently dropping someone's data-integrity constraints.
+  const withoutOwnCheck = tbl.sql.replace(/CHECK\s*\(\s*category\s+IN\s*\([^)]*\)\s*\)/i, '');
+  if (/FOREIGN\s+KEY|REFERENCES|UNIQUE|CHECK|GENERATED/i.test(withoutOwnCheck)) {
     console.error(
       'facts.category migration skipped: custom constraint DDL on facts — vocabulary stays write-path-enforced only.',
     );
@@ -794,7 +803,10 @@ export function insertExchange(
       for (const toolCall of exchange.toolCalls) {
         toolStmt.run(
           toolCall.id,
-          toolCall.exchangeId,
+          // The parent id is authoritative: a malformed/stale archive entry
+          // whose exchangeId disagrees would trip the FK and roll back the
+          // whole exchange instead of indexing it.
+          exchange.id,
           toolCall.toolName,
           toolCall.toolInput ? JSON.stringify(toolCall.toolInput) : null,
           toolCall.toolResult || null,

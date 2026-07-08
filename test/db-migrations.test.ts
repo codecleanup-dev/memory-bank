@@ -265,6 +265,89 @@ describe('facts.category vocabulary migration', () => {
     }
   });
 
+  it('rebuilds facts tables whose prior CHECK carries a narrower vocabulary', () => {
+    const raw = new Database(dbPath);
+    raw.exec(`
+      CREATE TABLE facts (
+        id TEXT PRIMARY KEY,
+        fact TEXT NOT NULL,
+        category TEXT NOT NULL CHECK (category IN ('decision','knowledge')),
+        scope_type TEXT NOT NULL DEFAULT 'project',
+        scope_project TEXT,
+        source_exchange_ids TEXT,
+        embedding BLOB,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        consolidated_count INTEGER DEFAULT 1,
+        is_active INTEGER DEFAULT 1
+      )
+    `);
+    raw
+      .prepare(
+        `INSERT INTO facts (id, fact, category, created_at, updated_at) VALUES ('f-narrow', 'narrow vocab row', 'decision', datetime('now'), datetime('now'))`,
+      )
+      .run();
+    raw.close();
+
+    const db = initDatabase();
+    try {
+      // Every vocabulary member must be writable after init
+      const id = insertFact(db, {
+        fact: 'constraint category must be accepted',
+        category: 'constraint',
+        scope_type: 'global',
+        scope_project: null,
+        source_exchange_ids: [],
+        embedding: null,
+      });
+      const row = db.prepare('SELECT category FROM facts WHERE id = ?').get(id) as { category: string };
+      expect(row.category).toBe('constraint');
+      const kept = db.prepare(`SELECT category FROM facts WHERE id = 'f-narrow'`).get() as { category: string };
+      expect(kept.category).toBe('decision');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('stores tool_calls under the authoritative parent exchange id', () => {
+    const db = initDatabase();
+    try {
+      const embedding = new Array(384).fill(0.05);
+      insertExchange(
+        db,
+        {
+          id: 'ex-parent',
+          project: 'proj',
+          timestamp: new Date().toISOString(),
+          userMessage: 'u',
+          assistantMessage: 'a',
+          archivePath: '/tmp/a.jsonl',
+          lineStart: 1,
+          lineEnd: 2,
+          toolCalls: [
+            {
+              id: 'tc-mismatch',
+              exchangeId: 'ex-SOMETHING-ELSE', // malformed archive entry
+              toolName: 'Bash',
+              toolInput: undefined,
+              toolResult: 'ok',
+              isError: false,
+              timestamp: new Date().toISOString(),
+            },
+          ],
+        },
+        embedding,
+      ); // must not throw under FK enforcement
+
+      const row = db.prepare(`SELECT exchange_id FROM tool_calls WHERE id = 'tc-mismatch'`).get() as {
+        exchange_id: string;
+      };
+      expect(row.exchange_id).toBe('ex-parent');
+    } finally {
+      db.close();
+    }
+  });
+
   it('bails out on legacy facts tables carrying custom UNIQUE constraints', () => {
     const raw = new Database(dbPath);
     raw.exec(`
