@@ -143,6 +143,18 @@ export const RELATION_TYPES = [
 
 export type RelationType = (typeof RELATION_TYPES)[number];
 
+/**
+ * Order-independent relation semantics: A SUPPORTS B carries the same claim
+ * as B SUPPORTS A, and CONTRADICTS is inherently mutual — an
+ * opposite-direction duplicate of these is pure noise. Every other type is
+ * directional: the reverse edge is a DISTINCT claim (dependency cycle,
+ * competing canonicality, mutual derivation) that dedup must not swallow.
+ */
+export const SYMMETRIC_RELATION_TYPES: ReadonlySet<RelationType> = new Set([
+  'SUPPORTS',
+  'CONTRADICTS',
+]);
+
 export interface OntologyRelation {
   id: string;
   source_fact_id: string;

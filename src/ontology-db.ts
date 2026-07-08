@@ -8,6 +8,7 @@ import type {
   DomainTree,
   Fact,
 } from './types.js';
+import { SYMMETRIC_RELATION_TYPES } from './types.js';
 
 // === Domain CRUD ===
 
@@ -210,14 +211,20 @@ export function createRelation(
 }
 
 /**
- * Whether a relation (either direction) already links the two facts —
- * optionally scoped to one relation type.
+ * Duplicate-edge check used by the detection channels, honouring relation
+ * semantics:
  *
- * Type-scoped is the dedup used by the detection channels: an identical-type
- * edge must not be persisted twice, but a DIFFERENT type between the same
- * pair is legitimate relationship evolution (a SUPPORTS pair can turn
- * CONTRADICTS after one fact is revised in place) and must stay recordable —
- * otherwise the consistency queue can never see late-discovered conflicts.
+ * - type given, SYMMETRIC (SUPPORTS/CONTRADICTS): either direction counts as
+ *   a duplicate — the reverse edge carries the same claim.
+ * - type given, DIRECTIONAL (DEPENDS_ON/DERIVED_FROM/SUPERSEDES/INFLUENCES):
+ *   only the exact a→b edge is a duplicate. The reverse edge is a distinct
+ *   claim (dependency cycle, competing canonicality) that the graph — and
+ *   the consistency queue — must be able to record.
+ * - no type: any edge in either direction (coarse existence probe).
+ *
+ * A DIFFERENT type between the same pair is never a duplicate: that is
+ * relationship evolution (a SUPPORTS pair can turn CONTRADICTS after a fact
+ * is revised in place) and must stay recordable.
  */
 export function relationExistsBetween(
   db: Database.Database,
@@ -225,6 +232,17 @@ export function relationExistsBetween(
   factIdB: string,
   relationType?: RelationType,
 ): boolean {
+  if (relationType && !SYMMETRIC_RELATION_TYPES.has(relationType)) {
+    return (
+      db
+        .prepare(
+          `SELECT 1 AS one FROM ontology_relations
+           WHERE source_fact_id = ? AND target_fact_id = ? AND relation_type = ?
+           LIMIT 1`,
+        )
+        .get(factIdA, factIdB, relationType) !== undefined
+    );
+  }
   return (
     db
       .prepare(

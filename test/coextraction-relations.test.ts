@@ -118,6 +118,27 @@ describe('co-extraction relation channel', () => {
     expect(rels.map((r) => r.relation_type).sort()).toEqual(['CONTRADICTS', 'SUPPORTS']);
   });
 
+  it('directional types record the reverse edge (dependency cycles must stay visible)', async () => {
+    const a = mkFact('module a');
+    const b = mkFact('module b');
+    // Existing claim: b depends on a
+    createRelation(db, b, 'DEPENDS_ON', a, 'b needs a');
+
+    // New evidence: a depends on b — a DISTINCT (cycle-revealing) claim, not a duplicate
+    (callHaiku as Mock).mockResolvedValue('raw');
+    (parseJsonResponse as Mock).mockReturnValue({
+      has_relation: true,
+      relation_type: 'DEPENDS_ON',
+      reasoning: 'a needs b too',
+    });
+    await detectCoExtractionRelations(db, [a, b]);
+    expect(getRelationsForFact(db, a)).toHaveLength(2);
+
+    // Exact same direction again → true duplicate, not persisted
+    await detectCoExtractionRelations(db, [a, b]);
+    expect(getRelationsForFact(db, a)).toHaveLength(2);
+  });
+
   it('caps probes at MAX_COEXTRACT_PAIRS consecutive pairs', async () => {
     const ids = ['one', 'two', 'three', 'four', 'five'].map((n) => mkFact(`fact ${n}`));
 

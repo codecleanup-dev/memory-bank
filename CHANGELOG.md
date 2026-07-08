@@ -39,8 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependency/derivation links the similarity channel structurally misses —
   SUPPORTS was 83% of all 8,948 relations because candidates were
   embedding-near pairs only. Off-vocabulary LLM answers are rejected before
-  persist; dedup is per (pair, type) — an identical-type edge is never
-  written twice, while a different type between an already-linked pair
+  persist; dedup honours relation semantics — symmetric types
+  (SUPPORTS/CONTRADICTS) dedupe in either direction, directional types
+  (DEPENDS_ON/DERIVED_FROM/SUPERSEDES/INFLUENCES) only exact-direction so
+  reverse claims (dependency cycles, competing canonicality) stay
+  recordable, and a different type between an already-linked pair
   (relationship evolution, e.g. SUPPORTS later found CONTRADICTS) is
   recorded so the consistency queue can see late conflicts.
 
