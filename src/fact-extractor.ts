@@ -3,7 +3,7 @@ import type { ExtractedFact } from './types.js';
 import { callHaiku, parseJsonResponse } from './llm.js';
 import { insertFact } from './fact-db.js';
 import { generateEmbedding, initEmbeddings } from './embeddings.js';
-import { classifyAndLinkFact } from './ontology-classifier.js';
+import { classifyAndLinkFact, detectCoExtractionRelations } from './ontology-classifier.js';
 
 const EXTRACTION_SYSTEM_PROMPT = `You are an expert at extracting long-term facts from conversations.
 
@@ -228,6 +228,7 @@ export async function saveExtractedFacts(
       coding_agent: codingAgent,
       fact_kr: fact.fact_kr ?? null,
       embedding_kr: embeddingKr,
+      confidence: fact.confidence,
     });
 
     savedIds.push(id);
@@ -237,6 +238,17 @@ export async function saveExtractedFacts(
       await classifyAndLinkFact(db, id, embedding);
     } catch (err) {
       console.error(`Ontology pipeline failed for fact ${id}:`, err);
+    }
+  }
+
+  // Co-extraction relation channel: consecutive facts of this batch are
+  // probed for DEPENDS_ON/DERIVED_FROM links the similarity channel cannot
+  // nominate (bounded at MAX_COEXTRACT_PAIRS probes; non-fatal).
+  if (savedIds.length >= 2) {
+    try {
+      await detectCoExtractionRelations(db, savedIds);
+    } catch (err) {
+      console.error('Co-extraction relation detection failed:', err);
     }
   }
 
