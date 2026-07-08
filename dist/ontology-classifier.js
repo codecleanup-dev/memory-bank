@@ -1,7 +1,12 @@
+import { RELATION_TYPES } from './types.js';
 import { callHaiku, parseJsonResponse } from './llm.js';
 import { generateEmbedding } from './embeddings.js';
 import { searchSimilarFacts } from './fact-db.js';
-import { listDomains, getDomainByName, getCategoryByName, createDomain, createCategory, classifyFact, createRelation, searchSimilarCategories, upsertCategoryEmbedding, } from './ontology-db.js';
+import { listDomains, getDomainByName, getCategoryByName, createDomain, createCategory, classifyFact, createRelation, relationExistsBetween, searchSimilarCategories, upsertCategoryEmbedding, } from './ontology-db.js';
+const VALID_RELATION_TYPES = new Set(RELATION_TYPES);
+// Cap on co-extraction relation probes per extraction batch — each probe is
+// one Haiku call on top of the ≤12-call extraction budget.
+export const MAX_COEXTRACT_PAIRS = 3;
 // Nearest existing categories presented per fact as reuse candidates —
 // embedding top-K instead of dumping ALL categories (measured 1,612 ≈ 95K
 // tokens); kept small so a 20-fact batch stays a few KB. The full domain
@@ -126,6 +131,8 @@ Given a new fact and an existing fact, determine if there is a meaningful relati
 - SUPERSEDES: new fact replaces or overrides the existing fact
 - SUPPORTS: new fact provides evidence or reinforcement for the existing fact
 - CONTRADICTS: new fact conflicts with the existing fact
+- DEPENDS_ON: new fact only holds because of the existing fact (prerequisite/requirement)
+- DERIVED_FROM: new fact is a refinement or consequence derived from the existing fact
 
 ## Rules
 - Only report a relation if it is clear and meaningful
@@ -134,7 +141,7 @@ Given a new fact and an existing fact, determine if there is a meaningful relati
 ## Output format (JSON only, no markdown)
 {
   "has_relation": true,
-  "relation_type": "INFLUENCES|SUPERSEDES|SUPPORTS|CONTRADICTS",
+  "relation_type": "INFLUENCES|SUPERSEDES|SUPPORTS|CONTRADICTS|DEPENDS_ON|DERIVED_FROM",
   "reasoning": "one-line explanation"
 }`;
 /** Embed "name: description" in passage mode so the candidate index matches facts. */
@@ -671,6 +678,40 @@ export function parkExhaustedFacts(db) {
         .run(fallback.categoryId, new Date().toISOString(), MAX_CLASSIFY_ATTEMPTS);
     return result.changes;
 }
+/**
+ * Probe ONE candidate pair with the LLM and persist the relation when valid.
+ * Shared by the similarity channel (detectRelations) and the co-extraction
+ * channel (detectCoExtractionRelations).
+ *
+ * Dedup is per (pair, type) at persist time — NOT a blanket any-relation
+ * skip: an identical-type edge is never written twice, but a different type
+ * between an already-linked pair is relationship evolution (SUPPORTS pair
+ * later found CONTRADICTS after a fact was revised in place) and must be
+ * recorded, or the consistency queue can never see late conflicts.
+ */
+async function detectRelationBetween(db, newFact, existingFact, contextNote) {
+    const lines = [
+        `New fact: "${newFact.fact}"`,
+        `Existing fact: "${existingFact.fact}"`,
+        `New fact category: ${newFact.category}`,
+        `Existing fact category: ${existingFact.category}`,
+    ];
+    if (contextNote)
+        lines.push(`Context: ${contextNote}`);
+    const response = await callHaiku(DETECT_RELATION_SYSTEM_PROMPT, lines.join('\n'), 256);
+    const result = parseJsonResponse(response);
+    if (!result || !result.has_relation || !result.relation_type)
+        return false;
+    // The CHECK constraint would reject junk anyway, but validating first keeps
+    // an off-vocabulary LLM answer from throwing away the whole probe.
+    if (!VALID_RELATION_TYPES.has(result.relation_type))
+        return false;
+    // Exact-duplicate edge (same pair, same type, either direction) — skip.
+    if (relationExistsBetween(db, newFact.id, existingFact.id, result.relation_type))
+        return false;
+    createRelation(db, newFact.id, result.relation_type, existingFact.id, result.reasoning);
+    return true;
+}
 export async function detectRelations(db, newFact, 
 // 2 (was 5): each candidate costs one Haiku call, so per-fact ontology cost
 // was classify ×1 + relations ×0..5 = up to 6 calls. Capping candidates at 2
@@ -685,22 +726,52 @@ topK = 2) {
     const similar = searchSimilarFacts(db, embeddingArray, newFact.scope_project, topK, 0.89);
     const candidates = similar.filter((s) => s.fact.id !== newFact.id);
     for (const { fact: existingFact } of candidates) {
-        const prompt = [
-            `New fact: "${newFact.fact}"`,
-            `Existing fact: "${existingFact.fact}"`,
-            `New fact category: ${newFact.category}`,
-            `Existing fact category: ${existingFact.category}`,
-        ].join('\n');
         try {
-            const response = await callHaiku(DETECT_RELATION_SYSTEM_PROMPT, prompt, 256);
-            const result = parseJsonResponse(response);
-            if (result && result.has_relation && result.relation_type) {
-                createRelation(db, newFact.id, result.relation_type, existingFact.id, result.reasoning);
-            }
+            await detectRelationBetween(db, newFact, existingFact);
         }
         catch (error) {
             // Non-fatal: relation detection failure should not block fact saving
             console.error(`Relation detection failed for facts ${newFact.id} / ${existingFact.id}:`, error);
+        }
+    }
+}
+/**
+ * Co-extraction relation channel.
+ *
+ * The similarity channel only nominates embedding-near pairs (≥0.89), which
+ * structurally favours SUPPORTS (measured 83% of 8,948 relations,
+ * 2026-07-07): facts that DEPEND on or DERIVE from each other are usually
+ * NOT textually similar, so they never even become candidates. Facts saved
+ * from the same session extraction batch are natural candidates for exactly
+ * those links. Consecutive pairs only, capped at `maxPairs` probes,
+ * non-fatal like every other ontology step.
+ */
+export async function detectCoExtractionRelations(db, factIds, maxPairs = MAX_COEXTRACT_PAIRS) {
+    const pairs = [];
+    for (let i = 0; i + 1 < factIds.length && pairs.length < maxPairs; i++) {
+        pairs.push([factIds[i], factIds[i + 1]]);
+    }
+    if (pairs.length === 0)
+        return;
+    const load = (id) => {
+        const row = db.prepare(`SELECT * FROM facts WHERE id = ? AND is_active = 1`).get(id);
+        return row ? rowToFact(row) : null;
+    };
+    for (const [earlierId, laterId] of pairs) {
+        const earlier = load(earlierId);
+        const later = load(laterId);
+        if (!earlier || !later)
+            continue;
+        try {
+            // The detection prompt frames the pair as "new fact" vs "existing
+            // fact". Within one extraction batch the LATER fact is the newer
+            // claim, so it must take the "new" slot — probing in insertion order
+            // would flip directional edges (later DEPENDS_ON earlier would be
+            // stored as earlier DEPENDS_ON later).
+            await detectRelationBetween(db, later, earlier, 'both facts were extracted from the same working session');
+        }
+        catch (error) {
+            console.error(`Co-extraction relation probe failed for facts ${earlierId} / ${laterId}:`, error);
         }
     }
 }

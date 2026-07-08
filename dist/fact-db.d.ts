@@ -10,6 +10,7 @@ interface InsertFactParams {
     coding_agent?: string;
     fact_kr?: string | null;
     embedding_kr?: number[] | null;
+    confidence?: number | null;
 }
 interface UpdateFactParams {
     fact?: string;

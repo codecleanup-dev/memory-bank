@@ -51,6 +51,29 @@ codex-support 완성·검증 후 활성화까지가 끝. **원작자에게 PR �
 
 ## 업스트림 동기화 기록
 
+### 2026-07-08 — upstream v1.3.2·v1.3.3 반영 (b453234 → 70c17c6, 27커밋) → 포크 1.4.2
+
+| 묶음 | 커밋 | 내용 | 판정 |
+|---|---|---|---|
+| consolidation 워커 락·게이트 | df88784…1f69cb2 (v1.3.2 + R2~R18, 17) | 단일 실행 락(고아 워커 flood 차단), 전역 락+전 프로젝트 drain, same-scope 격리(R4~R6 CRITICAL), keyset 커서(R14), drain 페이지네이션+쿼런틴(R16 CRITICAL), circuit-breaker→cross-run ledger | 채택 |
+| 에러 분류 수렴 | 47c2d59…aff39a9 (R19~R25, 7) | outage/deterministic/내부버그 3-값 분류(무한 wedge 제거), auth 401/403/404 명시 hold(silent drain 방지), 중첩 SDK/axios status 추출 | 채택 |
+| 워커 세션 색인 오염 차단 | 70c17c6 (v1.3.3) | isExcludedProject 내장 제외(`*-memory-bank-llm`, indexer/sync/verify 전 경로) + 트랜스크립트 TTL prune (upstream 측정: 11,573파일/99MB) | 채택 |
+| 문서·빌드 | 03f16de, ae2ff13 | CHANGELOG 1.3.2 + consolidator.d.ts 타입 동기화 | 채택 |
+
+- 전량 채택. 선행: 분기 정합 PR #4 (로컬 1.4.1 계열 15커밋 ∥ origin ontology 독립리뷰 29커밋 — CHANGELOG·ontology-db 충돌 해소) 위에서 수행.
+- 실충돌: 버전 3파일 + CHANGELOG + dist 3 + src/paths.ts·src/sync.ts. paths는 포크
+  findJsonlFiles ∥ upstream isExcludedProject 가산 공존, sync는 포크 재구조화(재귀
+  코덱스/1단 기본) 유지 + 1단 분기 제외 검사만 upstream 의미로 교체.
+- 포크 패치 대장 4종 보존 확인 (parser 라우터·paths/sync-cli/sync stamp, 프라이버시
+  인코딩, 런타임 pin .nvmrc/engines/wrapper, upstream-watch).
+- 검증: tsc 통과, vitest 412/414 (upstream 신규 paths/llm/consolidate 테스트 포함) —
+  실패 2건은 알려진 베이스라인(api-config httpbin 외부 네트워크·verify re-index 30s 마진).
+- dist는 pin 노드(v22.22.3)로 전체 재빌드 — **ontology 작업 신규 12파일(consistency·
+  taxonomy-align·fact-category·ontology-view + CLI·d.ts)이 최초 컴파일 포함** (origin/main
+  dist는 PR #3 이후 src 대비 stale였음). import 스모크 8/8 통과.
+- 참고: `*-memory-bank-llm` 제외(v1.3.3)는 이 머신의 워커 세션 오염에도 직접 적용 —
+  플러그인 갱신 후 verify/repair 1회로 기존 색인 오염 정리 후보.
+
 ### 2026-07-05 — upstream v1.3.1 반영 (e8bec6d → b453234, 13커밋) → 포크 1.4.1
 
 | 묶음 | 커밋 | 내용 | 판정 |

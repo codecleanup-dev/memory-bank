@@ -20,10 +20,11 @@ export function exportForSync() {
     const db = initDatabase();
     const syncDir = getSyncDir();
     try {
-        // Export facts (fact_kr included so other devices can build Korean vectors)
+        // Export facts (fact_kr included so other devices can build Korean
+        // vectors; confidence included so the reliability signal survives sync)
         const facts = db.prepare(`
       SELECT id, fact, fact_kr, category, scope_type, scope_project, source_exchange_ids,
-             created_at, updated_at, consolidated_count, ontology_category_id
+             created_at, updated_at, consolidated_count, ontology_category_id, confidence
       FROM facts WHERE is_active = 1
     `).all();
         const factsPath = path.join(syncDir, 'facts.jsonl');
@@ -37,8 +38,20 @@ export function exportForSync() {
         const categories = db.prepare('SELECT * FROM ontology_categories').all();
         const categoriesPath = path.join(syncDir, 'ontology-categories.jsonl');
         fs.writeFileSync(categoriesPath, categories.map(c => JSON.stringify(c)).join('\n') + '\n');
-        // Export relations
-        const relations = db.prepare('SELECT * FROM ontology_relations').all();
+        // Export relations — only edges whose BOTH endpoints are in the export
+        // set (active facts). An edge referencing an inactive/superseded fact
+        // would be silently dropped by the importer's FK check anyway; filtering
+        // here makes the sync set self-consistent, and the exclusion is counted
+        // instead of silent.
+        const relationsTotal = db.prepare('SELECT COUNT(*) AS n FROM ontology_relations').get().n;
+        const relations = db.prepare(`
+      SELECT r.* FROM ontology_relations r
+      JOIN facts a ON a.id = r.source_fact_id AND a.is_active = 1
+      JOIN facts b ON b.id = r.target_fact_id AND b.is_active = 1
+    `).all();
+        if (relationsTotal > relations.length) {
+            console.error(`sync-export: ${relationsTotal - relations.length} relations excluded (endpoint inactive or missing — local history only).`);
+        }
         const relationsPath = path.join(syncDir, 'ontology-relations.jsonl');
         fs.writeFileSync(relationsPath, relations.map(r => JSON.stringify(r)).join('\n') + '\n');
         // Export metadata

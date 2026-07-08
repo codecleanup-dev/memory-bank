@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import type { Fact } from './types.js';
 import { generateEmbedding } from './embeddings.js';
+export declare const MAX_COEXTRACT_PAIRS = 3;
 export declare const MAX_CLASSIFY_ATTEMPTS = 3;
 /**
  * The LLM CALL itself failed (SDK/network/spawn/empty stream) — the fact is
@@ -119,5 +120,17 @@ export declare function backfillClassifyBatch(db: Database.Database, factIds: st
  */
 export declare function parkExhaustedFacts(db: Database.Database): number;
 export declare function detectRelations(db: Database.Database, newFact: Fact, topK?: number): Promise<void>;
+/**
+ * Co-extraction relation channel.
+ *
+ * The similarity channel only nominates embedding-near pairs (≥0.89), which
+ * structurally favours SUPPORTS (measured 83% of 8,948 relations,
+ * 2026-07-07): facts that DEPEND on or DERIVE from each other are usually
+ * NOT textually similar, so they never even become candidates. Facts saved
+ * from the same session extraction batch are natural candidates for exactly
+ * those links. Consecutive pairs only, capped at `maxPairs` probes,
+ * non-fatal like every other ontology step.
+ */
+export declare function detectCoExtractionRelations(db: Database.Database, factIds: string[], maxPairs?: number): Promise<void>;
 export declare function classifyAndLinkFact(db: Database.Database, factId: string, embedding?: number[]): Promise<void>;
 export { generateEmbedding };
