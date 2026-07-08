@@ -178,7 +178,10 @@ export function applyMerges(db: Database.Database, candidates: MergeCandidate[])
     return cur;
   };
 
-  const exists = db.prepare('SELECT 1 AS one FROM ontology_categories WHERE id = ?');
+  const catStmt = db.prepare('SELECT id, created_at FROM ontology_categories WHERE id = ?');
+  const countStmt = db.prepare(
+    'SELECT COUNT(*) AS n FROM facts WHERE is_active = 1 AND ontology_category_id = ?',
+  );
   const mergeTx = db.transaction((keepId: string, dropId: string): number => {
     const res = db
       .prepare('UPDATE facts SET ontology_category_id = ? WHERE ontology_category_id = ?')
@@ -200,14 +203,32 @@ export function applyMerges(db: Database.Database, candidates: MergeCandidate[])
       result.skippedCrossDomain++;
       continue;
     }
-    const keep = resolve(cand.keepId);
-    const drop = resolve(cand.dropId);
-    if (keep === drop || !exists.get(keep) || !exists.get(drop)) {
+    const a = resolve(cand.keepId);
+    const b = resolve(cand.dropId);
+    if (a === b) {
       result.skippedStale++;
       continue;
     }
-    result.factsRemapped += mergeTx.immediate(keep, drop);
-    remap.set(drop, keep);
+    const aRow = catStmt.get(a) as { id: string; created_at: string } | undefined;
+    const bRow = catStmt.get(b) as { id: string; created_at: string } | undefined;
+    if (!aRow || !bRow) {
+      result.skippedStale++;
+      continue;
+    }
+
+    // Re-decide the survivor with CURRENT state — earlier merges may have
+    // moved facts, so carrying the stale candidate's keep/drop roles across a
+    // resolved chain can invert the intended survivor (e.g. A absorbs C,
+    // then a stale B-C pair would delete A into B). Same rule as detection:
+    // more active facts wins, tie → the older category.
+    const aCount = (countStmt.get(a) as { n: number }).n;
+    const bCount = (countStmt.get(b) as { n: number }).n;
+    const aSurvives = aCount > bCount || (aCount === bCount && aRow.created_at <= bRow.created_at);
+    const survivor = aSurvives ? a : b;
+    const absorbed = aSurvives ? b : a;
+
+    result.factsRemapped += mergeTx.immediate(survivor, absorbed);
+    remap.set(absorbed, survivor);
     result.merged++;
   }
   return result;

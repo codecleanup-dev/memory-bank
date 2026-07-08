@@ -150,6 +150,39 @@ describe('taxonomy alignment', () => {
     expect(remaining).not.toContain(cC.id);
   });
 
+  it('re-decides the survivor after chain resolution — stale roles cannot invert it', () => {
+    const domain = createDomain(db, 'Stale');
+    const cA = createCategory(db, domain.id, 'Stale A');
+    const cB = createCategory(db, domain.id, 'Stale B');
+    const cC = createCategory(db, domain.id, 'Stale C');
+    seedFacts(cA.id, 3, 'A');
+    seedFacts(cB.id, 2, 'B');
+    seedFacts(cC.id, 1, 'C');
+
+    // Adversarial candidate ORDER: A absorbs C first; the later stale B–C
+    // pair resolves its drop side to A — without re-deciding, the largest
+    // category (A) would be deleted into B.
+    const cand = (keepId: string, keepName: string, keepN: number, dropId: string, dropName: string, dropN: number) => ({
+      keepId, keepName, keepDomain: 'Stale', keepFactCount: keepN,
+      dropId, dropName, dropDomain: 'Stale', dropFactCount: dropN,
+      similarity: 1, sameDomain: true,
+    });
+    const result = applyMerges(db, [
+      cand(cA.id, 'Stale A', 3, cC.id, 'Stale C', 1),
+      cand(cB.id, 'Stale B', 2, cC.id, 'Stale C', 1),
+    ]);
+
+    expect(result.merged).toBe(2);
+    const remaining = (db.prepare(`SELECT id FROM ontology_categories WHERE id IN (?, ?, ?)`).all(
+      cA.id, cB.id, cC.id,
+    ) as Array<{ id: string }>).map((r) => r.id);
+    expect(remaining).toEqual([cA.id]); // the largest category survives
+    const total = db
+      .prepare('SELECT COUNT(*) AS n FROM facts WHERE ontology_category_id = ?')
+      .get(cA.id) as { n: number };
+    expect(total.n).toBe(6);
+  });
+
   it('never proposes merging the General/Misc parking category', () => {
     const general = createDomain(db, 'General', 'General purpose facts');
     const misc = createCategory(db, general.id, 'Misc', 'Miscellaneous facts');
