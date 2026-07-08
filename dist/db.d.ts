@@ -19,6 +19,8 @@ export declare function vecParamSql(dtype: VecDtype): string;
 /** Normalize a vec KNN distance back to float32 scale (int8 distances are ×127). */
 export declare function normalizeVecDistance(distance: number, dtype: VecDtype): number;
 export declare function migrateSchema(db: Database.Database): void;
+export declare function migrateRelationTypeVocabulary(db: Database.Database): void;
+export declare function migrateFactsCategoryVocabulary(db: Database.Database): void;
 export declare function initDatabase(): Database.Database;
 export declare function insertExchange(db: Database.Database, exchange: ConversationExchange, embedding: number[], _toolNames?: string[]): void;
 export declare function getAllExchanges(db: Database.Database): Array<{

@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.2] - 2026-07-08
+
+_Fork release: ships the ontology work below compiled into dist, and merges
+upstream v1.3.2–v1.3.3 (own sections below)._
 
 ### Added
 - **Controlled category vocabulary**: `facts.category` now carries
@@ -66,6 +69,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   edge whose fact was deduped onto an existing local fact used to be dropped
   by the FK check; post-remap self-loops and already-present edges are
   skipped instead of duplicated.
+
+## [1.3.3] - 2026-07-08
+
+### Fixed
+- **LLM worker sessions no longer pollute the conversation index** — every Haiku
+  call spawns a one-shot headless CLI session under `<tmpdir>/memory-bank-llm`;
+  those transcripts were being indexed like real conversations (measured: 4,351
+  sessions / 6.7k exchange rows). `isExcludedProject()` (paths.ts) now built-in
+  excludes any project slug ending with `-memory-bank-llm` (current fixed workdir
+  and legacy mkdtemp variants alike) and is applied at every exchange-inserting
+  walk: `indexConversations` / `indexSession` / `indexUnprocessed` (indexer.ts),
+  sync (sync.ts) and verify (verify.ts). Ephemeral worker state is not knowledge.
+- **Worker transcripts no longer accumulate forever** — nothing ever deleted the
+  one-shot session transcripts (measured: 11,573 files / 99MB under
+  `~/.claude/projects/*-memory-bank-llm`). `pruneLlmTranscripts()` (llm.ts) now
+  runs opportunistically (throttled to at most hourly) on each LLM call: deletes
+  only `.jsonl` / `-summary.txt` files older than a TTL
+  (`MEMORY_BANK_LLM_TRANSCRIPT_TTL_HOURS`, default 24h, hard floor 1h so an
+  in-flight transcript can never be reaped), strictly inside the reserved
+  `*-memory-bank-llm` slug namespace, never following symlinks, removing legacy
+  slug dirs once emptied, and never throwing into the LLM call path.
+- **Polluted rows cannot become extraction candidates** (defense in depth) —
+  `backfill-extract-worker` drops sessions whose `cwd` ends with
+  `/memory-bank-llm` from the pending queue, so exchanges indexed before this
+  fix cannot feed fact extraction (which would spawn yet more Haiku sessions —
+  a self-referential loop). The `NOT IN` subquery filters `session_id IS NOT
+  NULL` explicitly: one NULL inside `NOT IN` nulls the whole predicate
+  (3-valued logic) and would silently drain the entire backfill.
+- **All Agent SDK spawn sites are now contained** — summarizer.ts and
+  translate-facts.mjs ran `query()` without `cwd`/`settingSources`, so their
+  sessions landed in the caller's project slug (indexable, unpruned) and loaded
+  user settings whose SessionStart/End hooks re-spawn sync/backfill workers
+  (session cascade). Both now share the same containment as llm.ts `callHaiku`:
+  `cwd: llmWorkdir()`, `settingSources: []`.
+- `BACKFILL_MIN_EXCHANGES` is validated via `boundedInt` before being
+  interpolated into SQL — a garbage value (`'abc'` → `NaN`) used to produce
+  invalid query text at runtime.
+
+## [1.3.2] - 2026-07-05
+
+### Fixed
+- **`fact-consolidate-worker` had no single-instance lock** — the SessionStart hook
+  spawns it detached on every session with no lock, so orphaned workers (ppid=1) piled
+  up (measured 14 at once), each spawning a headless Claude session per LLM call and
+  flooding the proxy across the account pool. Added a GLOBAL atomic `wx` pid-lock (same
+  pattern as the ontology/extract/reembed workers). The lock is global, not per-project,
+  because consolidation touches shared global-scope facts — concurrent per-project
+  workers would race on the same rows.
+- **Consolidation now processes the whole backlog in one pass** (`consolidateAllPending`
+  / `getAllNewFactsSince`): the single lock-holder walks every new fact across all
+  scopes/projects exactly once under a single Haiku budget, instead of looping
+  `consolidateFacts` per project — which re-examined shared global facts once per project
+  (up to `MAX_HAIKU_CALLS × projectCount` calls, since INDEPENDENT/CONTRADICTION verdicts
+  keep the fact active) and could starve a project whose only pending work was an old
+  fact matching a new global one. Same orphan-flood class fixed for the backfill workers
+  in v1.3.0; the consolidate worker was the last detached worker missing a lock.
+- **Same-scope-only consolidation** (`searchSimilarFactsSameScope`): a fact is compared
+  ONLY within its own scope — a project fact against its own project's facts, a global
+  fact against other global facts — with the scope gate applied to the full candidate
+  overfetch BEFORE truncation, so an in-scope match is never starved out by closer
+  out-of-scope rows. This closes a cross-scope data-leak/mutation path in both directions:
+  a global driver reaching into a project's private rows, AND a project-private driver
+  rewriting a shared global fact via EVOLUTION (leaking private text to every project) or
+  deactivating it via CONTRADICTION. The old per-project `consolidateFacts()` (which used
+  a project-scoped search that still included globals) was removed — all consolidation
+  now goes through the single-pass, scope-isolated `consolidateAllPending`. The
+  same-scope search pages the KNN fetch (growing until enough in-scope hits or the
+  whole index is scanned) so even >200 closer out-of-scope rows cannot hide a valid
+  in-scope match. `consolidateFacts` is kept as a deprecated, now-scope-safe back-compat
+  export so existing importers don't crash at module load.
+- **Unparseable comparison output is a no-op, not a hard stop**: consolidation is a
+  best-effort background dedup, so a comparison whose LLM output isn't valid JSON is
+  treated as "no verdict" and the cursor advances past it (the call still counts against
+  the per-run Haiku budget). The pair is not lost — both facts stay active and the
+  comparison re-triggers whenever either is a driver/candidate later — and no single fact
+  (a transient non-JSON response, or a deliberately crafted one) can hold the cursor and
+  starve the rest of the backlog. Only TRANSIENT call failures (callHaiku rejected — infra
+  down) hold the cursor to retry, which is safe because during an outage nothing else
+  would progress either.
+- **Keyset consolidation cursor `(created_at, id)`**: the progress cursor was keyed on
+  `created_at` alone, which stalled forever when a single timestamp group held more facts
+  than the per-run Haiku budget (the cursor couldn't advance into a shared timestamp
+  without risking a skip, so every run reprocessed the same oldest N and never reached the
+  rest of the backlog). Keying on the unique `(created_at, id)` pair lets the drain advance
+  one fact at a time — no stall, no same-timestamp skip. The cursor is persisted as JSON;
+  an absent/legacy/corrupt cursor makes the drain start from the BEGINNING (no active fact
+  is skipped — the per-run budget only caps actual consolidation calls, so the whole
+  backlog drains across a few runs regardless of age). A fact imported mid-drain with an
+  old timestamp is not re-driven by the current pass but is still a candidate for future
+  comparisons (best-effort dedup, documented).
+- **Bounded drain page + index**: the consolidation query pages the keyset (LIMIT 2000)
+  instead of materializing every active fact, and a new `idx_facts_active_created_id`
+  index serves the `(is_active, created_at, id)` filter+sort — so a from-the-beginning
+  drain over tens of thousands of facts can't OOM or trigger a full-table temp sort.
+- **Error-classified consolidation failure handling** (`classifyLlmError`): a comparison
+  CALL rejection is three-valued — TRANSIENT (429/5xx/timeout/network/auth), DETERMINISTIC
+  (400/413/422/oversized-prompt), or UNKNOWN (unrecognized). The status is read from the
+  structured error (`status`/`statusCode`) OR the nested SDK/axios shape
+  (`error.response.status`) OR a status number explicitly labelled in the message
+  ("status code 400") — never a bare incidental number ("retry after 400 ms"). The drain
+  loop SKIPS (advances after `facts.consolidation_attempts` reaches MAX, idempotent
+  migration) **only** on a recognized DETERMINISTIC rejection — the one case where the fact
+  itself is provably at fault. TRANSIENT, UNKNOWN, and any non-LLM internal error
+  (parser/DB bug, tagged apart via `LlmCallError`) all HOLD the cursor and retry — an
+  outage or an unrecognized error never silently drains the backlog, and a code bug never
+  gets miscounted as a "bad fact". Skipping only on a certain per-request rejection is the
+  narrowest, safest criterion that satisfies both "an outage must not silently drain the
+  backlog" and "one un-processable fact must not wedge the cursor".
+- **Persisted consolidation cursor**: the worker records the last fully-examined
+  `created_at` (`fact-consolidate-cursor.txt`) and resumes after it, so the single Haiku
+  budget reaches newer/project backlog instead of re-spending every run on the same
+  oldest INDEPENDENT facts. The cursor only advances past a timestamp strictly older than
+  the first unexamined fact, so same-millisecond facts at the budget wall are never
+  skipped; a fact whose comparison errors (transient LLM failure) also holds the cursor
+  back so it is retried, not permanently skipped.
 
 ## [1.3.1] - 2026-07-05
 

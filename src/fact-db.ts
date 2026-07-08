@@ -234,6 +234,92 @@ export function searchSimilarFacts(
 }
 
 /**
+ * Nearest active facts restricted to EXACTLY one scope — used by consolidation
+ * so a project-private fact and a global fact can never be compared/merged
+ * across the boundary (which would leak private text into global memory or let
+ * one project mutate shared global facts). The scope filter is applied to the
+ * FULL overfetched candidate list BEFORE truncation, so a same-scope match is
+ * not starved out by closer out-of-scope rows (which the general
+ * searchSimilarFacts truncates first).
+ *
+ * scope: { type:'global' } → global facts only.
+ *        { type:'project', project } → that project's own facts only (no global).
+ */
+export function searchSimilarFactsSameScope(
+  db: Database.Database,
+  embedding: number[],
+  scope: { type: 'global' } | { type: 'project'; project: string },
+  limit: number = 5,
+  threshold: number = 0.85,
+): Array<{ fact: Fact; distance: number }> {
+  const canonProject = scope.type === 'project' ? canonicalizeProject(db, scope.project) : null;
+  const buf = Buffer.from(new Float32Array(embedding).buffer);
+
+  // Early out only if the scope is genuinely empty (nothing to match against).
+  const scopeCount = scope.type === 'global'
+    ? (db.prepare("SELECT COUNT(*) AS n FROM facts WHERE is_active = 1 AND scope_type = 'global' AND embedding_version = ?").get(EMBEDDING_VERSION) as { n: number }).n
+    : (db.prepare("SELECT COUNT(*) AS n FROM facts WHERE is_active = 1 AND scope_type = 'project' AND scope_project = ? AND embedding_version = ?").get(canonProject, EMBEDDING_VERSION) as { n: number }).n;
+  if (scopeCount === 0) return [];
+
+  // fetchN returns rows AND whether the index returned fewer than requested
+  // (i.e. it was exhausted). We page on the VECTOR-TABLE row count, not the
+  // active-fact count: the vec tables can hold stale/old-version rows that rank
+  // ahead of a valid in-scope row and are only rejected later by the
+  // embedding_version filter, so bounding by active facts could stop before
+  // reaching the match. `exhausted` is the correct, index-size-independent stop.
+  const fetchN = (table: string, n: number): { rows: Array<{ id: string; distance: number }>; exhausted: boolean } => {
+    try {
+      const rows = db.prepare(`
+        SELECT id, distance FROM ${table}
+        WHERE embedding MATCH ? ORDER BY distance LIMIT ?
+      `).all(buf, n) as Array<{ id: string; distance: number }>;
+      return { rows, exhausted: rows.length < n };
+    } catch {
+      return { rows: [], exhausted: true };
+    }
+  };
+
+  const HARD_CAP = 100_000; // safety ceiling so a pathological index can't loop unbounded
+  let fetchCount = Math.max(limit * 20, 200);
+  let results: Array<{ fact: Fact; distance: number }> = [];
+  for (;;) {
+    const a = fetchN('vec_facts', fetchCount);
+    const b = fetchN('vec_facts_kr', fetchCount);
+    const best = new Map<string, number>();
+    for (const vr of [...a.rows, ...b.rows]) {
+      const cur = best.get(vr.id);
+      if (cur === undefined || vr.distance < cur) best.set(vr.id, vr.distance);
+    }
+    const merged = [...best.entries()].map(([id, distance]) => ({ id, distance })).sort((x, y) => x.distance - y.distance);
+
+    results = [];
+    for (const vr of merged) {
+      const similarity = 1 - (vr.distance * vr.distance) / 2;
+      if (similarity < threshold) continue;
+      const row = db.prepare(
+        'SELECT * FROM facts WHERE id = ? AND is_active = 1 AND embedding_version = ?'
+      ).get(vr.id, EMBEDDING_VERSION) as Record<string, unknown> | undefined;
+      if (!row) continue;
+      const fact = rowToFact(row);
+      if (scope.type === 'global') {
+        if (fact.scope_type !== 'global') continue;
+      } else if (fact.scope_type !== 'project' || fact.scope_project !== canonProject) {
+        continue;
+      }
+      results.push({ fact, distance: vr.distance });
+      if (results.length >= limit) break;
+    }
+
+    // Stop when we have enough, both indexes are exhausted, or we hit the cap.
+    const bothExhausted = a.exhausted && b.exhausted;
+    if (results.length >= limit || bothExhausted || fetchCount >= HARD_CAP) break;
+    fetchCount = Math.min(fetchCount * 4, HARD_CAP);
+  }
+
+  return results;
+}
+
+/**
  * Get top facts using a relevance score that combines:
  * - Confirmation count (consolidated_count) — how established is this fact
  * - Recency (updated_at) — how recent is this fact
@@ -311,6 +397,47 @@ export function getNewFactsSince(db: Database.Database, project: string, since: 
       AND ((scope_type = 'project' AND scope_project = ?) OR scope_type = 'global')
     ORDER BY created_at ASC
   `).all(since, canonicalizeProject(db, project)) as Record<string, unknown>[]).map(rowToFact);
+}
+
+/**
+ * All active facts after a KEYSET cursor `(createdAt, id)`, EVERY scope/project,
+ * each row once, ordered by (created_at, id). The composite key is what makes
+ * the consolidate cursor strictly monotonic PER FACT: ordering by created_at
+ * alone stalls when a whole timestamp group is larger than the per-run budget
+ * (the cursor can't advance into a shared timestamp without risking a skip), so
+ * `id` is the unique tiebreaker that lets the drain progress one fact at a time.
+ *
+ * cursor null → from the beginning (all active facts).
+ *
+ * KNOWN LIMITATION (best-effort dedup): a fact IMPORTED mid-drain with an old
+ * `created_at` that sorts before the current cursor is not re-driven by this
+ * pass (it's still a similarity CANDIDATE for future facts, so a duplicate is
+ * still caught opportunistically). Consolidation is a background convenience,
+ * not an exhaustive guarantee, so this is accepted rather than adding a
+ * full re-scan on every import.
+ */
+export function getAllNewFactsSince(
+  db: Database.Database,
+  cursor: { createdAt: string; id: string } | null,
+  limit: number = 2000,
+): Fact[] {
+  // Bounded page (keyset) — NEVER materialize the whole table: seeding from the
+  // beginning could otherwise pull tens of thousands of rows into memory in one
+  // query. The keyset cursor makes each run resume exactly where the last ended,
+  // so the backlog drains page-by-page. The idx_facts_active_created_id index
+  // (is_active, created_at, id) serves both the filter and the ORDER BY without
+  // a temp sort.
+  if (!cursor) {
+    return (db.prepare(`
+      SELECT * FROM facts WHERE is_active = 1 ORDER BY created_at ASC, id ASC LIMIT ?
+    `).all(limit) as Record<string, unknown>[]).map(rowToFact);
+  }
+  return (db.prepare(`
+    SELECT * FROM facts
+    WHERE is_active = 1
+      AND (created_at > ? OR (created_at = ? AND id > ?))
+    ORDER BY created_at ASC, id ASC LIMIT ?
+  `).all(cursor.createdAt, cursor.createdAt, cursor.id, limit) as Record<string, unknown>[]).map(rowToFact);
 }
 
 /**

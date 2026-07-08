@@ -56,6 +56,7 @@ export interface Fact {
     is_active: boolean;
     ontology_category_id?: string | null;
     coding_agent?: string | null;
+    confidence?: number | null;
 }
 export interface FactRevision {
     id: string;
@@ -95,7 +96,23 @@ export interface OntologyCategory {
     description: string | null;
     created_at: string;
 }
-export type RelationType = 'INFLUENCES' | 'SUPERSEDES' | 'SUPPORTS' | 'CONTRADICTS';
+/**
+ * Relation vocabulary. The original four types skew heavily toward SUPPORTS
+ * (measured 83% of 8,948 relations, 2026-07-07) because candidates come from
+ * embedding-similar pairs. DEPENDS_ON / DERIVED_FROM cover the
+ * prerequisite/derivation axis surfaced by the co-extraction channel.
+ * Single source of truth — the DB CHECK constraint is generated from this list.
+ */
+export declare const RELATION_TYPES: readonly ["INFLUENCES", "SUPERSEDES", "SUPPORTS", "CONTRADICTS", "DEPENDS_ON", "DERIVED_FROM"];
+export type RelationType = (typeof RELATION_TYPES)[number];
+/**
+ * Order-independent relation semantics: A SUPPORTS B carries the same claim
+ * as B SUPPORTS A, and CONTRADICTS is inherently mutual — an
+ * opposite-direction duplicate of these is pure noise. Every other type is
+ * directional: the reverse edge is a DISTINCT claim (dependency cycle,
+ * competing canonicality, mutual derivation) that dedup must not swallow.
+ */
+export declare const SYMMETRIC_RELATION_TYPES: ReadonlySet<RelationType>;
 export interface OntologyRelation {
     id: string;
     source_fact_id: string;

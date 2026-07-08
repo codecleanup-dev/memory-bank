@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { SYMMETRIC_RELATION_TYPES } from './types.js';
 // === Domain CRUD ===
 export function createDomain(db, name, description) {
     const id = randomUUID();
@@ -119,7 +120,7 @@ export function createRelation(db, sourceFactId, relationType, targetFactId, rea
     // of the SAME type; distinct relation TYPES between the same facts remain
     // valid, user-visible graph data (a SUPPORTS b + a CONTRADICTS b) and are
     // deliberately NOT collapsed — an LLM type-flap across retries therefore
-    // adds at most one row per type (bounded by the 4-type enum).
+    // adds at most one row per type (bounded by the RELATION_TYPES enum).
     const existing = db
         .prepare(`SELECT * FROM ontology_relations
        WHERE source_fact_id = ? AND relation_type = ? AND target_fact_id = ?`)
@@ -156,6 +157,38 @@ export function createRelation(db, sourceFactId, relationType, targetFactId, rea
         reasoning: reasoning ?? null,
         created_at: now,
     };
+}
+/**
+ * Duplicate-edge check used by the detection channels, honouring relation
+ * semantics:
+ *
+ * - type given, SYMMETRIC (SUPPORTS/CONTRADICTS): either direction counts as
+ *   a duplicate — the reverse edge carries the same claim.
+ * - type given, DIRECTIONAL (DEPENDS_ON/DERIVED_FROM/SUPERSEDES/INFLUENCES):
+ *   only the exact a→b edge is a duplicate. The reverse edge is a distinct
+ *   claim (dependency cycle, competing canonicality) that the graph — and
+ *   the consistency queue — must be able to record.
+ * - no type: any edge in either direction (coarse existence probe).
+ *
+ * A DIFFERENT type between the same pair is never a duplicate: that is
+ * relationship evolution (a SUPPORTS pair can turn CONTRADICTS after a fact
+ * is revised in place) and must stay recordable.
+ */
+export function relationExistsBetween(db, factIdA, factIdB, relationType) {
+    if (relationType && !SYMMETRIC_RELATION_TYPES.has(relationType)) {
+        return (db
+            .prepare(`SELECT 1 AS one FROM ontology_relations
+           WHERE source_fact_id = ? AND target_fact_id = ? AND relation_type = ?
+           LIMIT 1`)
+            .get(factIdA, factIdB, relationType) !== undefined);
+    }
+    return (db
+        .prepare(`SELECT 1 AS one FROM ontology_relations
+         WHERE ((source_fact_id = @a AND target_fact_id = @b)
+             OR (source_fact_id = @b AND target_fact_id = @a))
+           AND (@type IS NULL OR relation_type = @type)
+         LIMIT 1`)
+        .get({ a: factIdA, b: factIdB, type: relationType ?? null }) !== undefined);
 }
 /**
  * Get related facts with relevance decay.
@@ -227,8 +260,9 @@ export function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance 
                 let chosen = null;
                 for (const row of rows) {
                     const relation = rowToRelation(row);
-                    // Relation type weight: SUPPORTS/INFLUENCES stronger than CONTRADICTS/SUPERSEDES
-                    const typeWeight = (relation.relation_type === 'SUPPORTS' || relation.relation_type === 'INFLUENCES') ? 1.0 : 0.7;
+                    // Conflict/retirement edges traverse weaker (0.7); every structural
+                    // edge (SUPPORTS/INFLUENCES/DEPENDS_ON/DERIVED_FROM) traverses fully.
+                    const typeWeight = (relation.relation_type === 'CONTRADICTS' || relation.relation_type === 'SUPERSEDES') ? 0.7 : 1.0;
                     const relevance = hopRelevance * typeWeight;
                     if (relevance >= minRelevance) {
                         chosen = { relation, relevance };
@@ -274,7 +308,7 @@ export function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance 
                 let chosen = null;
                 for (const row of rows) {
                     const relation = rowToRelation(row);
-                    const typeWeight = (relation.relation_type === 'SUPPORTS' || relation.relation_type === 'INFLUENCES') ? 1.0 : 0.7;
+                    const typeWeight = (relation.relation_type === 'CONTRADICTS' || relation.relation_type === 'SUPERSEDES') ? 0.7 : 1.0;
                     const relevance = hopRelevance * typeWeight;
                     if (relevance >= minRelevance) {
                         chosen = { relation, relevance };

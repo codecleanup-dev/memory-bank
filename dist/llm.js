@@ -2,20 +2,113 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { LLM_WORKDIR_BASENAME, getProjectsDir } from './paths.js';
 // Isolated working directory for headless Agent SDK sessions. The CLI that
 // query() spawns persists a transcript under ~/.claude/projects/<cwd-slug>/;
 // running it from the caller's cwd drops worker transcripts into that
 // project's dir, where a user `claude --resume` can pick one up as their own
 // session (observed 2026-07-05). A dedicated cwd keeps them in their own slug.
-const LLM_WORKDIR = path.join(os.tmpdir(), 'memory-bank-llm');
-function llmWorkdir() {
+const LLM_WORKDIR = path.join(os.tmpdir(), LLM_WORKDIR_BASENAME);
+export function llmWorkdir() {
     try {
         fs.mkdirSync(LLM_WORKDIR, { recursive: true });
     }
     catch {
         /* fall through — SDK will spawn in process cwd */
     }
+    pruneLlmTranscripts();
     return LLM_WORKDIR;
+}
+// ---------------------------------------------------------------------------
+// Transcript pruning — the one-shot sessions above each persist a transcript
+// (session .jsonl + agent-*.jsonl) that nothing ever deletes; observed
+// accumulation: 11,573 files / 99MB (2026-07-08). Prune files older than a
+// TTL, throttled to at most once per hour per process tree via a marker file.
+// Scope is strictly our reserved namespace: directories under
+// ~/.claude/projects whose name ends with '-memory-bank-llm' (covers the
+// current fixed workdir slug and legacy mkdtemp variants on any machine).
+// ---------------------------------------------------------------------------
+const PRUNE_MARKER = path.join(LLM_WORKDIR, '.last-transcript-prune');
+const PRUNE_THROTTLE_MS = 60 * 60 * 1000; // at most hourly
+function transcriptTtlMs() {
+    const raw = process.env.MEMORY_BANK_LLM_TRANSCRIPT_TTL_HOURS;
+    const hours = raw != null && /^\d+$/.test(raw) ? parseInt(raw, 10) : 24;
+    // Floor of 1h so an in-flight session's freshly-written transcript can
+    // never be deleted from under the CLI that is still appending to it.
+    return Math.max(1, hours) * 60 * 60 * 1000;
+}
+export function pruneLlmTranscripts(now = Date.now()) {
+    try {
+        // Throttle: mtime of the marker is the last prune time.
+        try {
+            const markerAge = now - fs.statSync(PRUNE_MARKER).mtimeMs;
+            if (markerAge >= 0 && markerAge < PRUNE_THROTTLE_MS)
+                return;
+        }
+        catch {
+            /* no marker yet — proceed */
+        }
+        try {
+            fs.writeFileSync(PRUNE_MARKER, new Date(now).toISOString());
+        }
+        catch {
+            /* marker write failed — still prune, worst case we prune more often */
+        }
+        const projectsDir = getProjectsDir();
+        const ttl = transcriptTtlMs();
+        let entries;
+        try {
+            entries = fs.readdirSync(projectsDir);
+        }
+        catch {
+            return; // no projects dir — nothing to prune
+        }
+        for (const entry of entries) {
+            if (entry !== LLM_WORKDIR_BASENAME && !entry.endsWith(`-${LLM_WORKDIR_BASENAME}`))
+                continue;
+            const dir = path.join(projectsDir, entry);
+            let stat;
+            try {
+                stat = fs.lstatSync(dir);
+            }
+            catch {
+                continue;
+            }
+            if (!stat.isDirectory())
+                continue; // never follow symlinks
+            let files;
+            try {
+                files = fs.readdirSync(dir);
+            }
+            catch {
+                continue;
+            }
+            for (const file of files) {
+                // Only transcript artifacts; leave anything else untouched.
+                if (!file.endsWith('.jsonl') && !file.endsWith('-summary.txt'))
+                    continue;
+                const filePath = path.join(dir, file);
+                try {
+                    const fstat = fs.lstatSync(filePath);
+                    if (fstat.isFile() && now - fstat.mtimeMs > ttl)
+                        fs.unlinkSync(filePath);
+                }
+                catch {
+                    /* skip file on any error */
+                }
+            }
+            // Drop the directory once empty (rmdir refuses non-empty dirs — safe).
+            try {
+                fs.rmdirSync(dir);
+            }
+            catch {
+                /* not empty or in use — fine */
+            }
+        }
+    }
+    catch {
+        /* pruning is best-effort housekeeping — never break the LLM call */
+    }
 }
 /**
  * Call Haiku via Claude Agent SDK (no API key needed inside Claude Code —

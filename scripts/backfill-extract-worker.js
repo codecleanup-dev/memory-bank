@@ -62,8 +62,9 @@ const EXCLUDE_PROJECTS = (
 // Minimum exchanges per session to be worth extracting. 1-exchange sessions are
 // overwhelmingly automated-worker/monitoring noise (bs-auto-issue, cron checks)
 // that yield no durable facts and never converge. Default 2; set to 1 to include
-// single-turn sessions.
-const MIN_EXCHANGES = parseInt(process.env.BACKFILL_MIN_EXCHANGES || '2', 10);
+// single-turn sessions. boundedInt (not bare parseInt): the value is
+// interpolated into SQL, so 'abc' → NaN must not reach the query text.
+const MIN_EXCHANGES = boundedInt(process.env.BACKFILL_MIN_EXCHANGES, 2, 1000);
 
 const LOCK = path.join(getIndexDir(), 'backfill-extract.lock');
 const LOG = path.join(getIndexDir(), 'backfill-extract.log');
@@ -143,13 +144,21 @@ function pendingSessions(db, limit) {
   // then recency. 1-exchange sessions are processed last.
   // Excluded projects (e.g. memory-bank's own monitoring sessions) are dropped
   // entirely to break the self-referential feedback loop.
+  // Built-in: the plugin's own headless LLM worker sessions (llm.ts spawns
+  // them with cwd <tmpdir>/memory-bank-llm). Indexing now skips them at the
+  // source (paths.ts isExcludedProject), but exchanges indexed before that
+  // fix — 6.4k rows observed 2026-07-08 — must not become extraction
+  // candidates (defense in depth against the self-referential loop).
   const exTerms = EXCLUDE_PROJECTS;
-  const exClause = exTerms.length
-    ? `AND e.session_id NOT IN (
+  // x.session_id IS NOT NULL is load-bearing: a single NULL inside a NOT IN
+  // subquery makes the whole predicate NULL (3-valued logic) → zero pending
+  // sessions → silent drain of the entire backfill.
+  const exClause = `AND e.session_id NOT IN (
          SELECT DISTINCT x.session_id FROM exchanges x
-         WHERE ${exTerms.map(() => 'x.cwd = ?').join(' OR ')}
-       )`
-    : '';
+         WHERE x.session_id IS NOT NULL
+           AND (x.cwd LIKE '%/memory-bank-llm'
+         ${exTerms.length ? 'OR ' + exTerms.map(() => 'x.cwd = ?').join(' OR ') : ''})
+       )`;
   return db.prepare(`
     SELECT e.session_id AS sid, MAX(e.timestamp) AS ts, COUNT(*) AS n
     FROM exchanges e

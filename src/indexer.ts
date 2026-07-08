@@ -1,12 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 import { initDatabase, insertExchange } from './db.js';
 import { parseConversation } from './parser.js';
 import { initEmbeddings, generateExchangeEmbedding } from './embeddings.js';
 import { summarizeConversation } from './summarizer.js';
 import { ConversationExchange } from './types.js';
-import { getArchiveDir, getExcludedProjects } from './paths.js';
+import { getArchiveDir, getExcludedProjects, isExcludedProject, getProjectsDir } from './paths.js';
 import { archiveFileExists, statArchiveFile } from './archive-io.js';
 
 /**
@@ -29,10 +28,7 @@ process.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = '20000';
 import { EventEmitter } from 'events';
 EventEmitter.defaultMaxListeners = 20;
 
-// Allow overriding paths for testing
-function getProjectsDir(): string {
-  return process.env.TEST_PROJECTS_DIR || path.join(os.homedir(), '.claude', 'projects');
-}
+// Projects dir (with TEST_PROJECTS_DIR override) now lives in paths.ts.
 
 // Process items in batches with limited concurrency
 export async function processBatch<T, R>(
@@ -78,8 +74,8 @@ export async function indexConversations(
   const excludedProjects = getExcludedProjects();
 
   for (const project of projects) {
-    // Skip excluded projects
-    if (excludedProjects.includes(project)) {
+    // Skip excluded projects (user list + built-in LLM worker sessions)
+    if (isExcludedProject(project, excludedProjects)) {
       console.log(`\nSkipping excluded project: ${project}`);
       continue;
     }
@@ -204,7 +200,7 @@ export async function indexSession(sessionId: string, concurrency: number = 1, n
   let found = false;
 
   for (const project of projects) {
-    if (excludedProjects.includes(project)) continue;
+    if (isExcludedProject(project, excludedProjects)) continue;
 
     const projectPath = path.join(PROJECTS_DIR, project);
     if (!fs.statSync(projectPath).isDirectory()) continue;
@@ -289,7 +285,7 @@ export async function indexUnprocessed(concurrency: number = 1, noSummaries: boo
 
   // Collect all unprocessed conversations
   for (const project of projects) {
-    if (excludedProjects.includes(project)) continue;
+    if (isExcludedProject(project, excludedProjects)) continue;
 
     const projectPath = path.join(PROJECTS_DIR, project);
     if (!fs.statSync(projectPath).isDirectory()) continue;
