@@ -778,6 +778,12 @@ export function insertExchange(
     db.prepare(`INSERT INTO vec_exchanges (id, embedding) VALUES (?, ${vecParamSql(vecDtype)})`)
       .run(exchange.id, embeddingToVecBlob(embedding, vecDtype));
 
+    // The archive is the source of truth for this exchange's tool calls —
+    // clear the previous set so a re-index cannot leave stale tool history
+    // behind (REPLACE never cleaned these up either; the upsert makes the
+    // contract explicit).
+    db.prepare('DELETE FROM tool_calls WHERE exchange_id = ?').run(exchange.id);
+
     if (exchange.toolCalls && exchange.toolCalls.length > 0) {
       const toolStmt = db.prepare(`
         INSERT OR REPLACE INTO tool_calls

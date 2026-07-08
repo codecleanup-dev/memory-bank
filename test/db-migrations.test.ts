@@ -233,6 +233,27 @@ describe('facts.category vocabulary migration', () => {
       };
       expect(tc.n).toBe(1);
 
+      // The archive is the source of truth: a re-index with a DIFFERENT tool
+      // call set must not leave stale children behind
+      insertExchange(
+        db,
+        {
+          ...exchange,
+          toolCalls: [{ ...exchange.toolCalls![0], id: 'tc-2' }],
+        },
+        embedding,
+      );
+      const replaced = (
+        db.prepare(`SELECT id FROM tool_calls WHERE exchange_id = 'ex-reindex'`).all() as Array<{ id: string }>
+      ).map((r) => r.id);
+      expect(replaced).toEqual(['tc-2']);
+
+      insertExchange(db, { ...exchange, toolCalls: [] }, embedding);
+      const cleared = db
+        .prepare(`SELECT COUNT(*) AS n FROM tool_calls WHERE exchange_id = 'ex-reindex'`)
+        .get() as { n: number };
+      expect(cleared.n).toBe(0);
+
       // Deleting the exchange must clear its children first (FK is ON)
       deleteExchange(db, 'ex-reindex');
       const gone = db.prepare(`SELECT COUNT(*) AS n FROM exchanges WHERE id = 'ex-reindex'`).get() as {
