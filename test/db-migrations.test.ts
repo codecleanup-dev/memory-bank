@@ -309,6 +309,50 @@ describe('facts.category vocabulary migration', () => {
     }
   });
 
+  it('rebuilds facts tables whose CHECK is complete but column is nullable (NULL passes CHECKs)', () => {
+    const raw = new Database(dbPath);
+    raw.exec(`
+      CREATE TABLE facts (
+        id TEXT PRIMARY KEY,
+        fact TEXT NOT NULL,
+        category TEXT CHECK (category IN ('decision','preference','pattern','knowledge','constraint')),
+        scope_type TEXT NOT NULL DEFAULT 'project',
+        scope_project TEXT,
+        source_exchange_ids TEXT,
+        embedding BLOB,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        consolidated_count INTEGER DEFAULT 1,
+        is_active INTEGER DEFAULT 1
+      )
+    `);
+    raw
+      .prepare(
+        `INSERT INTO facts (id, fact, category, created_at, updated_at) VALUES ('f-nullcat', 'null slipped past the CHECK', NULL, datetime('now'), datetime('now'))`,
+      )
+      .run();
+    raw.close();
+
+    const db = initDatabase();
+    try {
+      const sql = (
+        db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facts'`).get() as { sql: string }
+      ).sql;
+      expect(sql).toMatch(/category\s+TEXT\s+NOT NULL/i);
+      const row = db.prepare(`SELECT category FROM facts WHERE id = 'f-nullcat'`).get() as { category: string };
+      expect(row.category).toBe('knowledge'); // NULL normalized during rebuild
+      expect(() =>
+        db
+          .prepare(
+            `INSERT INTO facts (id, fact, category, created_at, updated_at) VALUES ('x', 'x', NULL, datetime('now'), datetime('now'))`,
+          )
+          .run(),
+      ).toThrow(); // NOT NULL closes the CHECK's NULL hole
+    } finally {
+      db.close();
+    }
+  });
+
   it('stores tool_calls under the authoritative parent exchange id', () => {
     const db = initDatabase();
     try {

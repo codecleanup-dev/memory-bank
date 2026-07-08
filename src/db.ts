@@ -254,12 +254,21 @@ export function migrateFactsCategoryVocabulary(db: Database.Database): void {
     .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facts'`)
     .get() as { sql: string } | undefined;
   if (!tbl?.sql) return;
-  // Already enforced only when EVERY vocabulary member is present — a
-  // narrower prior CHECK (e.g. two categories) must be rebuilt, or valid
-  // writes like category='constraint' would trip the stale constraint.
+  // Already enforced only when EVERY vocabulary member is present AND the
+  // column is NOT NULL — a narrower prior CHECK must be rebuilt (valid
+  // writes like category='constraint' would trip it), and a nullable column
+  // must be rebuilt too: SQLite CHECKs pass on NULL, so without NOT NULL
+  // the vocabulary invariant is hollow.
+  const categoryNotNull =
+    (
+      db
+        .prepare(`SELECT "notnull" AS nn FROM pragma_table_info('facts') WHERE name = 'category'`)
+        .get() as { nn: number } | undefined
+    )?.nn === 1;
   if (
     /CHECK\s*\(\s*category\s+IN/i.test(tbl.sql) &&
-    FACT_CATEGORIES.every((c) => tbl.sql.includes(`'${c}'`))
+    FACT_CATEGORIES.every((c) => tbl.sql.includes(`'${c}'`)) &&
+    categoryNotNull
   ) {
     return;
   }
