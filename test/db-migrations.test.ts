@@ -184,7 +184,8 @@ describe('facts.category vocabulary migration', () => {
   });
 
   it('extends the ontology_relations CHECK to the new relation vocabulary', () => {
-    // Legacy 4-type table with a row, as shipped before DEPENDS_ON/DERIVED_FROM
+    // Legacy 4-type table with a row — PLUS a custom column with data and a
+    // custom index on it: the generic rebuild must preserve all of it.
     const raw = new Database(dbPath);
     raw.exec(`
       CREATE TABLE ontology_relations (
@@ -193,12 +194,14 @@ describe('facts.category vocabulary migration', () => {
         relation_type TEXT NOT NULL CHECK(relation_type IN ('INFLUENCES','SUPERSEDES','SUPPORTS','CONTRADICTS')),
         target_fact_id TEXT NOT NULL,
         reasoning TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        custom_provenance TEXT
       )
     `);
+    raw.exec(`CREATE INDEX idx_custom_provenance ON ontology_relations(custom_provenance)`);
     raw
       .prepare(
-        `INSERT INTO ontology_relations (id, source_fact_id, relation_type, target_fact_id, reasoning) VALUES ('r1', 'a', 'SUPPORTS', 'b', 'legacy row')`,
+        `INSERT INTO ontology_relations (id, source_fact_id, relation_type, target_fact_id, reasoning, custom_provenance) VALUES ('r1', 'a', 'SUPPORTS', 'b', 'legacy row', 'hand-added')`,
       )
       .run();
     raw.close();
@@ -213,10 +216,18 @@ describe('facts.category vocabulary migration', () => {
       expect(sql).toContain("'DEPENDS_ON'");
       expect(sql).toContain("'DERIVED_FROM'");
 
-      const legacy = db.prepare(`SELECT reasoning FROM ontology_relations WHERE id = 'r1'`).get() as {
-        reasoning: string;
-      };
+      const legacy = db
+        .prepare(`SELECT reasoning, custom_provenance FROM ontology_relations WHERE id = 'r1'`)
+        .get() as { reasoning: string; custom_provenance: string };
       expect(legacy.reasoning).toBe('legacy row');
+      expect(legacy.custom_provenance).toBe('hand-added'); // custom column + data preserved
+
+      const relIndexes = (
+        db
+          .prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='ontology_relations'`)
+          .all() as Array<{ name: string }>
+      ).map((r) => r.name);
+      expect(relIndexes).toContain('idx_custom_provenance'); // custom index replayed
 
       // New inserts run under FK enforcement — reference a real fact
       const factId = insertFact(db, {

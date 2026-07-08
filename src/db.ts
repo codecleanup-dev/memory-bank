@@ -134,6 +134,19 @@ function withForeignKeysOff(db: Database.Database, fn: () => void): void {
  * is a pure schema copy. Idempotent: guarded on every vocabulary member
  * already appearing in the stored DDL.
  */
+/**
+ * DEFAULT clause for a rebuilt column from pragma_table_info's dflt_value:
+ * literals (quoted strings, numbers, already-parenthesized expressions) pass
+ * through; bare expressions like datetime('now') must be re-wrapped in
+ * parens or the generated DDL is a syntax error.
+ */
+function defaultClause(dfltValue: string | null): string {
+  if (dfltValue == null) return '';
+  const v = dfltValue.trim();
+  const literal = /^['"(]|^-?\d/.test(v) || /^(NULL|TRUE|FALSE|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP)$/i.test(v);
+  return ` DEFAULT ${literal ? v : `(${v})`}`;
+}
+
 export function migrateRelationTypeVocabulary(db: Database.Database): void {
   const tbl = db
     .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='ontology_relations'`)
@@ -141,9 +154,30 @@ export function migrateRelationTypeVocabulary(db: Database.Database): void {
   if (!tbl?.sql) return;
   if (RELATION_TYPES.every((t) => tbl.sql.includes(`'${t}'`))) return;
 
-  // Capture attached indexes/triggers (incl. user-added ones) for replay —
-  // they drop with the table. Unlike facts, the REFERENCES clauses here are
-  // ours and reproduced verbatim in the new DDL below.
+  // Fail-safe for hand-modified DBs: the two shipped FKs (source/target →
+  // facts.id) are reconstructed below; any OTHER foreign key is DDL this
+  // rebuild cannot reproduce, so leave the table alone (new relation types
+  // are then rejected by the old CHECK on that DB — detection probes treat
+  // that as a non-fatal skip).
+  const fks = db.pragma(`foreign_key_list('ontology_relations')`) as Array<{
+    table: string;
+    from: string;
+  }>;
+  const isShippedFk = (fk: { table: string; from: string }): boolean =>
+    fk.table === 'facts' && (fk.from === 'source_fact_id' || fk.from === 'target_fact_id');
+  if (fks.some((fk) => !isShippedFk(fk))) {
+    console.error(
+      'ontology_relations vocabulary migration skipped: custom FOREIGN KEY present — legacy CHECK stays in place.',
+    );
+    return;
+  }
+
+  // Column-generic copy (custom columns and their data are preserved), plus
+  // capture/replay of attached indexes/triggers — nothing outside a
+  // hardcoded list may be silently dropped.
+  const cols = db
+    .prepare(`SELECT name, type, "notnull" AS nn, dflt_value, pk FROM pragma_table_info('ontology_relations')`)
+    .all() as Array<{ name: string; type: string; nn: number; dflt_value: string | null; pk: number }>;
   const attachedDdl = (
     db
       .prepare(
@@ -153,20 +187,15 @@ export function migrateRelationTypeVocabulary(db: Database.Database): void {
   ).map((r) => r.sql);
 
   const rebuild = db.transaction(() => {
-    db.exec(`
-      CREATE TABLE ontology_relations_vocab_rebuild (
-        id TEXT PRIMARY KEY,
-        source_fact_id TEXT NOT NULL REFERENCES facts(id),
-        relation_type TEXT NOT NULL CHECK(${RELATION_TYPE_CHECK_SQL}),
-        target_fact_id TEXT NOT NULL REFERENCES facts(id),
-        reasoning TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `);
-    db.exec(`
-      INSERT INTO ontology_relations_vocab_rebuild (id, source_fact_id, relation_type, target_fact_id, reasoning, created_at)
-      SELECT id, source_fact_id, relation_type, target_fact_id, reasoning, created_at FROM ontology_relations
-    `);
+    const defs = cols.map((c) => {
+      const base = `${c.name} ${c.type}${c.pk ? ' PRIMARY KEY' : ''}${c.nn ? ' NOT NULL' : ''}${defaultClause(c.dflt_value)}`;
+      if (c.name === 'relation_type') return `${base} CHECK(${RELATION_TYPE_CHECK_SQL})`;
+      if (c.name === 'source_fact_id' || c.name === 'target_fact_id') return `${base} REFERENCES facts(id)`;
+      return base;
+    });
+    const names = cols.map((c) => c.name).join(', ');
+    db.exec(`CREATE TABLE ontology_relations_vocab_rebuild (${defs.join(', ')})`);
+    db.exec(`INSERT INTO ontology_relations_vocab_rebuild (${names}) SELECT ${names} FROM ontology_relations`);
     db.exec(`DROP TABLE ontology_relations`);
     db.exec(`ALTER TABLE ontology_relations_vocab_rebuild RENAME TO ontology_relations`);
     for (const ddl of attachedDdl) db.exec(ddl);
@@ -175,7 +204,16 @@ export function migrateRelationTypeVocabulary(db: Database.Database): void {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_source ON ontology_relations(source_fact_id)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_target ON ontology_relations(target_fact_id)`);
   });
-  withForeignKeysOff(db, () => rebuild.immediate());
+  try {
+    withForeignKeysOff(db, () => rebuild.immediate());
+  } catch (error) {
+    // A failed migration must never brick startup: the transaction rolled
+    // back, the legacy table (old CHECK) stays — new relation types are
+    // rejected on this DB until repaired, which detection treats as
+    // non-fatal per-probe skips.
+    console.error('ontology_relations vocabulary migration failed — keeping legacy table:', error);
+    return;
+  }
   console.error('Migrated ontology_relations: vocabulary extended (DEPENDS_ON, DERIVED_FROM).');
 }
 
@@ -231,8 +269,7 @@ export function migrateFactsCategoryVocabulary(db: Database.Database): void {
     const defs = cols.map((c) => {
       const notNull = c.name === 'category' ? ' NOT NULL' : c.nn ? ' NOT NULL' : '';
       const pk = c.pk ? ' PRIMARY KEY' : '';
-      const dflt = c.dflt_value != null ? ` DEFAULT ${c.dflt_value}` : '';
-      return `${c.name} ${c.type}${pk}${notNull}${dflt}`;
+      return `${c.name} ${c.type}${pk}${notNull}${defaultClause(c.dflt_value)}`;
     });
     const names = cols.map((c) => c.name).join(', ');
     db.exec(`CREATE TABLE facts_vocab_rebuild (${defs.join(', ')}, CHECK (${FACT_CATEGORY_CHECK_SQL}))`);
@@ -246,7 +283,15 @@ export function migrateFactsCategoryVocabulary(db: Database.Database): void {
   });
   // facts is a referenced parent (fact_revisions, ontology_relations) — the
   // DROP inside the rebuild needs FK enforcement suspended.
-  withForeignKeysOff(db, () => rebuild.immediate());
+  try {
+    withForeignKeysOff(db, () => rebuild.immediate());
+  } catch (error) {
+    // Never brick startup on a migration: the transaction rolled back, the
+    // legacy table stays, and the vocabulary remains write-path-enforced
+    // only on this DB until repaired.
+    console.error('facts.category vocabulary migration failed — keeping legacy table:', error);
+    return;
+  }
   console.error('Migrated facts.category: vocabulary normalized, CHECK constraint added.');
 }
 
