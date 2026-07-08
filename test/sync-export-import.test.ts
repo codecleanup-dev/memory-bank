@@ -140,6 +140,49 @@ describe('sync-export/import', () => {
     expect(result.newRelations).toBe(1);
   });
 
+  it('should normalize out-of-vocabulary categories from legacy sync files instead of dropping them', async () => {
+    // Sync files written by machines that predate the facts.category CHECK
+    // can carry 'requirement' / enum-echo / 'null' categories — those rows
+    // must be normalized on import, not thrown at the constraint and lost.
+    const { getSyncDir } = await import('../src/sync-export.js');
+    const syncDir = getSyncDir();
+    const now = new Date().toISOString();
+
+    const legacyRow = (id: string, category: string): string =>
+      JSON.stringify({
+        id, fact: `legacy fact ${id}`, category,
+        scope_type: 'global', scope_project: null, source_exchange_ids: '[]',
+        created_at: now, updated_at: now, consolidated_count: 1, ontology_category_id: null,
+      }) + '\n';
+
+    fs.writeFileSync(
+      path.join(syncDir, 'facts.jsonl'),
+      legacyRow('legacy-1', 'requirement') +
+        legacyRow('legacy-2', 'decision|preference|pattern|knowledge|constraint') +
+        legacyRow('legacy-3', 'null'),
+    );
+
+    const { importFromSync } = await import('../src/sync-import.js');
+    const result = await importFromSync();
+    expect(result.newFacts).toBe(3); // none silently dropped
+
+    const { initDatabase } = await import('../src/db.js');
+    const db = initDatabase();
+    try {
+      const byId = new Map(
+        (db.prepare(`SELECT id, category FROM facts WHERE id LIKE 'legacy-%'`).all() as Array<{
+          id: string;
+          category: string;
+        }>).map((r) => [r.id, r.category]),
+      );
+      expect(byId.get('legacy-1')).toBe('constraint');
+      expect(byId.get('legacy-2')).toBe('decision');
+      expect(byId.get('legacy-3')).toBe('knowledge');
+    } finally {
+      db.close();
+    }
+  });
+
   it('should skip duplicate records on re-import', async () => {
     const { getSyncDir } = await import('../src/sync-export.js');
     const syncDir = getSyncDir();
