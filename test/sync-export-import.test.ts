@@ -253,6 +253,39 @@ describe('sync-export/import', () => {
     }
   });
 
+  it('exports only relations whose both endpoints are active', async () => {
+    const { initDatabase } = await import('../src/db.js');
+    const { insertFact, deactivateFact } = await import('../src/fact-db.js');
+    const { createRelation } = await import('../src/ontology-db.js');
+    const db = initDatabase();
+    try {
+      const mk = (text: string): string =>
+        insertFact(db, {
+          fact: text, category: 'decision', scope_type: 'global', scope_project: null,
+          source_exchange_ids: [], embedding: null,
+        });
+      const a = mk('active endpoint a');
+      const b = mk('soon-inactive endpoint b');
+      const c = mk('active endpoint c');
+      createRelation(db, a, 'SUPERSEDES', b, 'b was retired');
+      createRelation(db, a, 'SUPPORTS', c, 'both active');
+      deactivateFact(db, b);
+    } finally {
+      db.close();
+    }
+
+    const { exportForSync, getSyncDir } = await import('../src/sync-export.js');
+    const result = exportForSync();
+    expect(result.relations).toBe(1); // the edge into the inactive fact is excluded
+
+    const lines = fs
+      .readFileSync(path.join(getSyncDir(), 'ontology-relations.jsonl'), 'utf-8')
+      .split('\n')
+      .filter((l) => l.trim());
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('SUPPORTS');
+  });
+
   it('dedupes symmetric relations in either direction on import', async () => {
     const { initDatabase } = await import('../src/db.js');
     const { insertFact } = await import('../src/fact-db.js');
