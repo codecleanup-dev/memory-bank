@@ -122,12 +122,17 @@ describe('sync-export/import', () => {
         id: 'imp-fact-1', fact: 'Use REST for APIs', category: 'decision',
         scope_type: 'project', scope_project: 'api-proj', source_exchange_ids: '[]',
         created_at: now, updated_at: now, consolidated_count: 1, ontology_category_id: 'imp-cat-1'
+      }) + '\n' +
+      JSON.stringify({
+        id: 'imp-fact-2', fact: 'Version APIs in the URL path', category: 'decision',
+        scope_type: 'project', scope_project: 'api-proj', source_exchange_ids: '[]',
+        created_at: now, updated_at: now, consolidated_count: 1, ontology_category_id: 'imp-cat-1'
       }) + '\n'
     );
     fs.writeFileSync(path.join(syncDir, 'ontology-relations.jsonl'),
       JSON.stringify({
         id: 'imp-rel-1', source_fact_id: 'imp-fact-1', relation_type: 'INFLUENCES',
-        target_fact_id: 'imp-fact-1', reasoning: 'test', created_at: now
+        target_fact_id: 'imp-fact-2', reasoning: 'test', created_at: now
       }) + '\n'
     );
 
@@ -136,8 +141,206 @@ describe('sync-export/import', () => {
 
     expect(result.newDomains).toBe(1);
     expect(result.newCategories).toBe(1);
-    expect(result.newFacts).toBe(1);
+    expect(result.newFacts).toBe(2);
     expect(result.newRelations).toBe(1);
+  });
+
+  it('should normalize out-of-vocabulary categories from legacy sync files instead of dropping them', async () => {
+    // Sync files written by machines that predate the facts.category CHECK
+    // can carry 'requirement' / enum-echo / 'null' categories — those rows
+    // must be normalized on import, not thrown at the constraint and lost.
+    const { getSyncDir } = await import('../src/sync-export.js');
+    const syncDir = getSyncDir();
+    const now = new Date().toISOString();
+
+    const legacyRow = (id: string, category: string, confidence?: number): string =>
+      JSON.stringify({
+        id, fact: `legacy fact ${id}`, category,
+        scope_type: 'global', scope_project: null, source_exchange_ids: '[]',
+        created_at: now, updated_at: now, consolidated_count: 1, ontology_category_id: null,
+        ...(confidence !== undefined ? { confidence } : {}),
+      }) + '\n';
+
+    fs.writeFileSync(
+      path.join(syncDir, 'facts.jsonl'),
+      legacyRow('legacy-1', 'requirement') +
+        legacyRow('legacy-2', 'decision|preference|pattern|knowledge|constraint') +
+        legacyRow('legacy-3', 'null') +
+        legacyRow('legacy-4', 'decision', 0.9),
+    );
+
+    const { importFromSync } = await import('../src/sync-import.js');
+    const result = await importFromSync();
+    expect(result.newFacts).toBe(4); // none silently dropped
+
+    const { initDatabase } = await import('../src/db.js');
+    const db = initDatabase();
+    try {
+      const byId = new Map(
+        (db.prepare(`SELECT id, category, confidence FROM facts WHERE id LIKE 'legacy-%'`).all() as Array<{
+          id: string;
+          category: string;
+          confidence: number | null;
+        }>).map((r) => [r.id, r]),
+      );
+      expect(byId.get('legacy-1')?.category).toBe('constraint');
+      expect(byId.get('legacy-2')?.category).toBe('decision');
+      expect(byId.get('legacy-3')?.category).toBe('knowledge');
+      // Reliability signal survives the sync; pre-confidence files stay NULL
+      expect(byId.get('legacy-4')?.confidence).toBe(0.9);
+      expect(byId.get('legacy-1')?.confidence).toBeNull();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('remaps relation endpoints when a fact was content-deduped to a local fact', async () => {
+    // Local DB already knows the fact text; the remote file carries the same
+    // text under a different id plus a relation from that id — the edge must
+    // land on the surviving local fact instead of being dropped by the FK.
+    const { initDatabase } = await import('../src/db.js');
+    const { insertFact } = await import('../src/fact-db.js');
+    const setupDb = initDatabase();
+    let localId: string;
+    try {
+      localId = insertFact(setupDb, {
+        fact: 'shared canonical fact',
+        category: 'decision',
+        scope_type: 'global',
+        scope_project: null,
+        source_exchange_ids: [],
+        embedding: null,
+      });
+    } finally {
+      setupDb.close();
+    }
+
+    const { getSyncDir } = await import('../src/sync-export.js');
+    const syncDir = getSyncDir();
+    const now = new Date().toISOString();
+    const row = (id: string, fact: string): string =>
+      JSON.stringify({
+        id, fact, category: 'decision', scope_type: 'global', scope_project: null,
+        source_exchange_ids: '[]', created_at: now, updated_at: now,
+        consolidated_count: 1, ontology_category_id: null,
+      }) + '\n';
+    fs.writeFileSync(
+      path.join(syncDir, 'facts.jsonl'),
+      row('remote-1', 'shared canonical fact') + row('remote-2', 'brand new remote fact'),
+    );
+    fs.writeFileSync(
+      path.join(syncDir, 'ontology-relations.jsonl'),
+      JSON.stringify({
+        id: 'remote-rel-1', source_fact_id: 'remote-1', relation_type: 'DEPENDS_ON',
+        target_fact_id: 'remote-2', reasoning: 'remapped edge', created_at: now,
+      }) + '\n',
+    );
+
+    const { importFromSync } = await import('../src/sync-import.js');
+    const result = await importFromSync();
+    expect(result.newFacts).toBe(1); // remote-1 deduped onto the local fact
+    expect(result.newRelations).toBe(1); // …but its edge survived, remapped
+
+    const db = initDatabase();
+    try {
+      const rel = db
+        .prepare(`SELECT source_fact_id, target_fact_id FROM ontology_relations WHERE id = 'remote-rel-1'`)
+        .get() as { source_fact_id: string; target_fact_id: string };
+      expect(rel.source_fact_id).toBe(localId);
+      expect(rel.target_fact_id).toBe('remote-2');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('exports only relations whose both endpoints are active', async () => {
+    const { initDatabase } = await import('../src/db.js');
+    const { insertFact, deactivateFact } = await import('../src/fact-db.js');
+    const { createRelation } = await import('../src/ontology-db.js');
+    const db = initDatabase();
+    try {
+      const mk = (text: string): string =>
+        insertFact(db, {
+          fact: text, category: 'decision', scope_type: 'global', scope_project: null,
+          source_exchange_ids: [], embedding: null,
+        });
+      const a = mk('active endpoint a');
+      const b = mk('soon-inactive endpoint b');
+      const c = mk('active endpoint c');
+      createRelation(db, a, 'SUPERSEDES', b, 'b was retired');
+      createRelation(db, a, 'SUPPORTS', c, 'both active');
+      deactivateFact(db, b);
+    } finally {
+      db.close();
+    }
+
+    const { exportForSync, getSyncDir } = await import('../src/sync-export.js');
+    const result = exportForSync();
+    expect(result.relations).toBe(1); // the edge into the inactive fact is excluded
+
+    const lines = fs
+      .readFileSync(path.join(getSyncDir(), 'ontology-relations.jsonl'), 'utf-8')
+      .split('\n')
+      .filter((l) => l.trim());
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('SUPPORTS');
+  });
+
+  it('dedupes symmetric relations in either direction on import', async () => {
+    const { initDatabase } = await import('../src/db.js');
+    const { insertFact } = await import('../src/fact-db.js');
+    const { createRelation } = await import('../src/ontology-db.js');
+    const setupDb = initDatabase();
+    let l1: string;
+    let l2: string;
+    try {
+      const mk = (text: string): string =>
+        insertFact(setupDb, {
+          fact: text, category: 'decision', scope_type: 'global', scope_project: null,
+          source_exchange_ids: [], embedding: null,
+        });
+      l1 = mk('symmetric fact one');
+      l2 = mk('symmetric fact two');
+      createRelation(setupDb, l1, 'SUPPORTS', l2, 'local edge');
+    } finally {
+      setupDb.close();
+    }
+
+    const { getSyncDir } = await import('../src/sync-export.js');
+    const syncDir = getSyncDir();
+    const now = new Date().toISOString();
+    const row = (id: string, fact: string): string =>
+      JSON.stringify({
+        id, fact, category: 'decision', scope_type: 'global', scope_project: null,
+        source_exchange_ids: '[]', created_at: now, updated_at: now,
+        consolidated_count: 1, ontology_category_id: null,
+      }) + '\n';
+    fs.writeFileSync(
+      path.join(syncDir, 'facts.jsonl'),
+      row('rem-1', 'symmetric fact one') + row('rem-2', 'symmetric fact two'),
+    );
+    // Reverse direction of the existing local SUPPORTS edge — same claim
+    fs.writeFileSync(
+      path.join(syncDir, 'ontology-relations.jsonl'),
+      JSON.stringify({
+        id: 'rem-rel-rev', source_fact_id: 'rem-2', relation_type: 'SUPPORTS',
+        target_fact_id: 'rem-1', reasoning: 'reverse duplicate', created_at: now,
+      }) + '\n',
+    );
+
+    const { importFromSync } = await import('../src/sync-import.js');
+    const result = await importFromSync();
+    expect(result.newRelations).toBe(0); // reverse SUPPORTS is the same claim → skipped
+
+    const db = initDatabase();
+    try {
+      const n = (
+        db.prepare(`SELECT COUNT(*) AS n FROM ontology_relations`).get() as { n: number }
+      ).n;
+      expect(n).toBe(1); // only the original local edge
+    } finally {
+      db.close();
+    }
   });
 
   it('should skip duplicate records on re-import', async () => {

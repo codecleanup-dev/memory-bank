@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Controlled category vocabulary**: `facts.category` now carries
+  NOT NULL + CHECK over the five categories. Legacy DBs are rebuilt once with
+  deterministic normalization of out-of-vocabulary values
+  (`requirement`→`constraint`, enum echoes→first valid token, everything
+  else→`knowledge`; measured contamination: 44+10+‥ rows). All writes
+  normalize at the `insertFact` chokepoint (`src/fact-category.ts`).
+- **Extraction confidence persisted** (`facts.confidence REAL`): previously
+  consumed only by the ≥0.7 extraction gate and discarded; now stored
+  (clamped 0..1) and surfaced in `search_facts` output next to the
+  `consolidated_count` reinforcement signal.
+- **Consistency checks** (`memory-bank consistency`, `src/consistency.ts`):
+  active-active CONTRADICTS/SUPERSEDES pairs exposed as a resolution queue
+  (report-first — nothing auto-deactivates), plus orphan-fact coverage and
+  single-fact-category counts. `--gate` exits 2 on violations for
+  deterministic health gating; `graph_stats` gained a Graph Health section.
+  Live baseline that motivated this: 405/417 CONTRADICTS and 437/446
+  SUPERSEDES pairs had both endpoints still active; 37.5% of facts had no
+  relations at all.
+- **Taxonomy alignment** (`memory-bank taxonomy-align`): embedding-KNN merge
+  candidates for near-duplicate categories (2,809 categories / 1,014
+  single-fact ones measured). Report-first; `--apply` merges same-domain
+  pairs only, resolves chains onto the final survivor, protects the
+  `General`/`Misc` parking category, and never bumps `updated_at`. Unblocks
+  re-measuring the deterministic reuse gate on a consolidated taxonomy.
+- **Relation vocabulary + co-extraction channel**: new `DEPENDS_ON` /
+  `DERIVED_FROM` relation types, single-sourced in `RELATION_TYPES` with the
+  DB CHECK generated from it (legacy 4-type tables rebuilt once).
+  Consecutive facts from one extraction batch are probed (≤3 calls) for
+  dependency/derivation links the similarity channel structurally misses —
+  SUPPORTS was 83% of all 8,948 relations because candidates were
+  embedding-near pairs only. Off-vocabulary LLM answers are rejected before
+  persist; dedup honours relation semantics — symmetric types
+  (SUPPORTS/CONTRADICTS) dedupe in either direction, directional types
+  (DEPENDS_ON/DERIVED_FROM/SUPERSEDES/INFLUENCES) only exact-direction so
+  reverse claims (dependency cycles, competing canonicality) stay
+  recordable, and a different type between an already-linked pair
+  (relationship evolution, e.g. SUPPORTS later found CONTRADICTS) is
+  recorded so the consistency queue can see late conflicts.
+
+### Changed
+- `search_ontology` output is bounded: unfiltered calls return a summary
+  (counts only — previously a full-tree dump measured at 4.9MB in a single
+  tool result); filtered calls cap facts per category via `limit` (default 5,
+  max 50) plus a global category render cap, all truncations reported with
+  exact remainders.
+- Graph traversal weights: only CONTRADICTS/SUPERSEDES edges traverse at 0.7;
+  every structural edge (SUPPORTS/INFLUENCES/DEPENDS_ON/DERIVED_FROM) at 1.0.
+
+### Fixed
+- Table-rebuild migrations toggle `foreign_keys` around the rebuild —
+  better-sqlite3 enables FK enforcement by default, so dropping a referenced
+  parent (`facts`) tripped child constraints on live-shaped DBs.
+- `search_ontology` handler now closes the DB in `finally` (previously leaked
+  the connection on error).
+- Sync import remaps relation endpoints through content-dedup survivors — an
+  edge whose fact was deduped onto an existing local fact used to be dropped
+  by the FK check; post-remap self-loops and already-present edges are
+  skipped instead of duplicated.
+
 ## [1.3.1] - 2026-07-05
 
 ### Documentation
@@ -40,22 +102,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deterministic category-reuse gate. The gate ships DISABLED by default
   (opt-in via `MEMORY_BANK_ONTOLOGY_DET_GATE`): measured top-1 agreement with LLM
   assignments was only 72% at sim≥0.93 (n=800 sample) — insufficient for auto-assign.
-
-### Hardened (adversarial review, 24 rounds pre-release)
-- Single-fact classification path unified onto the batch core (structured JSON prompt,
-  index validation, typed failure taxonomy shared)
-- Transient circuit breaker in the backfill worker (consecutive all-transient batches
-  abort the run; facts preserved untouched)
-- Category vec-index self-heal: exact id set-diff trigger, bidirectional reconciliation
-  (add missing + purge stale), structured completeness reporting — an incomplete index
-  always refuses candidate-starved classification
-- `IndexRepairError` typed escalation: index corruption surfaces loudly, never burns
-  fact attempts, never blocks relation detection over the healthy fact index
-- Relation edges idempotent per (source, type, target) + UNIQUE index migration
-  (exact-triple dedup only — distinct relation types between the same facts are
-  preserved as valid graph data)
-- Graph traversal: deterministic belief-safety edge preference (CONTRADICTS >
-  SUPERSEDES > affirmative), qualifying-edge fallback, and pruned-path containment
 
 ### Fixed
 - **Fallback classification was never persisted**: on unparseable LLM output the

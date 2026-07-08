@@ -69,6 +69,9 @@ Schema migrations are handled inline in `db.ts` via `migrateSchema()` — idempo
 ### Fact System
 
 Facts have 5 categories: `decision`, `preference`, `pattern`, `knowledge`, `constraint`.
+The vocabulary is enforced by a DB CHECK; every write normalizes through
+`normalizeFactCategory()` (`src/fact-category.ts`). Extraction confidence
+(0..1) is persisted on `facts.confidence`.
 Scope isolation: project facts stay within their project, global facts are shared.
 Consolidation relations: `DUPLICATE` (merge), `CONTRADICTION` (replace), `EVOLUTION` (update), `INDEPENDENT` (keep both).
 
@@ -87,8 +90,10 @@ Consolidation relations: `DUPLICATE` (merge), `CONTRADICTION` (replace), `EVOLUT
 Automatic classification of facts into domain/category hierarchy:
 - `ontology_domains` — Top-level groupings (e.g., "Infrastructure", "Frontend")
 - `ontology_categories` — Sub-groupings within domains
-- `ontology_relations` — Typed relations between facts: `INFLUENCES`, `SUPERSEDES`, `SUPPORTS`, `CONTRADICTS`
+- `ontology_relations` — Typed relations between facts: `INFLUENCES`, `SUPERSEDES`, `SUPPORTS`, `CONTRADICTS`, `DEPENDS_ON`, `DERIVED_FROM` (single-sourced in `RELATION_TYPES`, DB CHECK generated from it)
 - Classification runs asynchronously after fact insertion via `classifyAndLinkFact()`
+- Relation candidates come from two channels: embedding similarity (≥0.89, top-2) and co-extraction (consecutive facts of one extraction batch, ≤3 probes)
+- Maintenance CLIs: `memory-bank consistency` (active CONTRADICTS/SUPERSEDES resolution queue; `--gate` exits 2) and `memory-bank taxonomy-align` (near-duplicate category merge — report-first, `--apply` for same-domain merges)
 
 ### Avatar Responder
 
