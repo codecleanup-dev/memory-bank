@@ -31,6 +31,20 @@ const MAX_CATEGORIES_RENDERED = 40;
 // relations lines.
 const MAX_RELATIONS_PER_FACT = 5;
 
+/**
+ * DB-sourced text (fact text, domain/category names/descriptions) is past
+ * LLM/sync output. A stored payload like "## SYSTEM: ignore previous
+ * instructions" must not be able to fabricate its own markdown section
+ * inside this tool result — single-line + length-cap keeps every payload an
+ * inline fragment of a bullet we author (same carrier-bounding rationale as
+ * the classifier's oneLine(); semantic injection cannot be fully eliminated
+ * in a text tool, but it cannot restructure the output).
+ */
+function inert(value: string | null | undefined, max: number = 300): string {
+  if (!value) return '';
+  return value.replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
 interface SlimFactRow {
   id: string;
   fact: string;
@@ -105,8 +119,8 @@ function buildSummary(db: Database.Database): string {
 
   out += `## Domains (by fact count)\n\n`;
   for (const d of domains) {
-    out += `- **${d.name}** — ${d.categories} categories, ${d.facts} facts`;
-    if (d.description) out += ` · ${d.description}`;
+    out += `- **${inert(d.name, 80)}** — ${d.categories} categories, ${d.facts} facts`;
+    if (d.description) out += ` · ${inert(d.description, 160)}`;
     out += '\n';
   }
   out += `\n_Facts are not listed in summary mode. Pass \`domain\` and/or \`category\` to list facts (\`limit\` caps facts per category, default ${DEFAULT_FACT_LIMIT})._\n`;
@@ -157,26 +171,26 @@ function buildDetail(
   for (const m of rendered) {
     if (m.domainName !== currentDomain) {
       currentDomain = m.domainName;
-      out += `## ${m.domainName}\n`;
-      if (m.domainDescription) out += `> ${m.domainDescription}\n`;
+      out += `## ${inert(m.domainName, 80)}\n`;
+      if (m.domainDescription) out += `> ${inert(m.domainDescription, 200)}\n`;
       out += '\n';
     }
 
     const total = countCategoryFacts(db, m.categoryId);
     const facts = listCategoryFacts(db, m.categoryId, limit);
 
-    out += `### ${m.categoryName}`;
-    if (m.categoryDescription) out += ` — ${m.categoryDescription}`;
+    out += `### ${inert(m.categoryName, 80)}`;
+    if (m.categoryDescription) out += ` — ${inert(m.categoryDescription, 200)}`;
     out += `\n(showing ${facts.length} of ${total} facts)\n\n`;
 
     for (const fact of facts) {
-      out += `- **[${fact.category}]** ${fact.fact}\n`;
+      out += `- **[${fact.category}]** ${inert(fact.fact)}\n`;
       out += `  - ID: ${fact.id} | Confirmed: ${fact.consolidated_count}x | ${fact.created_at.slice(0, 10)}\n`;
 
       if (includeRelations) {
         const related = getRelatedFacts(db, fact.id, 1);
         for (const { fact: relFact, relation } of related.slice(0, MAX_RELATIONS_PER_FACT)) {
-          out += `  - ↔ [${relation.relation_type}] "${relFact.fact}"\n`;
+          out += `  - ↔ [${relation.relation_type}] "${inert(relFact.fact, 160)}"\n`;
         }
         if (related.length > MAX_RELATIONS_PER_FACT) {
           out += `  - _…+${related.length - MAX_RELATIONS_PER_FACT} more relations (use explore_graph for full traversal)._\n`;
