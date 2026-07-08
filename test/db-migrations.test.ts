@@ -68,6 +68,11 @@ describe('facts.category vocabulary migration', () => {
         `INSERT INTO ontology_relations (id, source_fact_id, relation_type, target_fact_id, reasoning) VALUES ('rel-legacy', 'f-ok', 'SUPPORTS', 'f-req', 'child row across the rebuild')`,
       )
       .run();
+
+    // User-added artifacts hanging off facts — the rebuild must replay them,
+    // not silently drop everything outside a hardcoded list.
+    raw.exec(`CREATE INDEX idx_custom_created ON facts(created_at)`);
+    raw.exec(`CREATE TRIGGER trg_facts_custom AFTER UPDATE ON facts BEGIN SELECT 1; END`);
     raw.close();
   }
 
@@ -114,6 +119,15 @@ describe('facts.category vocabulary migration', () => {
       };
       expect(rel.reasoning).toBe('child row across the rebuild');
       expect((db.pragma('foreign_keys', { simple: true }) as number)).toBe(1);
+
+      // User-added index/trigger were captured and replayed across the rebuild
+      expect(indexes).toContain('idx_custom_created');
+      const triggers = (
+        db.prepare(`SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='facts'`).all() as Array<{
+          name: string;
+        }>
+      ).map((r) => r.name);
+      expect(triggers).toContain('trg_facts_custom');
     } finally {
       db.close();
     }
@@ -125,6 +139,47 @@ describe('facts.category vocabulary migration', () => {
       expect(count).toBe(4);
     } finally {
       db2.close();
+    }
+  });
+
+  it('bails out (fail-safe) on exotic facts DDL it cannot reproduce, instead of dropping constraints', () => {
+    const raw = new Database(dbPath);
+    raw.exec(`CREATE TABLE legacy_parent (id TEXT PRIMARY KEY)`);
+    raw.exec(`
+      CREATE TABLE facts (
+        id TEXT PRIMARY KEY,
+        fact TEXT NOT NULL,
+        category TEXT,
+        scope_type TEXT NOT NULL DEFAULT 'project',
+        scope_project TEXT,
+        source_exchange_ids TEXT,
+        embedding BLOB,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        consolidated_count INTEGER DEFAULT 1,
+        is_active INTEGER DEFAULT 1,
+        custom_ref TEXT REFERENCES legacy_parent(id)
+      )
+    `);
+    raw
+      .prepare(
+        `INSERT INTO facts (id, fact, category, created_at, updated_at) VALUES ('f-exotic', 'row on exotic schema', 'requirement', datetime('now'), datetime('now'))`,
+      )
+      .run();
+    raw.close();
+
+    const db = initDatabase(); // must not throw
+    try {
+      const sql = (
+        db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facts'`).get() as { sql: string }
+      ).sql;
+      expect(sql).toMatch(/REFERENCES/i); // custom constraint preserved…
+      expect(sql).not.toMatch(/CHECK\s*\(\s*category\s+IN/i); // …at the cost of skipping the CHECK
+      // Degraded mode is explicit: legacy junk stays, write path still normalizes
+      const row = db.prepare(`SELECT category FROM facts WHERE id = 'f-exotic'`).get() as { category: string };
+      expect(row.category).toBe('requirement');
+    } finally {
+      db.close();
     }
   });
 

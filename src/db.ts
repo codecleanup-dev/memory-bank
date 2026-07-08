@@ -141,6 +141,17 @@ export function migrateRelationTypeVocabulary(db: Database.Database): void {
   if (!tbl?.sql) return;
   if (RELATION_TYPES.every((t) => tbl.sql.includes(`'${t}'`))) return;
 
+  // Capture attached indexes/triggers (incl. user-added ones) for replay —
+  // they drop with the table. Unlike facts, the REFERENCES clauses here are
+  // ours and reproduced verbatim in the new DDL below.
+  const attachedDdl = (
+    db
+      .prepare(
+        `SELECT sql FROM sqlite_master WHERE tbl_name='ontology_relations' AND type IN ('index','trigger') AND sql IS NOT NULL`,
+      )
+      .all() as Array<{ sql: string }>
+  ).map((r) => r.sql);
+
   const rebuild = db.transaction(() => {
     db.exec(`
       CREATE TABLE ontology_relations_vocab_rebuild (
@@ -158,6 +169,9 @@ export function migrateRelationTypeVocabulary(db: Database.Database): void {
     `);
     db.exec(`DROP TABLE ontology_relations`);
     db.exec(`ALTER TABLE ontology_relations_vocab_rebuild RENAME TO ontology_relations`);
+    for (const ddl of attachedDdl) db.exec(ddl);
+    // Standard indexes may not exist yet on very old DBs (created later in
+    // init on the fresh path) — ensure them regardless of the capture.
     db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_source ON ontology_relations(source_fact_id)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_target ON ontology_relations(target_fact_id)`);
   });
@@ -171,6 +185,29 @@ export function migrateFactsCategoryVocabulary(db: Database.Database): void {
     .get() as { sql: string } | undefined;
   if (!tbl?.sql) return;
   if (/CHECK\s*\(\s*category\s+IN/i.test(tbl.sql)) return; // already enforced
+
+  // Fail-safe for hand-modified DBs: a pragma-based column rebuild cannot
+  // reproduce arbitrary table-level constraints. No shipped facts schema
+  // ever carried FOREIGN KEY/REFERENCES, so this only trips on exotic DBs —
+  // there, leaving the vocabulary write-path-enforced-only beats silently
+  // dropping someone's constraints.
+  if (/FOREIGN\s+KEY|REFERENCES/i.test(tbl.sql)) {
+    console.error(
+      'facts.category migration skipped: custom FOREIGN KEY/REFERENCES on facts — vocabulary stays write-path-enforced only.',
+    );
+    return;
+  }
+
+  // Everything hanging off the table (indexes incl. user-added ones,
+  // triggers) is dropped with it — capture the DDL now and replay after the
+  // rename. A hardcoded recreate list would silently drop custom artifacts.
+  const attachedDdl = (
+    db
+      .prepare(
+        `SELECT sql FROM sqlite_master WHERE tbl_name='facts' AND type IN ('index','trigger') AND sql IS NOT NULL`,
+      )
+      .all() as Array<{ sql: string }>
+  ).map((r) => r.sql);
 
   const cols = db
     // NOTNULL is an SQLite keyword (IS NOTNULL), so the pragma column must be
@@ -203,12 +240,9 @@ export function migrateFactsCategoryVocabulary(db: Database.Database): void {
     db.exec(`DROP TABLE facts`);
     db.exec(`ALTER TABLE facts_vocab_rebuild RENAME TO facts`);
 
-    // 3) Indexes were dropped with the old table — recreate them.
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_scope ON facts(scope_type, scope_project)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_category ON facts(category)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_active ON facts(is_active)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_ontology ON facts(ontology_category_id)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_coding_agent ON facts(coding_agent)`);
+    // 3) Replay every captured index/trigger DDL (standard indexes were
+    //    created earlier in this same init, so they are in the capture too).
+    for (const ddl of attachedDdl) db.exec(ddl);
   });
   // facts is a referenced parent (fact_revisions, ontology_relations) — the
   // DROP inside the rebuild needs FK enforcement suspended.
