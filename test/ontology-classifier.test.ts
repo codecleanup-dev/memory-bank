@@ -34,6 +34,8 @@ import {
   createCategory,
   getDomainByName,
   getRelationsForFact,
+  getRelatedFacts,
+  createRelation,
   upsertCategoryEmbedding,
 } from '../src/ontology-db.js';
 import type { Fact } from '../src/types.js';
@@ -508,25 +510,25 @@ describe('ontology-classifier', () => {
       expect(row.ontology_attempts).toBe(0);
     });
 
-    it('vec index unusable(dropped) while categories exist → refuses starved classification (transient)', async () => {
+    it('vec index unusable(dropped) while categories exist → HARD repair failure surfaces loudly', async () => {
       const embeddingArr = new Array(384).fill(0.1);
       insertTestFact(db, 'st-0', 'Starved', embeddingArr);
       const domain = createDomain(db, 'Existing', 'e');
       createCategory(db, domain.id, 'Existing Cat', 'c');
-      db.exec('DROP TABLE vec_categories'); // swallowed-error path: lookup AND heal both impossible
+      db.exec('DROP TABLE vec_categories'); // lookup AND heal both impossible — unrepairable from here
 
-      const result = await classifyFactsBatch(db, [
-        makeFact({ id: 'st-0', fact: 'Starved', embedding: new Float32Array(embeddingArr) }),
-      ]);
-
-      expect(result.transient).toEqual(['st-0']); // no starved LLM call, no persistence
+      // Not silent-transient (eternal re-selection) and not a content failure:
+      // a plain Error propagates so the worker logs batch-ERROR + circuit-breaks.
+      await expect(
+        classifyFactsBatch(db, [makeFact({ id: 'st-0', fact: 'Starved', embedding: new Float32Array(embeddingArr) })]),
+      ).rejects.toThrow(/repair FAILED/);
       expect(callHaiku).not.toHaveBeenCalled();
       const row = db.prepare('SELECT ontology_category_id, ontology_attempts FROM facts WHERE id = ?').get('st-0') as {
         ontology_category_id: string | null;
         ontology_attempts: number;
       };
       expect(row.ontology_category_id).toBeNull();
-      expect(row.ontology_attempts).toBe(0);
+      expect(row.ontology_attempts).toBe(0); // hard failure is not the fact's fault either
     });
 
     it('STALE vec rows masking a missing category still get healed (0-hit fallback)', async () => {
@@ -579,6 +581,106 @@ describe('ontology-classifier', () => {
       expect(staleLeft).toBe(0);
       const row = db.prepare('SELECT ontology_category_id FROM facts WHERE id = ?').get('cr-0') as { ontology_category_id: string | null };
       expect(row.ontology_category_id).toBe(real.id);
+    });
+
+    it('stale row masking counts WHILE a live hit exists still triggers heal (exact set-diff)', async () => {
+      const embeddingArr = new Array(384).fill(0.1);
+      insertTestFact(db, 'xm-0', 'Exact match trigger', embeddingArr);
+      const domain = createDomain(db, 'Existing', 'e');
+      const catA = createCategory(db, domain.id, 'Indexed Cat', 'a');
+      upsertCategoryEmbedding(db, catA.id, embeddingArr); // A indexed → search WILL return a live hit
+      const catB = createCategory(db, domain.id, 'Missing Cat', 'b'); // B unindexed
+      // 1 stale row equalizes counts (2 live vs 2 vec) — count-based trigger would skip
+      db.prepare('INSERT INTO vec_categories (id, embedding) VALUES (?, ?)').run(
+        'stale-x', Buffer.from(new Float32Array(new Array(384).fill(0.7)).buffer),
+      );
+
+      (parseJsonResponse as ReturnType<typeof vi.fn>).mockReturnValue([
+        { index: 0, domain: 'Existing', category: 'Missing Cat', is_new_domain: false, is_new_category: false },
+      ]);
+      (callHaiku as ReturnType<typeof vi.fn>).mockResolvedValue('[]');
+
+      const result = await classifyFactsBatch(db, [
+        makeFact({ id: 'xm-0', fact: 'Exact match trigger', embedding: new Float32Array(embeddingArr) }),
+      ]);
+
+      expect(result.classified).toEqual(['xm-0']);
+      // heal ran despite live hit + equalized counts: B indexed, stale purged
+      const vecIds = (db.prepare('SELECT id FROM vec_categories').all() as Array<{ id: string }>).map((r) => r.id);
+      expect(vecIds).toContain(catB.id);
+      expect(vecIds).not.toContain('stale-x');
+    });
+
+    it('stale residue beyond the bounded purge keeps refusing (staleRemaining guard)', async () => {
+      const embeddingArr = new Array(384).fill(0.1);
+      insertTestFact(db, 'sr-0', 'Stale residue', embeddingArr);
+      const domain = createDomain(db, 'Existing', 'e');
+      const catA = createCategory(db, domain.id, 'Indexed Cat', 'a');
+      upsertCategoryEmbedding(db, catA.id, embeddingArr);
+      // 101 stale rows: bounded purge(100) leaves 1 → must still refuse
+      const stmt = db.prepare('INSERT INTO vec_categories (id, embedding) VALUES (?, ?)');
+      for (let i = 0; i < 101; i++) {
+        stmt.run(`stale-${i}`, Buffer.from(new Float32Array(new Array(384).fill(0.6)).buffer));
+      }
+
+      const result = await classifyFactsBatch(db, [
+        makeFact({ id: 'sr-0', fact: 'Stale residue', embedding: new Float32Array(embeddingArr) }),
+      ]);
+
+      expect(result.transient).toEqual(['sr-0']); // 1 stale left → refuse until fully reconciled
+      expect(callHaiku).not.toHaveBeenCalled();
+    });
+
+    it('insert path does NOT ledger IndexRepairError — corruption cannot park innocent facts', async () => {
+      const embeddingArr = new Array(384).fill(0.1);
+      insertTestFact(db, 'ir-0', 'Corruption victim', embeddingArr);
+      insertTestFact(db, 'ir-similar', 'Corruption neighbour', embeddingArr); // relation candidate via healthy vec_facts
+      const domain = createDomain(db, 'Existing', 'e');
+      createCategory(db, domain.id, 'Existing Cat', 'c');
+      db.exec('DROP TABLE vec_categories');
+
+      // Relation detection must still run under category-index corruption.
+      // Type FLAPS across retries (SUPPORTS → INFLUENCES → …): pair-level
+      // idempotency must still keep exactly one edge.
+      let flap = 0;
+      (parseJsonResponse as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+        has_relation: true,
+        relation_type: flap++ % 2 === 0 ? 'SUPPORTS' : 'INFLUENCES',
+        reasoning: 'similar',
+      }));
+      (callHaiku as ReturnType<typeof vi.fn>).mockResolvedValue('{}');
+
+      for (let i = 0; i < MAX_CLASSIFY_ATTEMPTS; i++) {
+        // Surfaces loudly at the caller boundary (no silent success)…
+        await expect(classifyAndLinkFact(db, 'ir-0', embeddingArr)).rejects.toThrow(/repair FAILED/);
+      }
+
+      const row = db.prepare('SELECT ontology_category_id, ontology_attempts FROM facts WHERE id = ?').get('ir-0') as {
+        ontology_category_id: string | null;
+        ontology_attempts: number;
+      };
+      expect(row.ontology_attempts).toBe(0); // …but infra corruption ≠ the fact's fault: no ledger burn
+      expect(row.ontology_category_id).toBeNull(); // NOT parked in General/Misc
+      // vec_facts is healthy → relation edges must NOT be lost to the category-index outage.
+      // Triple-level idempotency: the exact-dup SUPPORTS retry is suppressed, while the
+      // flapped INFLUENCES stays as a valid distinct-typed edge (bounded by the type enum).
+      const rels = getRelationsForFact(db, 'ir-0');
+      expect(rels.length).toBe(2);
+      expect(new Set(rels.map((r) => r.relation_type)).size).toBe(2); // no same-type duplicates
+    });
+
+    it('vec table scans but rejects INSERT (wrong schema) → hard repair failure, not transient loop', async () => {
+      const embeddingArr = new Array(384).fill(0.1);
+      insertTestFact(db, 'wr-0', 'Write broken', embeddingArr);
+      const domain = createDomain(db, 'Existing', 'e');
+      createCategory(db, domain.id, 'Existing Cat', 'c'); // unindexed → heal must add
+      db.exec('DROP TABLE vec_categories');
+      db.exec('CREATE TABLE vec_categories (id TEXT PRIMARY KEY)'); // scanable, but INSERT(id, embedding) fails
+
+      await expect(
+        classifyFactsBatch(db, [makeFact({ id: 'wr-0', fact: 'Write broken', embedding: new Float32Array(embeddingArr) })]),
+      ).rejects.toThrow(/repair FAILED \(write/);
+      expect(callHaiku).not.toHaveBeenCalled();
     });
 
     it('purge-only heal (missing add FAILED) must NOT unlock classification — transient', async () => {
@@ -761,6 +863,60 @@ describe('ontology-classifier', () => {
       const stats = await backfillClassifyBatch(db, ['sk-0', 'nonexistent']);
       expect(stats.classified + stats.deterministic + stats.fallback + stats.failed).toBe(0);
       expect(callHaiku).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('multi-typed edge traversal', () => {
+    it('surfaces CONTRADICTS over SUPPORTS when both connect the same pair (deterministic)', () => {
+      const emb = new Array(384).fill(0.1);
+      insertTestFact(db, 'g-a', 'Fact A', emb);
+      insertTestFact(db, 'g-b', 'Fact B', emb);
+      createRelation(db, 'g-a', 'SUPPORTS', 'g-b', 'affirms');
+      createRelation(db, 'g-a', 'CONTRADICTS', 'g-b', 'conflicts');
+
+      const related = getRelatedFacts(db, 'g-a', 1);
+
+      expect(related.length).toBe(1); // one edge per neighbour (visited-set contract)
+      expect(related[0].relation.relation_type).toBe('CONTRADICTS'); // belief-safety edge wins, not insertion luck
+    });
+
+    it('safety edge below the relevance floor does NOT hide a qualifying affirmative edge', () => {
+      const emb = new Array(384).fill(0.1);
+      insertTestFact(db, 'g-e', 'Fact E', emb);
+      insertTestFact(db, 'g-f', 'Fact F', emb);
+      createRelation(db, 'g-e', 'SUPPORTS', 'g-f', 'affirms');   // weight 1.0 → relevance 1.0
+      createRelation(db, 'g-e', 'CONTRADICTS', 'g-f', 'conflicts'); // weight 0.7 → relevance 0.7
+
+      const related = getRelatedFacts(db, 'g-e', 1, 0.6, 0.8); // floor 0.8: CONTRADICTS fails, SUPPORTS passes
+
+      expect(related.length).toBe(1);
+      expect(related[0].relation.relation_type).toBe('SUPPORTS'); // qualifying edge surfaced, neighbour not hidden
+    });
+
+    it('pruned neighbour does NOT leak deeper paths through a filtered edge', () => {
+      const emb = new Array(384).fill(0.1);
+      insertTestFact(db, 'g-p', 'Fact P', emb);
+      insertTestFact(db, 'g-q', 'Fact Q', emb);
+      insertTestFact(db, 'g-r', 'Fact R', emb);
+      createRelation(db, 'g-p', 'CONTRADICTS', 'g-q', 'blocked edge'); // 0.7 < floor 0.8 → Q pruned
+      createRelation(db, 'g-q', 'SUPPORTS', 'g-r', 'would leak');
+
+      const related = getRelatedFacts(db, 'g-p', 2, 1, 0.8);
+
+      expect(related.length).toBe(0); // Q pruned AND R unreachable through the pruned path
+    });
+
+    it('createRelation stays idempotent per triple but preserves distinct types', () => {
+      const emb = new Array(384).fill(0.1);
+      insertTestFact(db, 'g-c', 'Fact C', emb);
+      insertTestFact(db, 'g-d', 'Fact D', emb);
+      const first = createRelation(db, 'g-c', 'SUPPORTS', 'g-d', 'one');
+      const dup = createRelation(db, 'g-c', 'SUPPORTS', 'g-d', 'two'); // same triple → same row
+      const other = createRelation(db, 'g-c', 'INFLUENCES', 'g-d', 'three'); // distinct type → new row
+
+      expect(dup.id).toBe(first.id);
+      expect(other.id).not.toBe(first.id);
+      expect(getRelationsForFact(db, 'g-c').length).toBe(2);
     });
   });
 

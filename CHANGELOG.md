@@ -67,6 +67,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by the FK check; post-remap self-loops and already-present edges are
   skipped instead of duplicated.
 
+## [1.3.1] - 2026-07-05
+
+### Documentation
+- **README**: "What's New" refreshed for v1.3.0 (batch classification, spawn isolation,
+  attempt ledger, vec-index self-heal, hardened worker caps) and new **Configuration**
+  entries for the backfill worker env knobs (`BACKFILL_ONTOLOGY_MAX`, `BACKFILL_EXTRACT_MAX`,
+  `BACKFILL_BATCH_SIZE`, `BACKFILL_CONCURRENCY`, `BACKFILL_RELATIONS`) and the opt-in
+  deterministic reuse gate (`MEMORY_BANK_ONTOLOGY_DET_GATE`, disabled by default per
+  live measurement)
+
 ## [1.3.0] - 2026-07-05
 
 ### Changed

@@ -83,6 +83,20 @@ export class FactContentError extends Error {
   }
 }
 
+/**
+ * The category vec index is broken in a way self-heal cannot fix (table
+ * unscannable / rejects writes). Neither the fact's fault (no ledger burn —
+ * parking innocents in General/Misc under corruption would be wrong) nor
+ * transient (retry won't fix it): it must surface LOUDLY — worker logs a
+ * batch ERROR and circuit-breaks; manual repair is required.
+ */
+export class IndexRepairError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'IndexRepairError';
+  }
+}
+
 // Prompt-surface sanitizer for DB-sourced strings (category/domain names and
 // descriptions are PAST LLM OUTPUT — a poisoned description would otherwise
 // be re-injected into every future prompt that retrieves it as a candidate,
@@ -187,7 +201,7 @@ function categoryEmbeddingText(name: string, description?: string | null): strin
 async function healCategoryIndex(
   db: Database.Database,
   limit: number = 100,
-): Promise<{ added: number; purged: number; missingRemaining: number }> {
+): Promise<{ added: number; purged: number; missingRemaining: number; staleRemaining: number; blocked: 'embed' | 'write' | 'purge' | 'scan' | null }> {
   let indexed: Set<string>;
   try {
     indexed = new Set((db.prepare('SELECT id FROM vec_categories').all() as Array<{ id: string }>).map((r) => r.id));
@@ -195,7 +209,7 @@ async function healCategoryIndex(
     // vec table unusable — nothing to heal here; report full missingness so
     // the caller refuses rather than classifying candidate-starved.
     const live = (db.prepare('SELECT COUNT(*) AS n FROM ontology_categories').get() as { n: number }).n;
-    return { added: 0, purged: 0, missingRemaining: live };
+    return { added: 0, purged: 0, missingRemaining: live, staleRemaining: 0, blocked: 'scan' };
   }
   const liveRows = db.prepare('SELECT id, name, description FROM ontology_categories').all() as Array<{
     id: string;
@@ -207,15 +221,20 @@ async function healCategoryIndex(
   // Purge STALE vec rows (ids whose category was deleted): they are derived
   // index residue, and enough of them near a query crowd every live
   // candidate out of the LIMIT-k window — adding the missing row alone
-  // cannot fix retrieval. Bounded like the add side.
+  // cannot fix retrieval. Bounded like the add side; the REMAINDER is
+  // reported so the caller keeps refusing until the residue is gone (a
+  // partial purge can still dilute top-k with stale hits that the search
+  // filters into missing candidate slots).
+  const staleAll = [...indexed].filter((id) => !liveIds.has(id));
   let purged = 0;
-  for (const id of indexed) {
-    if (liveIds.has(id)) continue;
+  let blocked: 'embed' | 'write' | 'purge' | 'scan' | null = null;
+  for (const id of staleAll) {
     try {
       db.prepare('DELETE FROM vec_categories WHERE id = ?').run(id);
       purged++;
     } catch {
-      break; // vec table unusable mid-way — stop, guard decides
+      blocked = 'purge'; // vec table write-broken mid-way — stop, guard decides
+      break;
     }
     if (purged >= limit) break;
   }
@@ -224,19 +243,28 @@ async function healCategoryIndex(
   const missing = missingAll.slice(0, limit);
   let added = 0;
   for (const c of missing) {
+    let emb: number[];
     try {
-      const emb = await generateEmbedding(categoryEmbeddingText(c.name, c.description), 'passage');
+      emb = await generateEmbedding(categoryEmbeddingText(c.name, c.description), 'passage');
+    } catch {
+      if (!blocked) blocked = 'embed'; // runtime down — caller's guard goes transient
+      break;
+    }
+    try {
       upsertCategoryEmbedding(db, c.id, emb);
       added++;
     } catch {
-      break; // embedding runtime down — caller's guard goes transient
+      // vec INSERT rejected while the table scans: index corruption, NOT an
+      // embedding-runtime problem — must escalate hard, not loop transient.
+      blocked = 'write';
+      break;
     }
   }
   // missingRemaining counts EVERY live category still without a vec row
   // (embed failures AND beyond-limit backlog): purge success must never be
   // mistaken for repair success — an incomplete candidate index means
   // classification would run with some live categories invisible.
-  return { added, purged, missingRemaining: missingAll.length - added };
+  return { added, purged, missingRemaining: missingAll.length - added, staleRemaining: staleAll.length - purged, blocked };
 }
 
 /**
@@ -303,41 +331,63 @@ async function categoryHits(
   let hits = searchSimilarCategories(db, embedding, k);
   const catCount = (db.prepare('SELECT COUNT(*) AS n FROM ontology_categories').get() as { n: number }).n;
   if (catCount > 0) {
-    // Index-coverage self-heal — triggered by COUNTS, not by empty hits: a
-    // PARTIAL index (category created while the embedding runtime was down;
-    // applyClassification logs-and-continues) still returns hits for the
-    // indexed subset, which would leave the unindexed rest invisible as
-    // reuse candidates forever. Counts come from the plain rowids shadow
-    // table (cheap); a few stale vec rows can mask an equal number of
-    // missing ones — accepted: stale rows are removed via
-    // deleteCategoryEmbedding, and the one-time backfill script remains the
-    // full-repair path.
-    let vecCount = 0;
+    // Index-coverage self-heal — triggered by EXACT id-set reconciliation,
+    // not by counts and not by empty hits: counts are gamed by stale rows
+    // numerically masking missing ones (in both directions), and a PARTIAL
+    // index still returns hits for the indexed subset while leaving the
+    // unindexed rest invisible as reuse candidates forever. The id scan is
+    // a few ms at the current scale (~3K categories); revisit with a dirty
+    // flag if the taxonomy grows orders of magnitude.
+    let needHeal = false;
     try {
-      vecCount = (db.prepare('SELECT COUNT(*) AS n FROM vec_categories_rowids').get() as { n: number }).n;
-    } catch {
-      try {
-        vecCount = (db.prepare('SELECT COUNT(*) AS n FROM vec_categories').get() as { n: number }).n;
-      } catch {
-        vecCount = 0;
+      const vecIds = new Set(
+        (db.prepare('SELECT id FROM vec_categories').all() as Array<{ id: string }>).map((r) => r.id),
+      );
+      const liveIds = (db.prepare('SELECT id FROM ontology_categories').all() as Array<{ id: string }>).map((r) => r.id);
+      const liveSet = new Set(liveIds);
+      const missingExists = liveIds.some((id) => !vecIds.has(id));
+      let staleExists = false;
+      for (const id of vecIds) {
+        if (!liveSet.has(id)) {
+          staleExists = true;
+          break;
+        }
       }
+      needHeal = missingExists || staleExists;
+    } catch {
+      needHeal = true; // vec table unusable — heal reports full missingness → refusal
     }
     const healAndRefresh = async (): Promise<void> => {
       const heal = await healCategoryIndex(db);
-      if (heal.missingRemaining > 0) {
-        // Purge/partial-add success must NOT unlock classification: any live
-        // category still unindexed means the candidate list is incomplete
-        // and the LLM could recreate it as a duplicate. Progressive runs
-        // keep healing (bounded per call) until the index is whole.
+      if (heal.missingRemaining > 0 || heal.staleRemaining > 0) {
+        // Partial repair must NOT unlock classification: an unindexed live
+        // category is invisible to reuse (duplicate risk), and RESIDUAL
+        // stale rows dilute the top-k window with hits the search filters
+        // away (candidate slots silently lost).
+        //
+        // Distinguish HOW it is incomplete (fail-loud, no eternal-transient
+        // laundering):
+        // - progress was made, or the embedding runtime is down → transient:
+        //   progressive runs keep healing until reconciled / runtime returns.
+        // - ZERO progress because the vec table itself rejects writes/scans →
+        //   the index is unrepairable from here; a plain Error surfaces
+        //   loudly (worker batch-ERROR log + circuit breaker; insert path
+        //   ledgers it) instead of silently re-selecting forever.
+        const progress = heal.added + heal.purged;
+        if (progress === 0 && (heal.blocked === 'purge' || heal.blocked === 'scan' || heal.blocked === 'write')) {
+          throw new IndexRepairError(
+            `ontology category index repair FAILED (${heal.blocked}: vec_categories unwritable/unscannable; missing ${heal.missingRemaining}, stale ${heal.staleRemaining}) — manual repair required (fact ${fact.id})`,
+          );
+        }
         throw new TransientLlmError(
-          `category index incomplete after heal (${heal.missingRemaining} live categories unindexed) — refusing candidate-starved classification (fact ${fact.id})`,
+          `category index incomplete after heal (missing ${heal.missingRemaining}, stale ${heal.staleRemaining}) — refusing candidate-starved classification (fact ${fact.id})`,
         );
       }
       if (heal.added + heal.purged > 0) {
         hits = searchSimilarCategories(db, embedding as number[], k); // re-rank with reconciled index
       }
     };
-    if (vecCount < catCount) {
+    if (needHeal) {
       await healAndRefresh();
     }
     if (hits.length === 0) {
@@ -865,6 +915,13 @@ export async function classifyAndLinkFact(
     fact.embedding = new Float32Array(embedding);
   }
 
+  // Held-back repair failure: it must surface to the caller (fail-loud), but
+  // NOT before relation detection has run — relations use the fact index
+  // (vec_facts), which can be perfectly healthy while vec_categories is
+  // corrupt, and skipping them here would permanently lose live relation
+  // edges (backfill has relations off by default).
+  let repairError: IndexRepairError | null = null;
+
   try {
     await classifyFactToOntology(db, fact);
   } catch (error) {
@@ -876,7 +933,15 @@ export async function classifyAndLinkFact(
     // path: an outage is not the fact's fault, and mixing the two would let
     // one transient hiccup push a fact with prior content failures over the
     // parking cap.
-    if (!(error instanceof TransientLlmError)) {
+    if (error instanceof IndexRepairError) {
+      // Infra corruption: no ledger burn (parking innocent facts in
+      // General/Misc because the INDEX is broken would misfile them), but it
+      // must not dissolve into silent success either — rethrown below, AFTER
+      // relation detection, so live insert callers see the failure at their
+      // boundary (fact-extractor logs it loudly and continues extraction;
+      // the overlay stays NULL and the backfill resumes once repaired).
+      repairError = error;
+    } else if (!(error instanceof TransientLlmError)) {
       try {
         const attempts = recordOntologyAttempt(db, factId);
         if (attempts >= MAX_CLASSIFY_ATTEMPTS) {
@@ -893,6 +958,8 @@ export async function classifyAndLinkFact(
   } catch (error) {
     console.error(`Relation detection failed for fact ${factId}:`, error);
   }
+
+  if (repairError) throw repairError;
 }
 
 function ensureFallbackCategory(db: Database.Database): { domainId: string; categoryId: string } {

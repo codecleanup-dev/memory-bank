@@ -51,6 +51,23 @@ codex-support 완성·검증 후 활성화까지가 끝. **원작자에게 PR �
 
 ## 업스트림 동기화 기록
 
+### 2026-07-05 — upstream v1.3.1 반영 (e8bec6d → b453234, 13커밋) → 포크 1.4.1
+
+| 묶음 | 커밋 | 내용 | 판정 |
+|---|---|---|---|
+| 인덱스 self-heal fail-loud | d5ab396…c3fd8dc (R9~R14, 6) | heal 트리거 id set-diff 정합, staleRemaining 거부, IndexRepairError 타입 분리 + rethrow 재배열 | 채택 |
+| 관계 dedup | 6d753b9, 27536c0 (R15~R17) | 관계 엣지 멱등화(쌍 단위 + UNIQUE 인덱스) + dedup pair→TRIPLE 교정(CRITICAL)·라이브 복원 | 채택 |
+| 그래프 탐색 문턱 | 657c118…e9f21a2 (R18~R20, 3) | 결정론적 belief-safety 우선 순회, safety 엣지의 이웃 숨김 방지, 문턱 미달 frontier 진입 차단 | 채택 |
+| 문서 | 063000b, b453234 | README What's New v1.3.0 + backfill 워커 env 문서화, 게이트 MEDIUM 2건 반영 | 채택 |
+
+- 전량 채택. 실충돌은 버전 필드 3파일(package.json engines 블록 포함)뿐 — 소스 겹침 0
+  (upstream: db/ontology-* ∥ 포크: parser/paths/sync).
+- 포크 패치 대장 4종 보존 확인: 병합이 해당 파일 미접촉.
+- 검증: ontology-classifier 50/50 통과. 전체 스위트 329 중 2건 실패는
+  api-config(httpbin 외부 네트워크)·verify re-index(30s 마진 콜드로드) — 병합 전
+  origin/main 베이스라인 worktree에서 동일 재현 확인, 회귀 아님.
+- dist는 pin 노드(v22.22.3)로 재빌드, dist/db·ontology-* import 스모크 통과.
+
 ### 2026-07-05 — upstream v1.3.0 반영 (90fbd3d → e8bec6d, 15커밋) → 포크 1.4.0
 
 | 묶음 | 커밋 | 내용 | 판정 |
