@@ -743,9 +743,13 @@ export function parkExhaustedFacts(db: Database.Database): number {
 /**
  * Probe ONE candidate pair with the LLM and persist the relation when valid.
  * Shared by the similarity channel (detectRelations) and the co-extraction
- * channel (detectCoExtractionRelations). Skips — saving the LLM call — when
- * any relation already links the pair: both channels can nominate the same
- * neighbours across runs.
+ * channel (detectCoExtractionRelations).
+ *
+ * Dedup is per (pair, type) at persist time — NOT a blanket any-relation
+ * skip: an identical-type edge is never written twice, but a different type
+ * between an already-linked pair is relationship evolution (SUPPORTS pair
+ * later found CONTRADICTS after a fact was revised in place) and must be
+ * recorded, or the consistency queue can never see late conflicts.
  */
 async function detectRelationBetween(
   db: Database.Database,
@@ -753,8 +757,6 @@ async function detectRelationBetween(
   existingFact: Fact,
   contextNote?: string,
 ): Promise<boolean> {
-  if (relationExistsBetween(db, newFact.id, existingFact.id)) return false;
-
   const lines = [
     `New fact: "${newFact.fact}"`,
     `Existing fact: "${existingFact.fact}"`,
@@ -770,6 +772,8 @@ async function detectRelationBetween(
   // The CHECK constraint would reject junk anyway, but validating first keeps
   // an off-vocabulary LLM answer from throwing away the whole probe.
   if (!VALID_RELATION_TYPES.has(result.relation_type)) return false;
+  // Exact-duplicate edge (same pair, same type, either direction) — skip.
+  if (relationExistsBetween(db, newFact.id, existingFact.id, result.relation_type)) return false;
 
   createRelation(db, newFact.id, result.relation_type, existingFact.id, result.reasoning);
   return true;

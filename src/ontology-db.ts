@@ -210,25 +210,31 @@ export function createRelation(
 }
 
 /**
- * Whether ANY relation (either direction) already links the two facts.
- * Both detection channels (similarity + co-extraction) can nominate the same
- * pair across runs — checking first saves the LLM probe and prevents
- * duplicate edges.
+ * Whether a relation (either direction) already links the two facts —
+ * optionally scoped to one relation type.
+ *
+ * Type-scoped is the dedup used by the detection channels: an identical-type
+ * edge must not be persisted twice, but a DIFFERENT type between the same
+ * pair is legitimate relationship evolution (a SUPPORTS pair can turn
+ * CONTRADICTS after one fact is revised in place) and must stay recordable —
+ * otherwise the consistency queue can never see late-discovered conflicts.
  */
 export function relationExistsBetween(
   db: Database.Database,
   factIdA: string,
   factIdB: string,
+  relationType?: RelationType,
 ): boolean {
   return (
     db
       .prepare(
         `SELECT 1 AS one FROM ontology_relations
-         WHERE (source_fact_id = ? AND target_fact_id = ?)
-            OR (source_fact_id = ? AND target_fact_id = ?)
+         WHERE ((source_fact_id = @a AND target_fact_id = @b)
+             OR (source_fact_id = @b AND target_fact_id = @a))
+           AND (@type IS NULL OR relation_type = @type)
          LIMIT 1`,
       )
-      .get(factIdA, factIdB, factIdB, factIdA) !== undefined
+      .get({ a: factIdA, b: factIdB, type: relationType ?? null }) !== undefined
   );
 }
 

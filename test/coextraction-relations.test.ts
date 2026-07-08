@@ -89,21 +89,33 @@ describe('co-extraction relation channel', () => {
     expect(getRelationsForFact(db, a)).toHaveLength(0);
   });
 
-  it('skips pairs that already have a relation (either direction) without burning an LLM call', async () => {
+  it('never duplicates a same-type edge, but records relationship evolution (different type)', async () => {
     const a = mkFact('fact a');
     const b = mkFact('fact b');
     createRelation(db, b, 'SUPPORTS', a, 'pre-existing reverse edge');
 
+    // Probe returns the SAME type (opposite direction) → no duplicate edge
     (callHaiku as Mock).mockResolvedValue('raw');
     (parseJsonResponse as Mock).mockReturnValue({
       has_relation: true,
-      relation_type: 'DEPENDS_ON',
-      reasoning: 'should never run',
+      relation_type: 'SUPPORTS',
+      reasoning: 'same type again',
     });
-
     await detectCoExtractionRelations(db, [a, b]);
-    expect(callHaiku).not.toHaveBeenCalled();
-    expect(getRelationsForFact(db, a)).toHaveLength(1); // only the pre-existing edge
+    expect(getRelationsForFact(db, a)).toHaveLength(1); // still only the pre-existing edge
+
+    // Probe returns a DIFFERENT type → relationship evolution is recorded
+    // (a blanket any-relation skip would permanently hide late conflicts
+    // from the consistency queue)
+    (parseJsonResponse as Mock).mockReturnValue({
+      has_relation: true,
+      relation_type: 'CONTRADICTS',
+      reasoning: 'later evidence conflicts',
+    });
+    await detectCoExtractionRelations(db, [a, b]);
+    const rels = getRelationsForFact(db, a);
+    expect(rels).toHaveLength(2);
+    expect(rels.map((r) => r.relation_type).sort()).toEqual(['CONTRADICTS', 'SUPPORTS']);
   });
 
   it('caps probes at MAX_COEXTRACT_PAIRS consecutive pairs', async () => {

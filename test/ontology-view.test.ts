@@ -95,6 +95,23 @@ describe('buildOntologyView', () => {
     expect(out).toContain('↔ [SUPPORTS]');
   });
 
+  it('bounds relations per fact when include_relations is set', () => {
+    const domain = createDomain(db, 'Hubs', 'hub domain');
+    const cat = createCategory(db, domain.id, 'Hub Category');
+    const hub = seedFact(db, 'hub fact with many edges', cat.id);
+    for (let i = 0; i < 8; i++) {
+      const other = seedFact(db, `spoke fact ${i}`, cat.id);
+      createRelation(db, hub, 'SUPPORTS', other, `edge ${i}`);
+    }
+    // Pin the hub as the top-ranked fact so limit:1 renders exactly it
+    db.prepare('UPDATE facts SET consolidated_count = 10 WHERE id = ?').run(hub);
+
+    const out = buildOntologyView(db, { domain: 'hubs', includeRelations: true, limit: 1 });
+    const relationLines = (out.match(/↔ \[SUPPORTS\]/g) ?? []).length;
+    expect(relationLines).toBe(5); // 8 edges → capped at 5
+    expect(out).toContain('+3 more relations');
+  });
+
   it('caps rendered categories globally and reports the remainder', () => {
     const bulk = createDomain(db, 'Bulk', 'many categories');
     for (let i = 0; i < 45; i++) {

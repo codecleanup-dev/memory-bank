@@ -26,6 +26,10 @@ export interface OntologyViewOptions {
 const DEFAULT_FACT_LIMIT = 5;
 const MAX_FACT_LIMIT = 50;
 const MAX_CATEGORIES_RENDERED = 40;
+// include_relations must be bounded too: a hub fact can carry thousands of
+// 1-hop edges, which would reopen the unbounded-output hole through the
+// relations lines.
+const MAX_RELATIONS_PER_FACT = 5;
 
 interface SlimFactRow {
   id: string;
@@ -171,8 +175,11 @@ function buildDetail(
 
       if (includeRelations) {
         const related = getRelatedFacts(db, fact.id, 1);
-        for (const { fact: relFact, relation } of related) {
+        for (const { fact: relFact, relation } of related.slice(0, MAX_RELATIONS_PER_FACT)) {
           out += `  - ↔ [${relation.relation_type}] "${relFact.fact}"\n`;
+        }
+        if (related.length > MAX_RELATIONS_PER_FACT) {
+          out += `  - _…+${related.length - MAX_RELATIONS_PER_FACT} more relations (use explore_graph for full traversal)._\n`;
         }
       }
     }
