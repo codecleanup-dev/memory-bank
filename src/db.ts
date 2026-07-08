@@ -186,11 +186,19 @@ export function migrateRelationTypeVocabulary(db: Database.Database): void {
       .all() as Array<{ sql: string }>
   ).map((r) => r.sql);
 
+  // Mirror-what-exists: reproduce the shipped FK clauses only when the
+  // legacy table actually declared them. A hand-made no-FK table must not
+  // gain constraints its (possibly dangling) rows never satisfied.
+  const hadShippedFk = (col: string): boolean =>
+    fks.some((fk) => fk.table === 'facts' && fk.from === col);
+
   const rebuild = db.transaction(() => {
     const defs = cols.map((c) => {
       const base = `${c.name} ${c.type}${c.pk ? ' PRIMARY KEY' : ''}${c.nn ? ' NOT NULL' : ''}${defaultClause(c.dflt_value)}`;
       if (c.name === 'relation_type') return `${base} CHECK(${RELATION_TYPE_CHECK_SQL})`;
-      if (c.name === 'source_fact_id' || c.name === 'target_fact_id') return `${base} REFERENCES facts(id)`;
+      if ((c.name === 'source_fact_id' || c.name === 'target_fact_id') && hadShippedFk(c.name)) {
+        return `${base} REFERENCES facts(id)`;
+      }
       return base;
     });
     const names = cols.map((c) => c.name).join(', ');
@@ -215,6 +223,20 @@ export function migrateRelationTypeVocabulary(db: Database.Database): void {
     return;
   }
   console.error('Migrated ontology_relations: vocabulary extended (DEPENDS_ON, DERIVED_FROM).');
+  // Observability, not enforcement: dangling relation rows (facts hard-deleted
+  // out from under an edge) predate this rebuild and are copied verbatim —
+  // surface the count so they can be repaired instead of silently vanishing
+  // from JOIN-based graph queries.
+  try {
+    const dangling = db.pragma(`foreign_key_check('ontology_relations')`) as unknown[];
+    if (dangling.length > 0) {
+      console.error(
+        `ontology_relations: ${dangling.length} dangling relation rows reference missing facts (pre-existing; see PRAGMA foreign_key_check).`,
+      );
+    }
+  } catch {
+    /* pragma unavailable on very old SQLite builds */
+  }
 }
 
 export function migrateFactsCategoryVocabulary(db: Database.Database): void {

@@ -53,6 +53,7 @@ describe('facts.category vocabulary migration', () => {
     // Child rows referencing facts — the production shape (8,948 relations,
     // 83 revisions). The facts rebuild must survive dropping a referenced
     // parent (better-sqlite3 enforces foreign_keys by default).
+    // Shipped shape: FK clauses present — the rebuild must reproduce them.
     raw.exec(`
       CREATE TABLE ontology_relations (
         id TEXT PRIMARY KEY,
@@ -128,6 +129,15 @@ describe('facts.category vocabulary migration', () => {
         }>
       ).map((r) => r.name);
       expect(triggers).toContain('trg_facts_custom');
+
+      // Relations table (shipped shape) kept its FK clauses AND gained the vocabulary
+      const relSql = (
+        db
+          .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='ontology_relations'`)
+          .get() as { sql: string }
+      ).sql;
+      expect(relSql).toMatch(/REFERENCES\s+facts/i);
+      expect(relSql).toContain("'DEPENDS_ON'");
     } finally {
       db.close();
     }
@@ -215,6 +225,9 @@ describe('facts.category vocabulary migration', () => {
       ).sql;
       expect(sql).toContain("'DEPENDS_ON'");
       expect(sql).toContain("'DERIVED_FROM'");
+      // Mirror-what-exists: this legacy fixture declared NO foreign keys, so
+      // the rebuild must not add constraints its rows never satisfied
+      expect(sql).not.toMatch(/REFERENCES/i);
 
       const legacy = db
         .prepare(`SELECT reasoning, custom_provenance FROM ontology_relations WHERE id = 'r1'`)
