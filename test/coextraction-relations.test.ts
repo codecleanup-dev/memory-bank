@@ -72,6 +72,10 @@ describe('co-extraction relation channel', () => {
     expect(rels).toHaveLength(1);
     expect(rels[0].relation_type).toBe('DEPENDS_ON'); // fresh-DB CHECK accepts the new type
     expect(rels[0].reasoning).toBe('deploy depends on vault config');
+    // Direction: the LATER fact of the batch is the "new fact" in the probe,
+    // so the stored edge is later → earlier
+    expect(rels[0].source_fact_id).toBe(b);
+    expect(rels[0].target_fact_id).toBe(a);
   });
 
   it('rejects off-vocabulary relation types without persisting or throwing', async () => {
@@ -121,15 +125,16 @@ describe('co-extraction relation channel', () => {
   it('directional types record the reverse edge (dependency cycles must stay visible)', async () => {
     const a = mkFact('module a');
     const b = mkFact('module b');
-    // Existing claim: b depends on a
-    createRelation(db, b, 'DEPENDS_ON', a, 'b needs a');
+    // Existing claim: a depends on b. The co-extraction probe for [a, b]
+    // frames b (later) as the new fact, so it will assert b → a edges.
+    createRelation(db, a, 'DEPENDS_ON', b, 'a needs b');
 
-    // New evidence: a depends on b — a DISTINCT (cycle-revealing) claim, not a duplicate
+    // New evidence: b depends on a — a DISTINCT (cycle-revealing) claim, not a duplicate
     (callHaiku as Mock).mockResolvedValue('raw');
     (parseJsonResponse as Mock).mockReturnValue({
       has_relation: true,
       relation_type: 'DEPENDS_ON',
-      reasoning: 'a needs b too',
+      reasoning: 'b needs a too',
     });
     await detectCoExtractionRelations(db, [a, b]);
     expect(getRelationsForFact(db, a)).toHaveLength(2);

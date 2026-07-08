@@ -833,14 +833,19 @@ export async function detectCoExtractionRelations(
     return row ? rowToFact(row as Record<string, unknown>) : null;
   };
 
-  for (const [aId, bId] of pairs) {
-    const a = load(aId);
-    const b = load(bId);
-    if (!a || !b) continue;
+  for (const [earlierId, laterId] of pairs) {
+    const earlier = load(earlierId);
+    const later = load(laterId);
+    if (!earlier || !later) continue;
     try {
-      await detectRelationBetween(db, a, b, 'both facts were extracted from the same working session');
+      // The detection prompt frames the pair as "new fact" vs "existing
+      // fact". Within one extraction batch the LATER fact is the newer
+      // claim, so it must take the "new" slot — probing in insertion order
+      // would flip directional edges (later DEPENDS_ON earlier would be
+      // stored as earlier DEPENDS_ON later).
+      await detectRelationBetween(db, later, earlier, 'both facts were extracted from the same working session');
     } catch (error) {
-      console.error(`Co-extraction relation probe failed for facts ${aId} / ${bId}:`, error);
+      console.error(`Co-extraction relation probe failed for facts ${earlierId} / ${laterId}:`, error);
     }
   }
 }
