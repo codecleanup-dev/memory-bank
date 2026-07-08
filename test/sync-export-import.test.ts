@@ -253,6 +253,63 @@ describe('sync-export/import', () => {
     }
   });
 
+  it('dedupes symmetric relations in either direction on import', async () => {
+    const { initDatabase } = await import('../src/db.js');
+    const { insertFact } = await import('../src/fact-db.js');
+    const { createRelation } = await import('../src/ontology-db.js');
+    const setupDb = initDatabase();
+    let l1: string;
+    let l2: string;
+    try {
+      const mk = (text: string): string =>
+        insertFact(setupDb, {
+          fact: text, category: 'decision', scope_type: 'global', scope_project: null,
+          source_exchange_ids: [], embedding: null,
+        });
+      l1 = mk('symmetric fact one');
+      l2 = mk('symmetric fact two');
+      createRelation(setupDb, l1, 'SUPPORTS', l2, 'local edge');
+    } finally {
+      setupDb.close();
+    }
+
+    const { getSyncDir } = await import('../src/sync-export.js');
+    const syncDir = getSyncDir();
+    const now = new Date().toISOString();
+    const row = (id: string, fact: string): string =>
+      JSON.stringify({
+        id, fact, category: 'decision', scope_type: 'global', scope_project: null,
+        source_exchange_ids: '[]', created_at: now, updated_at: now,
+        consolidated_count: 1, ontology_category_id: null,
+      }) + '\n';
+    fs.writeFileSync(
+      path.join(syncDir, 'facts.jsonl'),
+      row('rem-1', 'symmetric fact one') + row('rem-2', 'symmetric fact two'),
+    );
+    // Reverse direction of the existing local SUPPORTS edge — same claim
+    fs.writeFileSync(
+      path.join(syncDir, 'ontology-relations.jsonl'),
+      JSON.stringify({
+        id: 'rem-rel-rev', source_fact_id: 'rem-2', relation_type: 'SUPPORTS',
+        target_fact_id: 'rem-1', reasoning: 'reverse duplicate', created_at: now,
+      }) + '\n',
+    );
+
+    const { importFromSync } = await import('../src/sync-import.js');
+    const result = await importFromSync();
+    expect(result.newRelations).toBe(0); // reverse SUPPORTS is the same claim → skipped
+
+    const db = initDatabase();
+    try {
+      const n = (
+        db.prepare(`SELECT COUNT(*) AS n FROM ontology_relations`).get() as { n: number }
+      ).n;
+      expect(n).toBe(1); // only the original local edge
+    } finally {
+      db.close();
+    }
+  });
+
   it('should skip duplicate records on re-import', async () => {
     const { getSyncDir } = await import('../src/sync-export.js');
     const syncDir = getSyncDir();
