@@ -16,12 +16,41 @@ const __dirname = dirname(__filename);
 // Determine plugin root directory
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT || join(__dirname, '..');
 
-// [fork] Native deps (better-sqlite3) are ABI-built for the runtime pinned in .nvmrc,
-// so the server must start on a matching node even when PATH points at a newer one.
-// Resolution: MEMORY_BANK_NODE_BIN → .nvmrc (exact, then same-major highest) → process.execPath
+// [fork] Native deps (better-sqlite3) are ABI-built for ONE runtime shared by every
+// entry point (bootstrap self-heal, sync loop, toolchain probe, this server). That
+// runtime is pinned in ~/.claude/memory-bank.env — skipping it and trusting only
+// .nvmrc is what killed the MCP read path on 2026-07-09 (env pin = homebrew node,
+// module ABI 147; .nvmrc = nvm 22, ABI 127 → load failure while writers stayed up).
+// Resolution: MEMORY_BANK_NODE_BIN → memory-bank.env pin → .nvmrc (exact, then
+// same-major highest) → process.execPath
+function envFilePinNode() {
+  try {
+    const envFile =
+      process.env.MEMORY_BANK_ENV_FILE || join(homedir(), '.claude', 'memory-bank.env');
+    if (!existsSync(envFile)) return null;
+    const match = readFileSync(envFile, 'utf8').match(/^export MEMORY_BANK_NODE="([^"]+)"$/m);
+    if (!match) return null;
+    const pinned = match[1];
+    // Execute only well-known user-owned install locations — a tampered env file
+    // must not become arbitrary-binary execution (same posture as the sync loop).
+    const nvmPrefix = join(homedir(), '.nvm', 'versions', 'node') + '/';
+    const allowed =
+      pinned === '/opt/homebrew/bin/node' ||
+      pinned === '/usr/local/bin/node' ||
+      pinned === '/usr/bin/node' ||
+      (pinned.startsWith(nvmPrefix) && pinned.endsWith('/bin/node'));
+    if (allowed && existsSync(pinned)) return pinned;
+  } catch {
+    // unreadable env file — fall through to .nvmrc
+  }
+  return null;
+}
+
 function resolveNodeBin() {
   const envBin = process.env.MEMORY_BANK_NODE_BIN;
   if (envBin && existsSync(envBin)) return envBin;
+  const pinnedNode = envFilePinNode();
+  if (pinnedNode) return pinnedNode;
   try {
     const pin = readFileSync(join(PLUGIN_ROOT, '.nvmrc'), 'utf8').trim().replace(/^v/, '');
     const nvmDir = join(homedir(), '.nvm', 'versions', 'node');
