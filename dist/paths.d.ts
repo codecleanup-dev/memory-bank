@@ -76,6 +76,22 @@ export declare const LLM_WORKDIR_BASENAME = "memory-bank-llm";
  */
 export declare function isExcludedProject(project: string, excluded?: string[]): boolean;
 /**
+ * Exact leading text of the plugin's own Haiku worker prompts. Sessions from
+ * BEFORE the fixed LLM workdir existed ran query() with the CALLER project's
+ * cwd, so their transcripts sit in REAL project archives and can never be
+ * excluded by slug — the slug is a legitimate project's. Content is the only
+ * discriminator. Kept as full first sentences so a prefix can't match
+ * ordinary human text by accident (measured pollution: 59,940 exchanges /
+ * ~16% of one production corpus before this guard existed).
+ */
+export declare const WORKER_PROMPT_PREFIXES: readonly string[];
+/**
+ * True if a user message is one of the plugin's own LLM worker prompts —
+ * such an exchange is ephemeral worker state, never knowledge, and must not
+ * be indexed (searchable) regardless of which project slug it sits under.
+ */
+export declare function isWorkerPromptMessage(userMessage: string | null | undefined): boolean;
+/**
  * Get list of projects to exclude from indexing
  * Configurable via env var or config file
  */

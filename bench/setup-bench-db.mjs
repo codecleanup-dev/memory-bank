@@ -97,7 +97,16 @@ console.log('fts_built flag:', flag?.value);
 
 // 3) Copy matching vec embeddings (stream prod vec table, filter by id set).
 console.log('Copying vec embeddings (streaming prod vec_exchanges)...');
-const vecIns = bench.prepare('INSERT INTO vec_exchanges (id, embedding) VALUES (?, ?)');
+// dtype-aware: raw blob copy only works when both tables share a dtype, and
+// int8 params must be wrapped in vec_int8() (vec0 treats a bare blob param as
+// float32 otherwise). Prod migrated to int8 on 2026-07-11.
+const { getVecDtype, vecParamSql } = await import(path.join(REPO, 'dist/db.js'));
+const prodDtype = getVecDtype(prod);
+const benchDtype = getVecDtype(bench);
+if (prodDtype !== benchDtype) {
+  throw new Error(`vec dtype mismatch: prod=${prodDtype} bench=${benchDtype} — align dtypes before regenerating`);
+}
+const vecIns = bench.prepare(`INSERT INTO vec_exchanges (id, embedding) VALUES (?, ${vecParamSql(benchDtype)})`);
 let copied = 0;
 let batch = [];
 const flush = bench.transaction((b) => { for (const [id, emb] of b) vecIns.run(id, emb); });

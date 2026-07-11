@@ -1,3 +1,4 @@
+import { l2DistanceToSimilarity } from './db.js';
 import { callHaiku, parseJsonResponse } from './llm.js';
 import { generateEmbedding, initEmbeddings } from './embeddings.js';
 import { searchSimilarFacts } from './fact-db.js';
@@ -57,7 +58,7 @@ export async function askAvatar(db, question, project) {
     // Step 4: Build context for Haiku
     const factContextLines = [];
     for (const { fact, distance } of vectorResults) {
-        const similarity = (1 - (distance * distance) / 2).toFixed(2);
+        const similarity = l2DistanceToSimilarity(distance).toFixed(2);
         const catInfo = fact.ontology_category_id
             ? categoryMap.get(fact.ontology_category_id)
             : undefined;
@@ -100,7 +101,7 @@ export async function askAvatar(db, question, project) {
             : undefined;
         const domainName = catInfo ? (domainMap.get(catInfo.domainId) ?? 'Unknown') : 'Unknown';
         const catName = catInfo ? catInfo.name : 'Unknown';
-        const relevance = parseFloat((1 - (distance * distance) / 2).toFixed(3));
+        const relevance = parseFloat(l2DistanceToSimilarity(distance).toFixed(3));
         return {
             fact,
             domain: domainName,

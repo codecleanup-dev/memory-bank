@@ -1,5 +1,5 @@
 import { generateEmbedding, initEmbeddings, EMBEDDING_VERSION } from './embeddings.js';
-import { initDatabase, getVecDtype, embeddingToVecBlob, vecParamSql, normalizeVecDistance } from './db.js';
+import { initDatabase, getVecDtype, embeddingToVecBlob, vecParamSql, normalizeVecDistance, l2DistanceToSimilarity } from './db.js';
 /**
  * Detect if the current prompt is similar to a past exchange.
  * Returns matches above the threshold, sorted by similarity.
@@ -7,10 +7,19 @@ import { initDatabase, getVecDtype, embeddingToVecBlob, vecParamSql, normalizeVe
  * This enables "You asked something similar before — here's what happened"
  * context injection, reducing repeated prompts.
  */
-export async function detectRepeat(prompt, project, limit = 3, threshold = 0.82) {
-    await initEmbeddings();
-    const embedding = await generateEmbedding(prompt, 'query');
-    const db = initDatabase();
+export async function detectRepeat(prompt, project, limit = 3, threshold = 0.82, 
+// Warm-path options: the inject daemon already has the prompt's query
+// embedding and a cached DB handle — re-embedding the SAME prompt and
+// re-running initDatabase()'s migration pass per request is pure overhead.
+// A caller-provided db is NOT closed here (the caller owns its lifecycle).
+opts = {}) {
+    let embedding = opts.embedding;
+    if (!embedding) {
+        await initEmbeddings();
+        embedding = await generateEmbedding(prompt, 'query');
+    }
+    const ownDb = !opts.db;
+    const db = opts.db ?? initDatabase();
     try {
         // Vector search against past user messages (dtype-aware: int8 tables need
         // quantized query blobs and return ×127-scaled distances)
@@ -25,7 +34,7 @@ export async function detectRepeat(prompt, project, limit = 3, threshold = 0.82)
         const matches = [];
         for (const vr of vecResults) {
             const d = normalizeVecDistance(vr.distance, vecDtype);
-            const similarity = 1 - (d * d) / 2;
+            const similarity = l2DistanceToSimilarity(d);
             if (similarity < threshold)
                 continue;
             // embedding_version filter: skip rows the re-embed worker has not
@@ -65,7 +74,8 @@ export async function detectRepeat(prompt, project, limit = 3, threshold = 0.82)
         return matches;
     }
     finally {
-        db.close();
+        if (ownDb)
+            db.close();
     }
 }
 /**

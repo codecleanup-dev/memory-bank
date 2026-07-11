@@ -18,6 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { initDatabase } from '../dist/db.js';
+import { getExtractionConfig, pendingExtractionCoreQuery } from '../dist/pending-extraction.js';
 import { runFactExtraction } from '../dist/fact-extractor.js';
 import { canonicalizeProject } from '../dist/project-canon.js';
 import { getIndexDir } from '../dist/paths.js';
@@ -51,20 +52,8 @@ const CONCURRENCY = Math.max(1, boundedInt(process.env.BACKFILL_CONCURRENCY, 4, 
 // cron sessions). These are ~98% 1-exchange noise that the backfill itself
 // generates, so including them is a feedback loop that never converges.
 // Comma-separated cwd paths; env-overridable.
-const EXCLUDE_PROJECTS = (
-  process.env.BACKFILL_EXCLUDE_PROJECTS ||
-  '/Users/jung-wankim/Project/Claude/memory-bank'
-)
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
+const { minExchanges: MIN_EXCHANGES, excludeProjects: EXCLUDE_PROJECTS } = getExtractionConfig();
 
-// Minimum exchanges per session to be worth extracting. 1-exchange sessions are
-// overwhelmingly automated-worker/monitoring noise (bs-auto-issue, cron checks)
-// that yield no durable facts and never converge. Default 2; set to 1 to include
-// single-turn sessions. boundedInt (not bare parseInt): the value is
-// interpolated into SQL, so 'abc' → NaN must not reach the query text.
-const MIN_EXCHANGES = boundedInt(process.env.BACKFILL_MIN_EXCHANGES, 2, 1000);
 
 const LOCK = path.join(getIndexDir(), 'backfill-extract.lock');
 const LOG = path.join(getIndexDir(), 'backfill-extract.log');
@@ -140,36 +129,10 @@ function seedFromExistingFacts(db) {
 }
 
 function pendingSessions(db, limit) {
-  // Content-rich sessions first (more exchanges → more extractable facts),
-  // then recency. 1-exchange sessions are processed last.
-  // Excluded projects (e.g. memory-bank's own monitoring sessions) are dropped
-  // entirely to break the self-referential feedback loop.
-  // Built-in: the plugin's own headless LLM worker sessions (llm.ts spawns
-  // them with cwd <tmpdir>/memory-bank-llm). Indexing now skips them at the
-  // source (paths.ts isExcludedProject), but exchanges indexed before that
-  // fix — 6.4k rows observed 2026-07-08 — must not become extraction
-  // candidates (defense in depth against the self-referential loop).
-  const exTerms = EXCLUDE_PROJECTS;
-  // x.session_id IS NOT NULL is load-bearing: a single NULL inside a NOT IN
-  // subquery makes the whole predicate NULL (3-valued logic) → zero pending
-  // sessions → silent drain of the entire backfill.
-  const exClause = `AND e.session_id NOT IN (
-         SELECT DISTINCT x.session_id FROM exchanges x
-         WHERE x.session_id IS NOT NULL
-           AND (x.cwd LIKE '%/memory-bank-llm'
-         ${exTerms.length ? 'OR ' + exTerms.map(() => 'x.cwd = ?').join(' OR ') : ''})
-       )`;
-  return db.prepare(`
-    SELECT e.session_id AS sid, MAX(e.timestamp) AS ts, COUNT(*) AS n
-    FROM exchanges e
-    WHERE e.is_sidechain = 0 AND e.session_id IS NOT NULL
-      AND NOT EXISTS (SELECT 1 FROM extraction_log l WHERE l.session_id = e.session_id)
-      ${exClause}
-    GROUP BY e.session_id
-    HAVING COUNT(*) >= ${MIN_EXCHANGES}
-    ORDER BY ts DESC
-    LIMIT ?
-  `).all(...exTerms, limit);
+  // Single source (pendingExtractionCoreQuery) shared with the SessionStart
+  // hook's spawn condition so the two can never drift.
+  const { sql, params } = pendingExtractionCoreQuery({ minExchanges: MIN_EXCHANGES, excludeProjects: EXCLUDE_PROJECTS });
+  return db.prepare(`${sql} ORDER BY ts DESC LIMIT ?`).all(...params, limit);
 }
 
 /** Simple concurrency pool — LLM latency dominates, DB writes are sync-safe. */

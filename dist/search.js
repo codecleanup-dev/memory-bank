@@ -1,4 +1,4 @@
-import { initDatabase, getVecDtype, embeddingToVecBlob, vecParamSql, normalizeVecDistance } from './db.js';
+import { initDatabase, getVecDtype, embeddingToVecBlob, vecParamSql, normalizeVecDistance, l2DistanceToSimilarity } from './db.js';
 import { getDbPath } from './paths.js';
 import { initEmbeddings, generateEmbedding, EMBEDDING_VERSION } from './embeddings.js';
 import { searchSimilarFacts } from './fact-db.js';
@@ -27,7 +27,7 @@ function fileIdent(p) {
         return null; // file missing — force reopen (initDatabase recreates it)
     }
 }
-function getSearchDb() {
+export function getSearchDb() {
     const p = getDbPath();
     const ident = fileIdent(p);
     if (cachedSearchDb && cachedSearchDb.open &&
@@ -449,23 +449,57 @@ export async function searchConversations(query, options = {}) {
     });
 }
 // Helper function to count lines in a file efficiently
+// The "(N lines)" hint used to SCAN the whole archive file per result —
+// measured 199ms/10 results on plain files and ~1.6s when the archives are
+// zst-compressed (each count = a full decompression). The indexer already
+// recorded every exchange's line range, so ask the DB instead:
+// MAX(line_end) over the file's exchanges (idx_archive_path — instant).
+// The full scan survives only as a fallback for files the DB doesn't know,
+// memoized by (path, mtime, size) with in-flight dedup so duplicate result
+// rows can't trigger concurrent decompressions of the same file.
+const lineCountCache = new Map();
+const LINE_COUNT_CACHE_MAX = 2000;
 async function countLines(filePath) {
+    // DB-first: instant, no file I/O, no decompression.
     try {
-        const fileStream = createArchiveReadStream(filePath);
-        const rl = readline.createInterface({
-            input: fileStream,
-            crlfDelay: Infinity
-        });
-        let count = 0;
-        for await (const line of rl) {
-            if (line.trim())
-                count++;
+        const row = getSearchDb().prepare('SELECT MAX(line_end) AS n FROM exchanges WHERE archive_path = ?').get(filePath);
+        if (row?.n)
+            return row.n;
+    }
+    catch { /* DB unavailable — fall through to the scan */ }
+    let key = filePath;
+    try {
+        const st = statArchiveFile(filePath);
+        if (st)
+            key = `${filePath}:${st.mtimeMs}:${st.size}`;
+    }
+    catch { /* stat failed — fall through to an uncached scan attempt */ }
+    const hit = lineCountCache.get(key);
+    if (hit !== undefined)
+        return hit;
+    const scan = (async () => {
+        try {
+            const fileStream = createArchiveReadStream(filePath);
+            const rl = readline.createInterface({
+                input: fileStream,
+                crlfDelay: Infinity
+            });
+            let count = 0;
+            for await (const line of rl) {
+                if (line.trim())
+                    count++;
+            }
+            return count;
         }
-        return count;
-    }
-    catch (error) {
-        return 0; // Return 0 if file can't be read
-    }
+        catch {
+            lineCountCache.delete(key); // not cached — may become readable later
+            return 0;
+        }
+    })();
+    if (lineCountCache.size >= LINE_COUNT_CACHE_MAX)
+        lineCountCache.clear();
+    lineCountCache.set(key, scan);
+    return scan;
 }
 // Helper function to get file size in KB (resolves compressed variants)
 function getFileSizeInKB(filePath) {
@@ -479,7 +513,10 @@ export async function formatResults(results) {
         return 'No results found.';
     }
     let output = `Found ${results.length} relevant conversation${results.length > 1 ? 's' : ''}:\n\n`;
-    // Process results sequentially to get file metadata
+    // Pre-compute per-result file metadata in PARALLEL — the line counts are
+    // independent file scans (memoized above), so first-call latency is the
+    // slowest single file instead of the sum of all of them.
+    const lineCounts = await Promise.all(results.map((r) => countLines(r.exchange.archivePath)));
     for (let index = 0; index < results.length; index++) {
         const result = results[index];
         const date = new Date(result.exchange.timestamp).toISOString().split('T')[0];
@@ -509,9 +546,9 @@ export async function formatResults(results) {
                 .join(', ');
             output += `   Tools: ${toolSummary}\n`;
         }
-        // Get file metadata
+        // Get file metadata (line count pre-computed in parallel above)
         const fileSizeKB = getFileSizeInKB(result.exchange.archivePath);
-        const totalLines = await countLines(result.exchange.archivePath);
+        const totalLines = lineCounts[index];
         const lineRange = `${result.exchange.lineStart}-${result.exchange.lineEnd}`;
         // File information with metadata (clean format for smart tool selection)
         output += `   Lines ${lineRange} in ${result.exchange.archivePath} (${fileSizeKB}KB, ${totalLines} lines)\n\n`;
@@ -583,7 +620,7 @@ export async function getKnowledgeContext(query, project, limit = 5) {
         const categoryMap = new Map(categories.map(c => [c.id, { name: c.name, domainId: c.domain_id }]));
         const enrichedFacts = [];
         for (const { fact, distance } of factResults) {
-            const similarity = parseFloat((1 - (distance * distance) / 2).toFixed(3));
+            const similarity = parseFloat(l2DistanceToSimilarity(distance).toFixed(3));
             const catInfo = fact.ontology_category_id
                 ? categoryMap.get(fact.ontology_category_id)
                 : undefined;

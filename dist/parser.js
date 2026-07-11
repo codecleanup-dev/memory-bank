@@ -92,16 +92,15 @@ async function parseClaudeConversation(filePath, projectName, archivePath) {
                         }
                     }
                 }
-                // Extract tool results
-                if (parsed.message.role === 'user') {
-                    for (const block of parsed.message.content) {
-                        if (block.type === 'tool_result') {
-                            // Store for later association with tool_use
-                            // For now, we'll just track results exist
-                            // TODO: Match tool_use_id to previous tool_use
-                        }
-                    }
-                }
+                // Tool RESULTS are intentionally not associated back to their tool_use
+                // here. The tool_calls table therefore stores tool_name + tool_input
+                // only; `tool_result` stays NULL and `is_error` stays 0 for every row.
+                // This is fine because NO feature reads those two columns — embeddings
+                // include tool NAMES only ("Tools: a, b"), search shows name counts, and
+                // the `read` tool returns the raw archive (which has full results). If a
+                // future feature needs real result/error data, MATCH tool_result blocks
+                // to the preceding tool_use by tool_use_id and populate both columns —
+                // do NOT trust the current always-0 `is_error`.
             }
             // Skip empty messages
             if (!text.trim() && toolCalls.length === 0) {

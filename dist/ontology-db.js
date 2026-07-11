@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { SYMMETRIC_RELATION_TYPES } from './types.js';
+import { getVecTableDtype, embeddingToVecBlob, vecParamSql, normalizeVecDistance } from './db.js';
 // === Domain CRUD ===
 export function createDomain(db, name, description) {
     const id = randomUUID();
@@ -50,10 +50,11 @@ export function getCategoryByName(db, name, domainId) {
  * by the caller from "name: description" in 'passage' mode.
  */
 export function upsertCategoryEmbedding(db, categoryId, embedding) {
-    const buf = Buffer.from(new Float32Array(embedding).buffer);
+    const dt = getVecTableDtype(db, 'vec_categories');
+    const buf = embeddingToVecBlob(embedding, dt);
     const tx = db.transaction(() => {
         db.prepare('DELETE FROM vec_categories WHERE id = ?').run(categoryId);
-        db.prepare('INSERT INTO vec_categories (id, embedding) VALUES (?, ?)').run(categoryId, buf);
+        db.prepare(`INSERT INTO vec_categories (id, embedding) VALUES (?, ${vecParamSql(dt)})`).run(categoryId, buf);
     });
     tx();
 }
@@ -70,13 +71,16 @@ export function deleteCategoryEmbedding(db, categoryId) {
  * Returns [] if the index is empty (caller falls back to the full list).
  */
 export function searchSimilarCategories(db, embedding, k = 20) {
-    const buf = Buffer.from(new Float32Array(embedding).buffer);
     let hits;
     try {
+        const dt = getVecTableDtype(db, 'vec_categories');
         hits = db.prepare(`
       SELECT id, distance FROM vec_categories
-      WHERE embedding MATCH ? ORDER BY distance LIMIT ?
-    `).all(buf, k);
+      WHERE embedding MATCH ${vecParamSql(dt)} ORDER BY distance LIMIT ?
+    `).all(embeddingToVecBlob(embedding, dt), k);
+        // ×127-scaled int8 distances → float32-equivalent scale for callers.
+        for (const h of hits)
+            h.distance = normalizeVecDistance(h.distance, dt);
     }
     catch {
         return []; // index absent → caller uses the full category list
@@ -120,7 +124,7 @@ export function createRelation(db, sourceFactId, relationType, targetFactId, rea
     // of the SAME type; distinct relation TYPES between the same facts remain
     // valid, user-visible graph data (a SUPPORTS b + a CONTRADICTS b) and are
     // deliberately NOT collapsed — an LLM type-flap across retries therefore
-    // adds at most one row per type (bounded by the RELATION_TYPES enum).
+    // adds at most one row per type (bounded by the 4-type enum).
     const existing = db
         .prepare(`SELECT * FROM ontology_relations
        WHERE source_fact_id = ? AND relation_type = ? AND target_fact_id = ?`)
@@ -157,38 +161,6 @@ export function createRelation(db, sourceFactId, relationType, targetFactId, rea
         reasoning: reasoning ?? null,
         created_at: now,
     };
-}
-/**
- * Duplicate-edge check used by the detection channels, honouring relation
- * semantics:
- *
- * - type given, SYMMETRIC (SUPPORTS/CONTRADICTS): either direction counts as
- *   a duplicate — the reverse edge carries the same claim.
- * - type given, DIRECTIONAL (DEPENDS_ON/DERIVED_FROM/SUPERSEDES/INFLUENCES):
- *   only the exact a→b edge is a duplicate. The reverse edge is a distinct
- *   claim (dependency cycle, competing canonicality) that the graph — and
- *   the consistency queue — must be able to record.
- * - no type: any edge in either direction (coarse existence probe).
- *
- * A DIFFERENT type between the same pair is never a duplicate: that is
- * relationship evolution (a SUPPORTS pair can turn CONTRADICTS after a fact
- * is revised in place) and must stay recordable.
- */
-export function relationExistsBetween(db, factIdA, factIdB, relationType) {
-    if (relationType && !SYMMETRIC_RELATION_TYPES.has(relationType)) {
-        return (db
-            .prepare(`SELECT 1 AS one FROM ontology_relations
-           WHERE source_fact_id = ? AND target_fact_id = ? AND relation_type = ?
-           LIMIT 1`)
-            .get(factIdA, factIdB, relationType) !== undefined);
-    }
-    return (db
-        .prepare(`SELECT 1 AS one FROM ontology_relations
-         WHERE ((source_fact_id = @a AND target_fact_id = @b)
-             OR (source_fact_id = @b AND target_fact_id = @a))
-           AND (@type IS NULL OR relation_type = @type)
-         LIMIT 1`)
-        .get({ a: factIdA, b: factIdB, type: relationType ?? null }) !== undefined);
 }
 /**
  * Get related facts with relevance decay.
@@ -260,9 +232,8 @@ export function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance 
                 let chosen = null;
                 for (const row of rows) {
                     const relation = rowToRelation(row);
-                    // Conflict/retirement edges traverse weaker (0.7); every structural
-                    // edge (SUPPORTS/INFLUENCES/DEPENDS_ON/DERIVED_FROM) traverses fully.
-                    const typeWeight = (relation.relation_type === 'CONTRADICTS' || relation.relation_type === 'SUPERSEDES') ? 0.7 : 1.0;
+                    // Relation type weight: SUPPORTS/INFLUENCES stronger than CONTRADICTS/SUPERSEDES
+                    const typeWeight = (relation.relation_type === 'SUPPORTS' || relation.relation_type === 'INFLUENCES') ? 1.0 : 0.7;
                     const relevance = hopRelevance * typeWeight;
                     if (relevance >= minRelevance) {
                         chosen = { relation, relevance };
@@ -308,7 +279,7 @@ export function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance 
                 let chosen = null;
                 for (const row of rows) {
                     const relation = rowToRelation(row);
-                    const typeWeight = (relation.relation_type === 'CONTRADICTS' || relation.relation_type === 'SUPERSEDES') ? 0.7 : 1.0;
+                    const typeWeight = (relation.relation_type === 'SUPPORTS' || relation.relation_type === 'INFLUENCES') ? 1.0 : 0.7;
                     const relevance = hopRelevance * typeWeight;
                     if (relevance >= minRelevance) {
                         chosen = { relation, relevance };

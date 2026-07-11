@@ -1,3 +1,4 @@
+import { initDatabase } from './db.js';
 export interface RepeatMatch {
     exchangeId: string;
     project: string;
@@ -16,7 +17,10 @@ export interface RepeatMatch {
  * This enables "You asked something similar before — here's what happened"
  * context injection, reducing repeated prompts.
  */
-export declare function detectRepeat(prompt: string, project: string | null, limit?: number, threshold?: number): Promise<RepeatMatch[]>;
+export declare function detectRepeat(prompt: string, project: string | null, limit?: number, threshold?: number, opts?: {
+    embedding?: number[];
+    db?: ReturnType<typeof initDatabase>;
+}): Promise<RepeatMatch[]>;
 /**
  * Format repeat detection results for context injection.
  */

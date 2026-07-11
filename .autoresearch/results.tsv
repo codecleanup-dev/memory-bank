@@ -4,3 +4,32 @@ iter	commit	target_file	score	recall@10	p50_ms	idx_db_kb	status	description
 8	5c31580	src/search.ts	125.99	1.000	35.97	1144	keep	work-recheck C4 수정: FTS OR 6캡+half-limit 재적용 — 사용자 요구(정확도 개선)가 합성메트릭보다 우선 (anti-Goodhart)
 9	ced31de	src/search.ts+db.ts	121.36	0.980	41.70	1144	keep	FTS detail=column(2953→407MB) + 토크나이저 정렬(phrase 예외 방지) + OR DF게이트(35s 병리 제거)
 10	5edc9fe	src/search.ts	139.49	0.980	25.20	1144	keep	BM25 detail=column 병리 수정: rank예산(detail분기) + 희소토큰 AND사다리 (35s→13ms, recall 0.980)
+11	prod-db	migrate-vec-int8(운영DB 적용)	-	82%ovl(near-tie)	13.4	-	keep	prod vec float32→int8: KNN p50 58.5→13.4ms(4.4x), E2E both 65→23.7ms, DB 2.9G→2.4G, divergent 거리차<=0.0007(품질무손실), 백업 175877벡터
+12	8bb406a	scripts/reembed-worker.js	-	-	-	-	keep	stamp-vector mismatch self-heal: 코퍼스 53%(197K) 시맨틱 불가시 복구, 400행 라이브 검증 delta 정확, 전체 드레인 백그라운드 진행
+13	4e3a69d	scripts/purge-llm-sessions.mjs	-	-	-	-	keep	레거시 워커프롬프트 오염 59,940행(16%) purge: content-prefix 판별자+BEGIN IMMEDIATE+배치삭제. 부수발견: exchanges_fts 손상→rebuild 복구, vec0 손상→백업재구축
+14	4e3a69d	src/paths.ts+indexer.ts+sync.ts	-	-	-	-	keep	isWorkerPromptMessage 인덱싱 가드(4지점) — 재파싱돼도 재오염 구조적 차단, 355/355 tests
+15	6fc6029	inject 훅 warm 데몬	-	출력동일	0.2s(2.3s→)	-	keep	매 프롬프트 훅 2.27→0.19~0.32s(7~11x): MCP서버 내 socket 사이드카+thin client+폴백, cold도 1.56s로 개선
+16	52467b6	inject-core+repeat-detector	-	출력동일	34ms(내부)	-	keep	요청당 initDatabase x2/재임베딩 제거: 데몬내부 80~224→30~38ms, E2E 0.10~0.13s
+17	91f2d3c	fact/category vec int8	-	22/25ovl(near-tie)	3.8ms(25.4→)	-	keep	fact검색 6.7x + 훅 E2E 0.065s(35x 누적) + sync-import NUL 바이트 발견(grep 불가시) 수정
+18	55748d4	src/search.ts formatResults	-	포맷동일	26ms(199~1600→)	-	keep	MCP search 응답: 줄수 힌트 DB-first(MAX line_end), zst 감압 제거, 재호출 1.4ms
+19	-	SQLite mmap/cache pragma	-	-	-	-	discard	mmap4G ABAB 3라운드 일관 악화(35~50ms→220~359ms, macOS UBC 특성). 첫 실험의 1142→21ms는 콜드캐시 순서 아티팩트로 판명 — 코드 무변경
+20	-	배치 임베딩(reembed 가속)	-	76%ovl	-	-	discard	transformers.js mean-pooling pad 마스킹 불완전로 배치 드리프트 1.7~2.2e-2 > int8스텝 7.8e-3(batch크기 무관). batch=1만 동일. backfill/live 벡터 불일치 → revert
+21	fece954	reembed WAL checkpoint	-	-	10.3행/s(3.2→)	-	keep	상시리더+writer로 WAL 1.4GB 무한성장→드레인 크롤. 주기적 truncate 체크포인트로 WAL 유계(4MB), 드레인 3.2→10.3행/s
+22	3f93a58	inject 데몬 connect 前 기동	-	E2E응답ok	0.5s소켓	-	keep	데몬을 server.connect 앞으로(게이트 제거) + 실 MCP서버 프로세스 E2E 검증(소켓 0.5s, inject 응답 1034자). iter15 프로덕션 작동 확증
+23	5ad5385	journal_size_limit 64MiB	-	-	WAL유계	-	keep	전 연결 WAL 상한(iter21 reembed한정→근본). journal_size_limit -1→64MiB, 체크포인트후 파일 truncate, 1.4GB 팽창 구조적 차단
+24	b68d66d	reembed 선택자 오염제외	-	제외검증PASS	-	-	keep	self-heal이 워커-프롬프트 오염(벡터없음)을 임베딩해 검색에 재주입하던 것 차단, WORKER_PROMPT_PREFIXES substr 제외
+25	c3fcec0	reembed 선택자 추출+테스트	-	6/6 PASS	-	-	keep	고위험 self-heal/오염제외 선택자를 buildReembedPending로 추출+6 회귀테스트(실 vec0 DB), 361/361
+26	-	two-stage KNN(bit prefilter)	-	현18ms충분	-	-	discard	192k벡터 int8 brute 18ms=체감불가. bit 이중인덱스 유지보수(전write)+binary quant recall손실 리스크 vs 이득 없음(18→5ms 체감불가). 코퍼스 수백만·brute>100ms시 재검토
+27	-	병렬 disjoint 드레인 워커	-	-	-	-	discard	10코어중 유휴 2.2뿐(reembed 4.3코어)+load 7.93. 2번째 워커는 oversubscription으로 1.5배에 그치며 부하 12+로 사용자 타 세션 해침(순음수). 배치임베딩(drift)에 이어 안전한 드레인 가속 없음 확정
+28	ac3dadb	오염 판별자 DRY통합+테스트	-	6/6 PASS	-	-	keep	purge LEGACY_PROMPT_PREFIXES 중복→buildPollutionWhere 단일source(drift버그 방지)+삭제술어 6 회귀테스트, 367/367
+29	6ec2641	int8 양자화 canonical 위임	-	바이트동일	-	-	keep	마이그레이션 하드코딩 quant→embeddingToVecBlob(VEC_INT8_SCALE 단일source). 스케일 튜닝시 벡터 corruption 방지, 5샘플 바이트동일 검증
+30	0ae0a63	워커프롬프트 coupling 테스트	-	3/3+drift포착	-	-	keep	프롬프트 튜닝시 오염탐지 조용히 깨지는 fragile coupling→프롬프트 export+3 테스트로 빌드타임 강제, 370 tests
+31	d791a0e	distance→similarity 단일source	-	잔존0	-	-	keep	L2→cosine 공식 9곳 복제→l2DistanceToSimilarity canonical. 관련성 게이트 divergence 방지, 370/370
+32	3ab5555	reembed tool 순서 결정론화	-	-	-	-	keep	reembed tool_calls 조회 ORDER BY rowid — 재임베딩 벡터가 원본 인덱싱 Tools순서와 결정론적 일치(embedding text 중앙화는 이미 확인)
+33	4a1f1f3	parser TODO 명확화	-	tsc클린	-	-	keep	오도성 TODO→known-limitation 경고(is_error always-0 소비자0 확인, 미래 오신뢰 예방). audit 3연속(exchange text/silent catch/parser)은 안전확인=커버리지 증거
+34	b19fc49	reembed spawn 조건 근본수정	-	라이브검증	-	-	keep	SessionStart 훅 pendingEx가 stale-version만 봐 missing-vector 100910 백로그 불가시→세션간 자동재개 안됨. buildReembedPending 단일source로 교체(iter12 워커수정과 coupling 일치). 드레인 수동재시작 근본 해소
+35	0319866	pendingFact KR백로그 감지	-	라이브검증	-	-	keep	iter34 동일클래스 완결: pendingFact가 embedKoreanFacts의 missing-KR 백로그 놓치던 latent drift 수정, 훅 전 spawn조건이 워커와 일치
+36	c0bfdc2	pendingExtract 무익spawn 제거	-	shared==원본	-	-	keep	훅이 phantom 508세션(2미만/오염)을 백로그로 봐 매세션 backfill-extract 무익spawn. pendingExtractionCoreQuery 단일source로 워커일치, over-spawn 509→1
+37	12accf7	consolidation 모델로드 제거	-	1s→3ms	-	-	keep	consolidateAllPending의 vestigial initEmbeddings(~1s) 제거 — consolidation은 stored벡터+Haiku만 사용. 매세션 spawn되는 founding워커의 무익 모델로드 근절, 370/370
+38	7cc7037	bench-perf 미가시 지표 정확화	-	87727정확	-	-	keep	exchanges_invisible이 stale-version만 세어 missing-vector 90k를 0 오보고. stale OR missing-vector로 수정, 최종 기준선 정직화(iter34 blind spot을 측정 harness에서)
+43	38cc5a2	드레인 완료 + 최종 기준선	87727→0미가시	전체검색가능	-	-	keep	벡터 드레인 완료(87,727→0 미가시, 313,183 전체 검색가능). 최종 기준선: vector검색 p50 20.9ms/p95 498ms, fts 3.4ms, fact 3.1ms, embedding-gen 3.3ms. 일회성 v2→v3 마이그레이션 부채를 원자 워커가 self-heal 완료

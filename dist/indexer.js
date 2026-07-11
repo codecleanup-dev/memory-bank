@@ -4,7 +4,7 @@ import { initDatabase, insertExchange } from './db.js';
 import { parseConversation } from './parser.js';
 import { initEmbeddings, generateExchangeEmbedding } from './embeddings.js';
 import { summarizeConversation } from './summarizer.js';
-import { getArchiveDir, getExcludedProjects, isExcludedProject, getProjectsDir } from './paths.js';
+import { getArchiveDir, getExcludedProjects, isExcludedProject, isWorkerPromptMessage, getProjectsDir } from './paths.js';
 import { archiveFileExists, statArchiveFile } from './archive-io.js';
 /**
  * Copy source → archive unless a current copy (plain or .zst) already exists.
@@ -119,6 +119,11 @@ export async function indexConversations(limitToProject, maxConversations, concu
         // Now process embeddings and DB inserts (fast, sequential is fine)
         for (const conv of toProcess) {
             for (const exchange of conv.exchanges) {
+                // The plugin's own worker-prompt sessions are ephemeral state, not
+                // knowledge — never index them (legacy transcripts sit under REAL
+                // project slugs, so the slug exclusion can't catch them).
+                if (isWorkerPromptMessage(exchange.userMessage))
+                    continue;
                 const toolNames = exchange.toolCalls?.map(tc => tc.toolName);
                 const embedding = await generateExchangeEmbedding(exchange.userMessage, exchange.assistantMessage, toolNames);
                 insertExchange(db, exchange, embedding, toolNames);
@@ -175,6 +180,8 @@ export async function indexSession(sessionId, concurrency = 1, noSummaries = fal
                 }
                 // Index
                 for (const exchange of exchanges) {
+                    if (isWorkerPromptMessage(exchange.userMessage))
+                        continue; // worker prompt = ephemeral state, not knowledge
                     const toolNames = exchange.toolCalls?.map(tc => tc.toolName);
                     const embedding = await generateExchangeEmbedding(exchange.userMessage, exchange.assistantMessage, toolNames);
                     insertExchange(db, exchange, embedding, toolNames);
@@ -263,6 +270,8 @@ export async function indexUnprocessed(concurrency = 1, noSummaries = false) {
     console.log(`\nIndexing embeddings...`);
     for (const conv of unprocessed) {
         for (const exchange of conv.exchanges) {
+            if (isWorkerPromptMessage(exchange.userMessage))
+                continue; // worker prompt = ephemeral state, not knowledge
             const toolNames = exchange.toolCalls?.map(tc => tc.toolName);
             const embedding = await generateExchangeEmbedding(exchange.userMessage, exchange.assistantMessage, toolNames);
             insertExchange(db, exchange, embedding, toolNames);

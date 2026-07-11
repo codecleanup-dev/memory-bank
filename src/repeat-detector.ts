@@ -1,5 +1,5 @@
 import { generateEmbedding, initEmbeddings, EMBEDDING_VERSION } from './embeddings.js';
-import { initDatabase, getVecDtype, embeddingToVecBlob, vecParamSql, normalizeVecDistance } from './db.js';
+import { initDatabase, getVecDtype, embeddingToVecBlob, vecParamSql, normalizeVecDistance, l2DistanceToSimilarity } from './db.js';
 
 export interface RepeatMatch {
   exchangeId: string;
@@ -25,10 +25,19 @@ export async function detectRepeat(
   project: string | null,
   limit: number = 3,
   threshold: number = 0.82,
+  // Warm-path options: the inject daemon already has the prompt's query
+  // embedding and a cached DB handle — re-embedding the SAME prompt and
+  // re-running initDatabase()'s migration pass per request is pure overhead.
+  // A caller-provided db is NOT closed here (the caller owns its lifecycle).
+  opts: { embedding?: number[]; db?: ReturnType<typeof initDatabase> } = {},
 ): Promise<RepeatMatch[]> {
-  await initEmbeddings();
-  const embedding = await generateEmbedding(prompt, 'query');
-  const db = initDatabase();
+  let embedding = opts.embedding;
+  if (!embedding) {
+    await initEmbeddings();
+    embedding = await generateEmbedding(prompt, 'query');
+  }
+  const ownDb = !opts.db;
+  const db = opts.db ?? initDatabase();
 
   try {
     // Vector search against past user messages (dtype-aware: int8 tables need
@@ -49,7 +58,7 @@ export async function detectRepeat(
 
     for (const vr of vecResults) {
       const d = normalizeVecDistance(vr.distance, vecDtype);
-      const similarity = 1 - (d * d) / 2;
+      const similarity = l2DistanceToSimilarity(d);
       if (similarity < threshold) continue;
 
       // embedding_version filter: skip rows the re-embed worker has not
@@ -91,7 +100,7 @@ export async function detectRepeat(
 
     return matches;
   } finally {
-    db.close();
+    if (ownDb) db.close();
   }
 }
 

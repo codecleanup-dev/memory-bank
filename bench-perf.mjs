@@ -44,7 +44,17 @@ async function main() {
   out.exchange_embedding_versions = ev;
   out.current_embedding_version = EMBEDDING_VERSION;
   const stale = ev.filter(r => String(r.v) !== String(EMBEDDING_VERSION)).reduce((s, r) => s + r.c, 0);
-  out.exchanges_invisible_to_vector_search = stale;
+  out.exchanges_stale_version = stale;
+  // TRUE invisibility to vector search = the search JOINs vec_exchanges and filters
+  // embedding_version, so a row is unreachable if it is stale-version OR has NO
+  // vec row at all. Counting only stale (the old metric) reported 0 while ~90k
+  // current-version rows sat vector-less and unsearchable — the same missing-vector
+  // blind spot fixed in the re-embed selector (iter 34).
+  out.exchanges_invisible_to_vector_search = db.prepare(`
+    SELECT count(*) c FROM exchanges e
+    WHERE e.embedding_version != ?
+       OR NOT EXISTS (SELECT 1 FROM vec_exchanges_rowids v WHERE v.id = e.id)
+  `).get(EMBEDDING_VERSION).c;
   out.ontology = {
     domains: db.prepare('SELECT count(*) c FROM ontology_domains').get().c,
     categories: db.prepare('SELECT count(*) c FROM ontology_categories').get().c,
@@ -63,13 +73,17 @@ async function main() {
   for (const q of QUERIES) qEmb.push(Buffer.from(new Float32Array(await generateEmbedding(q, 'query')).buffer));
 
   // --- 2. vector search on exchanges (k=10, version-filtered JOIN — real search.ts path) ---
+  const { getVecDtype, embeddingToVecBlob, vecParamSql } = await import('./dist/db.js');
+  const exDt = getVecDtype(db);
   const vecStmt = db.prepare(`
     SELECT e.id, vec.distance FROM vec_exchanges AS vec
     JOIN exchanges AS e ON vec.id = e.id
-    WHERE vec.embedding MATCH ? AND k = ? AND e.embedding_version = ?
+    WHERE vec.embedding MATCH ${vecParamSql(exDt)} AND k = ? AND e.embedding_version = ?
     ORDER BY vec.distance ASC`);
+  const qBlobs = [];
+  for (const q of QUERIES) qBlobs.push(embeddingToVecBlob(await generateEmbedding(q, 'query'), exDt));
   const vecT = [];
-  for (let r = 0; r < 3; r++) for (const b of qEmb) { const a = performance.now(); vecStmt.all(b, 10, EMBEDDING_VERSION); vecT.push(ms(a, performance.now())); }
+  for (let r = 0; r < 3; r++) for (const b of qBlobs) { const a = performance.now(); vecStmt.all(b, 10, EMBEDDING_VERSION); vecT.push(ms(a, performance.now())); }
   out.vector_search_exchanges_ms = stats(vecT);
 
   // --- 3. text LIKE search on exchanges (mode 'both' always runs this — no FTS) ---
@@ -93,19 +107,15 @@ async function main() {
   }
   out.text_fts_search_exchanges_ms = stats(ftsT);
 
-  // --- 4. fact vector search (dual-index merge — searchSimilarFacts path) ---
-  const factFetch = db.prepare(`SELECT id, distance FROM vec_facts WHERE embedding MATCH ? ORDER BY distance LIMIT ?`);
-  const factFetchKr = db.prepare(`SELECT id, distance FROM vec_facts_kr WHERE embedding MATCH ? ORDER BY distance LIMIT ?`);
-  const factRow = db.prepare(`SELECT id FROM facts WHERE id=? AND is_active=1 AND embedding_version=?`);
+  // --- 4. fact vector search (REAL searchSimilarFacts path — dtype-aware,
+  // works on float32 and int8 fact tables alike) ---
+  const { searchSimilarFacts } = await import('./dist/fact-db.js');
+  const qFloat = [];
+  for (const q of QUERIES) qFloat.push(await generateEmbedding(q, 'query'));
   const factT = [];
-  for (let r = 0; r < 3; r++) for (const b of qEmb) {
+  for (let r = 0; r < 3; r++) for (const e of qFloat) {
     const a = performance.now();
-    const best = new Map();
-    for (const vr of [...factFetch.all(b, 50), ...factFetchKr.all(b, 50)]) {
-      const c = best.get(vr.id); if (c === undefined || vr.distance < c) best.set(vr.id, vr.distance);
-    }
-    const merged = [...best.entries()].map(([id, d]) => ({ id, d })).sort((x, y) => x.d - y.d);
-    let kept = 0; for (const m of merged) { if (factRow.get(m.id, EMBEDDING_VERSION)) { kept++; if (kept >= 5) break; } }
+    searchSimilarFacts(db, e, null, 5, 0.5);
     factT.push(ms(a, performance.now()));
   }
   out.fact_vector_search_ms = stats(factT);
@@ -129,8 +139,12 @@ async function main() {
   const sampleFact = db.prepare('SELECT embedding FROM facts WHERE is_active=1 AND embedding IS NOT NULL LIMIT 1').get();
   let candChars = 0, candCount = 0;
   if (sampleFact?.embedding) {
-    const hits = db.prepare(`SELECT id, distance FROM vec_categories WHERE embedding MATCH ? ORDER BY distance LIMIT 20`)
-      .all(sampleFact.embedding);
+    // dtype-aware: facts.embedding column is canonical float32; the vec table may be int8.
+    const { getVecTableDtype } = await import('./dist/db.js');
+    const catDt = getVecTableDtype(db, 'vec_categories');
+    const f32 = new Float32Array(sampleFact.embedding.buffer, sampleFact.embedding.byteOffset, 384);
+    const hits = db.prepare(`SELECT id, distance FROM vec_categories WHERE embedding MATCH ${vecParamSql(catDt)} ORDER BY distance LIMIT 20`)
+      .all(embeddingToVecBlob(Array.from(f32), catDt));
     const catById = new Map(categories.map(c => [c.id, c]));
     const lines = hits.map(h => { const c = catById.get(h.id); const d = domains.find(x => x.id === c?.domain_id);
       return c ? `- ${d?.name ?? '?'} / ${c.name}: ${c.description ?? '(no description)'}` : ''; }).filter(Boolean);
