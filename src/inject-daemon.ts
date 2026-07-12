@@ -35,15 +35,23 @@ export function startInjectDaemon(): void {
 
   const server = net.createServer((conn) => {
     let buf = '';
+    // [fork] one request per connection, enforced: without this, any data
+    // arriving after the first newline re-finds the SAME newline and re-runs
+    // the full embedding+search computation — a same-user client that dribbles
+    // bytes after its request line turns one prompt into N computations
+    // (adversarial-review find, 2026-07-12).
+    let handled = false;
     conn.setTimeout(10_000, () => conn.destroy());
     conn.on('error', () => { /* client vanished — fine */ });
     conn.on('data', (chunk) => {
+      if (handled) return; // request already consumed — protocol is 1 line per conn
       buf += chunk.toString('utf8');
       const nl = buf.indexOf('\n');
       if (nl < 0) {
         if (buf.length > 1_000_000) conn.destroy(); // absurd request — drop
         return;
       }
+      handled = true;
       const line = buf.slice(0, nl);
       void (async () => {
         try {

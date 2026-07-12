@@ -24944,16 +24944,19 @@ function startInjectDaemon() {
   const sockPath = injectSocketPath();
   const server2 = net.createServer((conn) => {
     let buf = "";
+    let handled = false;
     conn.setTimeout(1e4, () => conn.destroy());
     conn.on("error", () => {
     });
     conn.on("data", (chunk) => {
+      if (handled) return;
       buf += chunk.toString("utf8");
       const nl = buf.indexOf("\n");
       if (nl < 0) {
         if (buf.length > 1e6) conn.destroy();
         return;
       }
+      handled = true;
       const line = buf.slice(0, nl);
       void (async () => {
         try {
