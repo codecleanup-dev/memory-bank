@@ -18,6 +18,8 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { initDatabase } from '../dist/db.js';
+import { buildReembedPending } from '../dist/reembed-selector.js';
+import { getExtractionConfig, pendingExtractionCoreQuery } from '../dist/pending-extraction.js';
 import { getTopFacts } from '../dist/fact-db.js';
 import { getLastSessionContext, formatSessionContinuity } from '../dist/session-continuity.js';
 import { predictIntent, formatIntentContext } from '../dist/intent-predictor.js';
@@ -76,12 +78,27 @@ async function main() {
     };
     try {
       const { EMBEDDING_VERSION } = await import('../dist/embeddings.js');
-      const pendingFact = db.prepare(
-        'SELECT 1 FROM facts WHERE is_active = 1 AND embedding_version != ? LIMIT 1'
-      ).get(EMBEDDING_VERSION);
-      const pendingEx = db.prepare(
-        'SELECT 1 FROM exchanges WHERE embedding_version != ? LIMIT 1'
-      ).get(EMBEDDING_VERSION);
+      // Match BOTH of the worker's fact conditions (reembedFacts: stale version;
+      // embedKoreanFacts: a fact_kr with no vec_facts_kr row) so a Korean-vector
+      // backlog also auto-spawns the worker — the version-only check missed it,
+      // the same coupling drift that hid the exchange missing-vector backlog.
+      const pendingFact = db.prepare(`
+        SELECT 1 FROM facts f WHERE f.is_active = 1 AND (
+          f.embedding_version != ?
+          OR (f.fact_kr IS NOT NULL AND f.fact_kr != ''
+              AND NOT EXISTS (SELECT 1 FROM vec_facts_kr_rowids v WHERE v.id = f.id))
+        ) LIMIT 1
+      `).get(EMBEDDING_VERSION);
+      // Match the WORKER's own selector exactly (single source: buildReembedPending)
+      // so the spawn condition can't drift from what the worker actually processes.
+      // The old version-only check missed the (b) MISSING-VECTOR backlog — rows
+      // that claim the current version but have no vec_exchanges row — so the
+      // re-embed worker was never auto-spawned to heal them across sessions
+      // (measured: 100k+ such rows sat undrained until manually kicked). It also
+      // excludes worker-prompt pollution, so a pure-pollution DB won't spin the
+      // worker up forever.
+      const { clause, params } = buildReembedPending(EMBEDDING_VERSION);
+      const pendingEx = db.prepare(`SELECT 1 FROM exchanges e WHERE ${clause} LIMIT 1`).get(...params);
       if (pendingFact || pendingEx) spawnDetached('reembed-worker.js');
     } catch {
       // Non-fatal: re-embedding resumes on a later session
@@ -99,12 +116,13 @@ async function main() {
     // 2c. Auto-resume cross-project extraction backfill (sessions that ended
     // before the fixed SessionEnd hook existed).
     try {
-      const pendingExtract = db.prepare(`
-        SELECT 1 FROM exchanges e
-        WHERE e.is_sidechain = 0 AND e.session_id IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM extraction_log l WHERE l.session_id = e.session_id)
-        LIMIT 1
-      `).get();
+      // Match the WORKER's exact pending-session predicate (single source:
+      // pendingExtractionCoreQuery) — the old bare NOT-IN-extraction_log check
+      // over-counted by 508 (sessions below MIN_EXCHANGES + memory-bank-llm
+      // pollution that the worker permanently skips), so it spawned the worker
+      // on EVERY session start for phantom work it could never clear.
+      const { sql: exSql, params: exParams } = pendingExtractionCoreQuery(getExtractionConfig());
+      const pendingExtract = db.prepare(`SELECT 1 FROM (${exSql}) LIMIT 1`).get(...exParams);
       if (pendingExtract) spawnDetached('backfill-extract-worker.js');
     } catch { /* non-fatal */ }
     const topFacts = getTopFacts(db, project, 10);

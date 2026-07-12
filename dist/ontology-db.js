@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { getVecTableDtype, embeddingToVecBlob, vecParamSql, normalizeVecDistance } from './db.js';
 import { SYMMETRIC_RELATION_TYPES } from './types.js';
 // === Domain CRUD ===
 export function createDomain(db, name, description) {
@@ -50,10 +51,11 @@ export function getCategoryByName(db, name, domainId) {
  * by the caller from "name: description" in 'passage' mode.
  */
 export function upsertCategoryEmbedding(db, categoryId, embedding) {
-    const buf = Buffer.from(new Float32Array(embedding).buffer);
+    const dt = getVecTableDtype(db, 'vec_categories');
+    const buf = embeddingToVecBlob(embedding, dt);
     const tx = db.transaction(() => {
         db.prepare('DELETE FROM vec_categories WHERE id = ?').run(categoryId);
-        db.prepare('INSERT INTO vec_categories (id, embedding) VALUES (?, ?)').run(categoryId, buf);
+        db.prepare(`INSERT INTO vec_categories (id, embedding) VALUES (?, ${vecParamSql(dt)})`).run(categoryId, buf);
     });
     tx();
 }
@@ -70,13 +72,16 @@ export function deleteCategoryEmbedding(db, categoryId) {
  * Returns [] if the index is empty (caller falls back to the full list).
  */
 export function searchSimilarCategories(db, embedding, k = 20) {
-    const buf = Buffer.from(new Float32Array(embedding).buffer);
     let hits;
     try {
+        const dt = getVecTableDtype(db, 'vec_categories');
         hits = db.prepare(`
       SELECT id, distance FROM vec_categories
-      WHERE embedding MATCH ? ORDER BY distance LIMIT ?
-    `).all(buf, k);
+      WHERE embedding MATCH ${vecParamSql(dt)} ORDER BY distance LIMIT ?
+    `).all(embeddingToVecBlob(embedding, dt), k);
+        // ×127-scaled int8 distances → float32-equivalent scale for callers.
+        for (const h of hits)
+            h.distance = normalizeVecDistance(h.distance, dt);
     }
     catch {
         return []; // index absent → caller uses the full category list

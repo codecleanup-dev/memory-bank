@@ -1,4 +1,6 @@
 import { SearchResult, MultiConceptResult } from './types.js';
+import type DatabaseType from 'better-sqlite3';
+export declare function getSearchDb(): DatabaseType.Database;
 export interface SearchOptions {
     limit?: number;
     mode?: 'vector' | 'text' | 'both';

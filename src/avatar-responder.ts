@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { l2DistanceToSimilarity } from './db.js';
 import type { AvatarResponse, Fact, RelationType } from './types.js';
 import { callHaiku, parseJsonResponse } from './llm.js';
 import { generateEmbedding, initEmbeddings } from './embeddings.js';
@@ -82,7 +83,7 @@ export async function askAvatar(
   const factContextLines: string[] = [];
 
   for (const { fact, distance } of vectorResults) {
-    const similarity = (1 - (distance * distance) / 2).toFixed(2);
+    const similarity = l2DistanceToSimilarity(distance).toFixed(2);
     const catInfo = fact.ontology_category_id
       ? categoryMap.get(fact.ontology_category_id)
       : undefined;
@@ -136,7 +137,7 @@ export async function askAvatar(
         : undefined;
       const domainName = catInfo ? (domainMap.get(catInfo.domainId) ?? 'Unknown') : 'Unknown';
       const catName = catInfo ? catInfo.name : 'Unknown';
-      const relevance = parseFloat((1 - (distance * distance) / 2).toFixed(3));
+      const relevance = parseFloat(l2DistanceToSimilarity(distance).toFixed(3));
 
       return {
         fact,

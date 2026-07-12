@@ -7,6 +7,8 @@ export interface InjectLogEntry {
     injected?: number;
     duration_ms?: number;
     error?: string;
+    /** Which execution path served this injection: warm MCP-server daemon or cold fallback. */
+    via?: 'daemon' | 'fallback';
 }
 export declare function getInjectLogPath(): string;
 /**

@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-07-12
+
+_Fork release: merges upstream v1.3.4 + post-tag autoresearch fixes (iter18~38,
+merged at 0b879d2 — the pre-galaxy "drain complete" baseline; its 1.3.4 section
+below), plus fork-side hook-runtime hardening._
+
+Version jumps 1.4.2 -> 1.5.0: upstream published its own v1.4.0-v1.4.3 while this
+release was in flight, so the fork leaves the 1.4.x namespace to avoid two
+different codebases sharing a version string.
+
+### Added (fork)
+- **`cli/node-pin.sh`** — single bash launcher that resolves the pinned runtime
+  for every session-hook entry (same contract as the MCP wrapper:
+  `MEMORY_BANK_NODE_BIN` -> `memory-bank.env` pin (allowlisted) -> `.nvmrc` ->
+  PATH). All 5 `hooks.json` commands and the inject cold-fallback now go
+  through it — bare PATH `node` in hooks was the remaining ABI-split surface
+  (2026-07-05 / 2026-07-09 class). Regression tests in
+  `test/node-pin-resolution.test.ts`.
+- **Codex x worker-prompt seam test** (`test/codex-worker-prompt.test.ts`) —
+  pins that upstream's `isWorkerPromptMessage` guard (v1.3.4) also fires for
+  exchanges produced by the fork-only codex discovery path.
+- **upstream-watch release-tag alerts** — a new upstream `v*` tag now raises an
+  emphasized notification (head-only alerts let 48 commits pile up silently
+  between v1.3.3 and v1.3.4).
+
+### Merged (upstream v1.3.4 + iter18~38, see 1.3.4 section below)
+- Warm inject daemon (per-prompt ~2.3s -> ~0.2s), fact/category vector int8
+  (25.4 -> 3.8ms), reembed stamp-vector self-heal + spawn-condition fixes,
+  formatResults 199~1600ms -> 26ms, WAL `journal_size_limit` 64MiB, pollution
+  predicate single-source + `purge-llm-sessions` script, DRY/test hardening.
+- Excluded for now: 3D Knowledge Galaxy (`ui/relations/`) — the fork operates a
+  separate visualization stack (knowledge-graph-viz); re-evaluate next sync.
+- `src/sync-import.ts` upstream delta hand-ported (ancestor had raw NUL bytes ->
+  git binary merge): dtype-aware vec inserts + unicode-escape contentKey
+  separator, applied on top of the fork's per-fact atomic transaction shape.
+
 ## [1.4.2] - 2026-07-08
 
 _Fork release: ships the ontology work below compiled into dist, and merges
@@ -69,6 +105,61 @@ upstream v1.3.2–v1.3.3 (own sections below)._
   edge whose fact was deduped onto an existing local fact used to be dropped
   by the FK check; post-remap self-loops and already-present edges are
   skipped instead of duplicated.
+
+## [1.3.4] - 2026-07-11
+
+### Performance
+- **Per-prompt context injection: ~2.3s → ~0.07s (35×)** — the UserPromptSubmit
+  hook used to pay a full cold start on EVERY prompt (measured: model load
+  1,130ms + node startup ~400ms + imports 186ms; the actual search was ~30ms).
+  A warm unix-socket sidecar (`startInjectDaemon`) now lives inside the
+  long-lived MCP server (which already has the embedding model loaded); the
+  hook is a thin client with a cold local fallback that behaves exactly as
+  before when no server is running. No new process, no new lifecycle: the
+  sidecar is unref'd and dies with the MCP server; stale sockets are probed
+  and reclaimed; socket mode 600. The shell wrapper also went from 4 node
+  spawns to 1 (JSON parsing moved into the client), so even the cold fallback
+  dropped ~2.3s → ~1.6s.
+- **Fact/category vector search: 25.4ms → 3.8ms (6.7×)** — vec_facts /
+  vec_facts_kr / vec_categories migrated to int8 (scripts/migrate-vec-facts-int8.mjs),
+  same quantization the exchanges index got in v1.3.x. All writers/readers are
+  dtype-aware via the new `getVecTableDtype()` (per-table, read from
+  sqlite_master — never a flag), with distances normalized BEFORE the
+  cross-language-index merge so mixed-dtype states mid-migration stay correct.
+  Fresh DBs now create all vec tables as int8. Measured quality: same-id
+  distance deviation ≤0.0098 (quantization noise), divergent picks are
+  near-ties only.
+- Exchanges vector KNN (int8, migrated on-machine via existing
+  migrate-vec-int8.mjs): 58.5ms → 13.4ms at equal corpus size.
+
+### Fixed
+- **Self-heal for stamp-vector mismatch** — 197K exchanges (53% of one
+  production corpus) claimed the current embedding_version but had NO vector
+  row, leaving them permanently invisible to semantic search AND to the
+  version-only reembed selector. The worker now also selects rows whose
+  vec_exchanges row is missing (exact set-diff via the vec0 shadow `_rowids`
+  table) and repairs them.
+- **Legacy worker-prompt pollution purge + guard** — Haiku worker sessions
+  from BEFORE the fixed LLM workdir ran with the caller project cwd, so their
+  transcripts were indexed under REAL project slugs (measured: 59,940
+  exchanges / ~16% of one corpus) where the v1.3.3 slug exclusion cannot see
+  them. `purge-llm-sessions.mjs --legacy-prompts` removes them (backup-first,
+  batched transactions), and `isWorkerPromptMessage()` now guards every
+  indexing path so re-parsed archives can never re-pollute.
+- `sync-import.ts` contained two literal NUL bytes (dedup-key separators) that
+  made grep treat the file as BINARY — invisible to every code sweep. Replaced
+  with the `\u0000` escape (runtime-identical) and made its vector writes
+  dtype-aware.
+- `bench-perf.mjs` / `bench/setup-bench-db.mjs`: dtype-aware against int8
+  production tables.
+
+### Operations note (per-machine)
+Existing installs get the code via plugin update, but the DB-side migrations
+run per machine: `node scripts/migrate-vec-int8.mjs` (exchanges),
+`node scripts/migrate-vec-facts-int8.mjs` (facts/categories),
+`node scripts/purge-llm-sessions.mjs --legacy-prompts --apply` (legacy
+pollution), then let the reembed worker drain missing vectors. All are
+idempotent, dry-run-first, backup-first.
 
 ## [1.3.3] - 2026-07-08
 

@@ -2,7 +2,7 @@ import { callHaiku, parseJsonResponse } from './llm.js';
 import { insertFact } from './fact-db.js';
 import { generateEmbedding, initEmbeddings } from './embeddings.js';
 import { classifyAndLinkFact, detectCoExtractionRelations } from './ontology-classifier.js';
-const EXTRACTION_SYSTEM_PROMPT = `You are an expert at extracting long-term facts from conversations.
+export const EXTRACTION_SYSTEM_PROMPT = `You are an expert at extracting long-term facts from conversations.
 
 ## Rules
 - 1 fact = 1 sentence (concise)

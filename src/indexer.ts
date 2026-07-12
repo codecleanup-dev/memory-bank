@@ -5,7 +5,7 @@ import { parseConversation } from './parser.js';
 import { initEmbeddings, generateExchangeEmbedding } from './embeddings.js';
 import { summarizeConversation } from './summarizer.js';
 import { ConversationExchange } from './types.js';
-import { getArchiveDir, getExcludedProjects, isExcludedProject, getProjectsDir } from './paths.js';
+import { getArchiveDir, getExcludedProjects, isExcludedProject, isWorkerPromptMessage, getProjectsDir } from './paths.js';
 import { archiveFileExists, statArchiveFile } from './archive-io.js';
 
 /**
@@ -162,6 +162,10 @@ export async function indexConversations(
     // Now process embeddings and DB inserts (fast, sequential is fine)
     for (const conv of toProcess) {
       for (const exchange of conv.exchanges) {
+        // The plugin's own worker-prompt sessions are ephemeral state, not
+        // knowledge — never index them (legacy transcripts sit under REAL
+        // project slugs, so the slug exclusion can't catch them).
+        if (isWorkerPromptMessage(exchange.userMessage)) continue;
         const toolNames = exchange.toolCalls?.map(tc => tc.toolName);
         const embedding = await generateExchangeEmbedding(
           exchange.userMessage,
@@ -237,6 +241,7 @@ export async function indexSession(sessionId: string, concurrency: number = 1, n
 
         // Index
         for (const exchange of exchanges) {
+          if (isWorkerPromptMessage(exchange.userMessage)) continue; // worker prompt = ephemeral state, not knowledge
           const toolNames = exchange.toolCalls?.map(tc => tc.toolName);
           const embedding = await generateExchangeEmbedding(
             exchange.userMessage,
@@ -352,6 +357,7 @@ export async function indexUnprocessed(concurrency: number = 1, noSummaries: boo
   console.log(`\nIndexing embeddings...`);
   for (const conv of unprocessed) {
     for (const exchange of conv.exchanges) {
+      if (isWorkerPromptMessage(exchange.userMessage)) continue; // worker prompt = ephemeral state, not knowledge
       const toolNames = exchange.toolCalls?.map(tc => tc.toolName);
       const embedding = await generateExchangeEmbedding(
         exchange.userMessage,

@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
+import { getVecTableDtype, embeddingToVecBlob, vecParamSql, normalizeVecDistance } from './db.js';
 import type {
   OntologyDomain,
   OntologyCategory,
@@ -104,10 +105,11 @@ export function upsertCategoryEmbedding(
   categoryId: string,
   embedding: number[],
 ): void {
-  const buf = Buffer.from(new Float32Array(embedding).buffer);
+  const dt = getVecTableDtype(db, 'vec_categories');
+  const buf = embeddingToVecBlob(embedding, dt);
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM vec_categories WHERE id = ?').run(categoryId);
-    db.prepare('INSERT INTO vec_categories (id, embedding) VALUES (?, ?)').run(categoryId, buf);
+    db.prepare(`INSERT INTO vec_categories (id, embedding) VALUES (?, ${vecParamSql(dt)})`).run(categoryId, buf);
   });
   tx();
 }
@@ -129,13 +131,15 @@ export function searchSimilarCategories(
   embedding: number[],
   k: number = 20,
 ): Array<{ category: OntologyCategory; domainName: string; distance: number }> {
-  const buf = Buffer.from(new Float32Array(embedding).buffer);
   let hits: Array<{ id: string; distance: number }>;
   try {
+    const dt = getVecTableDtype(db, 'vec_categories');
     hits = db.prepare(`
       SELECT id, distance FROM vec_categories
-      WHERE embedding MATCH ? ORDER BY distance LIMIT ?
-    `).all(buf, k) as Array<{ id: string; distance: number }>;
+      WHERE embedding MATCH ${vecParamSql(dt)} ORDER BY distance LIMIT ?
+    `).all(embeddingToVecBlob(embedding, dt), k) as Array<{ id: string; distance: number }>;
+    // ×127-scaled int8 distances → float32-equivalent scale for callers.
+    for (const h of hits) h.distance = normalizeVecDistance(h.distance, dt);
   } catch {
     return []; // index absent → caller uses the full category list
   }

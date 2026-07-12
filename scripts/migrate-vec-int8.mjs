@@ -41,15 +41,16 @@ import * as sqliteVec from 'sqlite-vec';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { embeddingToVecBlob } from '../dist/db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
 
-const quant = (f32) => {
-  const q = new Int8Array(384);
-  for (let i = 0; i < 384; i++) q[i] = Math.max(-127, Math.min(127, Math.round(f32[i] * 127)));
-  return Buffer.from(q.buffer);
-};
+// Delegate to the canonical quantizer (VEC_INT8_SCALE, single source of truth
+// in src/db.ts). A hardcoded copy here would silently corrupt the vector space
+// if the live-insert scale is ever tuned — the migration would re-quantize on a
+// different scale than every subsequent write.
+const quant = (f32) => embeddingToVecBlob(Array.from(f32), 'int8');
 
 function pidAlive(lockPath) {
   try {

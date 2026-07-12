@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { initDatabase } from './db.js';
+import { initDatabase, getVecTableDtype, embeddingToVecBlob, vecParamSql } from './db.js';
 import { generateEmbedding, initEmbeddings, EMBEDDING_VERSION } from './embeddings.js';
 import { getSyncDir } from './sync-export.js';
 import { canonicalizeProject } from './project-canon.js';
@@ -77,7 +77,7 @@ export async function importFromSync() {
                 }
                 // Content-based dedup: re-exports from other devices assign new ids
                 // to identical facts, so id-only checks accumulate duplicates.
-                const contentKey = `${f.fact} ${f.scope_type} ${f.scope_project ?? ''}`;
+                const contentKey = `${f.fact}\u0000${f.scope_type}\u0000${f.scope_project ?? ''}`;
                 const batchSurvivor = seenInBatch.get(contentKey);
                 if (batchSurvivor) {
                     remoteToLocal.set(f.id, batchSurvivor);
@@ -126,13 +126,16 @@ export async function importFromSync() {
                         // other write path, or the insert throws and the fact is
                         // silently dropped from the sync.
                         normalizeFactCategory(f.category), f.scope_type, f.scope_project, f.source_exchange_ids, Buffer.from(new Float32Array(embedding).buffer), f.created_at, f.updated_at, f.consolidated_count, f.ontology_category_id, f.fact_kr ?? null, EMBEDDING_VERSION, confidence);
-                        // Vector index
+                        // Vector index (dtype-aware: int8 tables need vec_int8()-wrapped
+                        // quantized blobs — a raw float32 blob throws on an int8 table)
+                        const dtF = getVecTableDtype(db, 'vec_facts');
                         db.prepare('DELETE FROM vec_facts WHERE id = ?').run(f.id);
-                        db.prepare('INSERT INTO vec_facts (id, embedding) VALUES (?, ?)').run(f.id, Buffer.from(new Float32Array(embedding).buffer));
+                        db.prepare(`INSERT INTO vec_facts (id, embedding) VALUES (?, ${vecParamSql(dtF)})`).run(f.id, embeddingToVecBlob(embedding, dtF));
                         // Korean-text vector index (same-language matching for Korean queries)
                         if (embeddingKr) {
+                            const dtK = getVecTableDtype(db, 'vec_facts_kr');
                             db.prepare('DELETE FROM vec_facts_kr WHERE id = ?').run(f.id);
-                            db.prepare('INSERT INTO vec_facts_kr (id, embedding) VALUES (?, ?)').run(f.id, Buffer.from(new Float32Array(embeddingKr).buffer));
+                            db.prepare(`INSERT INTO vec_facts_kr (id, embedding) VALUES (?, ${vecParamSql(dtK)})`).run(f.id, embeddingToVecBlob(embeddingKr, dtK));
                         }
                     });
                     insertTx.immediate();

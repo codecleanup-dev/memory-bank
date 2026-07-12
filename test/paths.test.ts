@@ -216,3 +216,17 @@ describe('paths', () => {
     });
   });
 });
+
+describe('isWorkerPromptMessage', () => {
+  it('matches every worker prompt prefix and nothing ordinary', async () => {
+    const { isWorkerPromptMessage, WORKER_PROMPT_PREFIXES } = await import('../src/paths.js');
+    for (const p of WORKER_PROMPT_PREFIXES) {
+      expect(isWorkerPromptMessage(p + '\n\n## Rules ...')).toBe(true);
+    }
+    expect(isWorkerPromptMessage('How do I fix this typescript error?')).toBe(false);
+    expect(isWorkerPromptMessage('You are an expert developer — help me refactor')).toBe(false); // 부분 유사 문구는 불일치
+    expect(isWorkerPromptMessage('')).toBe(false);
+    expect(isWorkerPromptMessage(null)).toBe(false);
+    expect(isWorkerPromptMessage(undefined)).toBe(false);
+  });
+});

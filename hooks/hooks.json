@@ -6,17 +6,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/cli/memory-bank.js sync --background",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/cli/node-pin.sh ${CLAUDE_PLUGIN_ROOT}/cli/memory-bank.js sync --background",
             "async": true
           },
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/sync-import-hook.js",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/cli/node-pin.sh ${CLAUDE_PLUGIN_ROOT}/scripts/sync-import-hook.js",
             "async": true
           },
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/fact-consolidate-hook.js",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/cli/node-pin.sh ${CLAUDE_PLUGIN_ROOT}/scripts/fact-consolidate-hook.js",
             "async": true
           },
           {
@@ -33,12 +33,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/fact-extract-hook.js",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/cli/node-pin.sh ${CLAUDE_PLUGIN_ROOT}/scripts/fact-extract-hook.js",
             "async": true
           },
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/sync-export-hook.js",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/cli/node-pin.sh ${CLAUDE_PLUGIN_ROOT}/scripts/sync-export-hook.js",
             "async": true
           }
         ]

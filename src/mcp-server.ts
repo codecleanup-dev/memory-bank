@@ -8,6 +8,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { startInjectDaemon } from './inject-daemon.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -967,6 +968,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   console.error('Episodic Memory MCP server running via stdio');
 
+  // Warm inject sidecar BEFORE connecting the transport: it lets the
+  // UserPromptSubmit hook reuse this process's loaded embedding model over a
+  // unix socket (~150ms warm vs ~2.3s cold). Starting it first means it is
+  // available immediately and is never gated on server.connect() completing
+  // (best-effort, unref'd — adds no lifecycle and never blocks MCP traffic).
+  startInjectDaemon();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

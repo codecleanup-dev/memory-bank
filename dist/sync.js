@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { SUMMARIZER_CONTEXT_MARKER } from './constants.js';
-import { getExcludedProjects, isExcludedProject, detectCodingAgent, findJsonlFiles } from './paths.js';
+import { getExcludedProjects, isExcludedProject, isWorkerPromptMessage, detectCodingAgent, findJsonlFiles } from './paths.js';
 import { sniffCodexProject, encodeProjectPath } from './parser.js';
 import { archiveFileExists, readArchiveFile, statArchiveFile } from './archive-io.js';
 const EXCLUSION_MARKERS = [
@@ -178,6 +178,10 @@ export async function syncConversations(sourceDir, destDir, options = {}) {
                         : exchange.project;
                     if (excludedProjects.includes(exKey))
                         continue;
+                    // Worker-prompt exchange = ephemeral state, not knowledge — never index.
+                    // Applies to every source branch (claude AND codex discovery paths).
+                    if (isWorkerPromptMessage(exchange.userMessage))
+                        continue;
                     // Tag each exchange with the coding agent
                     exchange.codingAgent = codingAgent;
                     const toolNames = exchange.toolCalls?.map(tc => tc.toolName);
@@ -193,6 +197,17 @@ export async function syncConversations(sourceDir, destDir, options = {}) {
                 });
             }
         }
+        // [fork] Active WAL reclaim at the end of this batch writer:
+        // journal_size_limit only truncates after a checkpoint actually resets the
+        // WAL, and long-lived MCP readers can keep deferring auto-checkpoints
+        // while a big sync commits thousands of writes. One explicit TRUNCATE
+        // attempt here (best-effort — skipped harmlessly if a reader holds a
+        // mark) mirrors the reembed worker's periodic truncate for the other
+        // heavy writer in the system.
+        try {
+            db.pragma('wal_checkpoint(TRUNCATE)');
+        }
+        catch { /* reader active — next writer retries */ }
         db.close();
     }
     // Generate summaries for files that need them

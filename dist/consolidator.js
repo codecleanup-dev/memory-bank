@@ -1,7 +1,6 @@
 import { callHaiku, parseJsonResponse } from './llm.js';
 import { getNewFactsSince, getAllNewFactsSince, searchSimilarFactsSameScope, updateFact, deactivateFact, insertRevision, } from './fact-db.js';
-import { initEmbeddings } from './embeddings.js';
-const CONSOLIDATION_SYSTEM_PROMPT = `Compare two facts and determine their relationship.
+export const CONSOLIDATION_SYSTEM_PROMPT = `Compare two facts and determine their relationship.
 
 ## Relationship types (choose one)
 - DUPLICATE: same content - merge
@@ -187,7 +186,8 @@ async function consolidateOne(db, newFact) {
  * public export so existing importers don't crash at module load.
  */
 export async function consolidateFacts(db, project, lastConsolidatedAt) {
-    await initEmbeddings();
+    // No initEmbeddings() — consolidation uses stored vectors + the LLM, never the
+    // local embedding model (see consolidateAllPending).
     const newFacts = getNewFactsSince(db, project, lastConsolidatedAt);
     let haikuCalls = 0, merged = 0, contradictions = 0, evolutions = 0;
     for (const newFact of newFacts) {
@@ -233,7 +233,11 @@ export async function consolidateFacts(db, project, lastConsolidatedAt) {
  * nor as a later candidate.
  */
 export async function consolidateAllPending(db, since) {
-    await initEmbeddings();
+    // NOTE: no initEmbeddings() here — consolidation never generates an embedding.
+    // It compares facts using their ALREADY-STORED vectors (searchSimilarFactsSameScope
+    // does a vec MATCH on the stored blob) and an LLM (callHaiku). Loading the local
+    // embedding model was a ~1s no-op on every run, wasteful because the consolidate
+    // worker is spawned on every SessionStart — most runs have an empty backlog.
     const newFacts = getAllNewFactsSince(db, since);
     let haikuCalls = 0;
     let merged = 0;
