@@ -18,6 +18,7 @@
  */
 
 import net from 'node:net';
+import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -59,13 +60,21 @@ function askDaemon(prompt, cwd) {
     let settled = false;
     let connected = false;
     const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+    // [fork] Distinguish "no daemon" from "daemon saturated": when the server
+    // hits maxConnections, connects are refused/queued while the socket FILE
+    // still exists — falling back cold there would stampede model loads while
+    // the daemon is busiest. Socket file present -> failures mean 'gave-up'
+    // (skip this injection); file absent -> genuinely no daemon -> cold path.
+    let sockExists = false;
+    try { sockExists = fs.existsSync(injectSocketPath()); } catch { /* treat as absent */ }
+    const failStatus = () => ({ status: (connected || sockExists) ? 'gave-up' : 'no-daemon' });
     let conn;
     try {
       conn = net.connect(injectSocketPath());
     } catch {
-      return done({ status: 'no-daemon' });
+      return done(failStatus());
     }
-    const connectTimer = setTimeout(() => { conn.destroy(); done({ status: 'no-daemon' }); }, SOCKET_CONNECT_TIMEOUT_MS);
+    const connectTimer = setTimeout(() => { conn.destroy(); done(failStatus()); }, SOCKET_CONNECT_TIMEOUT_MS);
     conn.on('connect', () => {
       connected = true;
       clearTimeout(connectTimer);
@@ -88,7 +97,7 @@ function askDaemon(prompt, cwd) {
     });
     conn.on('error', () => {
       clearTimeout(connectTimer);
-      done({ status: connected ? 'gave-up' : 'no-daemon' });
+      done(failStatus());
     });
   });
 }
