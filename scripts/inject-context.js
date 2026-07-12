@@ -45,22 +45,31 @@ function injectSocketPath() {
   return path.join(base, 'conversation-index', 'inject-daemon.sock');
 }
 
-/** Ask the warm daemon; resolve null (not reject) on ANY failure so the caller
- * falls back — the hook must never break a user prompt. */
+/** Ask the warm daemon. Resolves to:
+ *  - { status: 'ok', context }   — daemon answered
+ *  - { status: 'no-daemon' }     — could not connect (no MCP server serving)
+ *  - { status: 'gave-up' }       — connected but slow/declined/failed mid-request
+ * [fork] The caller cold-falls-back ONLY on 'no-daemon'. A connected-but-slow
+ * daemon is still doing the work — piling a cold model load in this process on
+ * top of the in-flight daemon computation is pure amplification (adversarial-
+ * review find, 2026-07-12). Giving up injection for one prompt is the cheaper
+ * failure. Never rejects — the hook must never break a user prompt. */
 function askDaemon(prompt, cwd) {
   return new Promise((resolve) => {
     let settled = false;
+    let connected = false;
     const done = (v) => { if (!settled) { settled = true; resolve(v); } };
     let conn;
     try {
       conn = net.connect(injectSocketPath());
     } catch {
-      return done(null);
+      return done({ status: 'no-daemon' });
     }
-    const connectTimer = setTimeout(() => { conn.destroy(); done(null); }, SOCKET_CONNECT_TIMEOUT_MS);
+    const connectTimer = setTimeout(() => { conn.destroy(); done({ status: 'no-daemon' }); }, SOCKET_CONNECT_TIMEOUT_MS);
     conn.on('connect', () => {
+      connected = true;
       clearTimeout(connectTimer);
-      conn.setTimeout(SOCKET_RESPONSE_TIMEOUT_MS, () => { conn.destroy(); done(null); });
+      conn.setTimeout(SOCKET_RESPONSE_TIMEOUT_MS, () => { conn.destroy(); done({ status: 'gave-up' }); });
       conn.write(JSON.stringify({ prompt, cwd }) + '\n');
       let buf = '';
       conn.on('data', (c) => {
@@ -69,14 +78,18 @@ function askDaemon(prompt, cwd) {
         if (nl < 0) return;
         try {
           const res = JSON.parse(buf.slice(0, nl));
-          done(res && res.ok ? String(res.context ?? '') : null);
+          if (res && res.ok) done({ status: 'ok', context: String(res.context ?? '') });
+          else done({ status: 'gave-up' }); // daemon alive but declined (over cap / error)
         } catch {
-          done(null);
+          done({ status: 'gave-up' });
         }
         conn.destroy();
       });
     });
-    conn.on('error', () => { clearTimeout(connectTimer); done(null); });
+    conn.on('error', () => {
+      clearTimeout(connectTimer);
+      done({ status: connected ? 'gave-up' : 'no-daemon' });
+    });
   });
 }
 
@@ -100,11 +113,14 @@ async function main() {
   if (!prompt || prompt.length < 20) return; // not worth an injection
 
   // FAST PATH — warm daemon inside a running MCP server.
-  const daemonContext = await askDaemon(prompt, cwd);
-  if (daemonContext !== null) {
-    if (daemonContext) process.stdout.write(daemonContext + '\n');
+  const daemonRes = await askDaemon(prompt, cwd);
+  if (daemonRes.status === 'ok') {
+    if (daemonRes.context) process.stdout.write(daemonRes.context + '\n');
     return;
   }
+  // Daemon exists but was slow or declined: its computation may still be
+  // running — do NOT stack a cold model load on top. Skip this injection.
+  if (daemonRes.status === 'gave-up') return;
 
   // COLD FALLBACK — compute locally (heavy imports load only here).
   try {
