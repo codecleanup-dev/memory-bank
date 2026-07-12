@@ -26,6 +26,10 @@ if [[ -f "$ERR_LOG" ]] && [[ $(wc -c < "$ERR_LOG" 2>/dev/null || echo 0) -gt 104
 fi
 
 # Pass raw stdin straight through — the JS parses JSON/plaintext/env itself.
-node "$INJECT_SCRIPT" 2>>"$ERR_LOG" || true
+# [fork] node-pin: the cold-fallback path loads better-sqlite3, which is
+# ABI-built for the pinned runtime — a PATH-resolved bare `node` here is the
+# 2026-07-05/07-09 ABI-split class. The bash resolver adds no extra node
+# startup, so the warm fast path stays at ~150ms.
+bash "${HOOK_DIR}/../cli/node-pin.sh" "$INJECT_SCRIPT" 2>>"$ERR_LOG" || true
 
 exit 0
