@@ -24991,6 +24991,7 @@ function startInjectDaemon() {
       })();
     });
   });
+  server2.maxConnections = 32;
   server2.on("error", (err) => {
     if (err.code !== "EADDRINUSE") return;
     const probe = net.connect(sockPath);

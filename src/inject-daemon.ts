@@ -91,6 +91,13 @@ export function startInjectDaemon(): void {
     });
   });
 
+  // [fork] Connection-count cap (node-native): without it a same-user client
+  // could hold thousands of sockets each buffering up to 1MB for the 10s idle
+  // timeout. 32 concurrent conns x 1MB worst-case = 32MB bounded. Excess
+  // connections are refused at accept — the thin client treats that as
+  // gave-up/no-daemon and never breaks a prompt.
+  server.maxConnections = 32;
+
   server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code !== 'EADDRINUSE') return; // best-effort sidecar — never crash the MCP server
     // Another bind exists: live server (skip) or stale socket file (reclaim).
