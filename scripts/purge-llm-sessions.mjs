@@ -131,7 +131,11 @@ function main() {
     // stopped, while the up-front backup already holds every row.
     // Order inside a batch: vec rows (per-id — vec0 takes no subqueries),
     // tool_calls, then exchanges (FTS triggers keep exchanges_fts in sync).
-    const BATCH = 2000;
+    // [fork] Batch size tunable: 2K was safe on the machine that authored the
+    // fix, but this DB still trips SQLITE_CORRUPT_VTAB at 2K while per-row
+    // autocommit deletes all 21,599 vec rows cleanly (measured 2026-07-12) —
+    // the safe threshold is DB-chunk-state dependent, so let operators lower it.
+    const BATCH = Math.max(1, Number(process.env.PURGE_BATCH || 2000));
     const delVec = db.prepare('DELETE FROM vec_exchanges WHERE id = ?');
     const delTc = db.prepare('DELETE FROM tool_calls WHERE exchange_id = ?');
     const delEx = db.prepare('DELETE FROM exchanges WHERE id = ?');
@@ -140,7 +144,21 @@ function main() {
     });
     let deleted = 0;
     for (let i = 0; i < ids.length; i += BATCH) {
-      delBatch.immediate(ids.slice(i, i + BATCH));
+      try {
+        delBatch.immediate(ids.slice(i, i + BATCH));
+      } catch (e) {
+        // [fork] SQLITE_CORRUPT_VTAB on the exchanges delete is (measured
+        // 2026-07-12) usually NOT real corruption: exchanges_fts is an
+        // external-content FTS5 table, and a desynced row makes the AFTER
+        // DELETE trigger hand FTS5 stale OLD values, which FTS5 reports as
+        // CORRUPT_VTAB. quick_check passes; the fix is a 3-5s index rebuild.
+        if (e && e.code === 'SQLITE_CORRUPT_VTAB') {
+          console.error('\nHINT: likely exchanges_fts external-content desync, not disk corruption.');
+          console.error("Run:  INSERT INTO exchanges_fts(exchanges_fts) VALUES('rebuild');  then re-run this purge.");
+          console.error('(Already-deleted batches are fine — the run is idempotent and resumes.)');
+        }
+        throw e;
+      }
       deleted += Math.min(BATCH, ids.length - i);
       if (deleted % 10000 < BATCH) console.log(`  deleted ${deleted}/${ids.length}`);
     }
