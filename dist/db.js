@@ -5,6 +5,9 @@ import * as sqliteVec from 'sqlite-vec';
 import { getDbPath } from './paths.js';
 import { autoHealScopeProjects } from './project-canon.js';
 import { EMBEDDING_VERSION } from './embeddings.js';
+import { FACT_CATEGORIES, FACT_CATEGORY_CHECK_SQL, normalizeFactCategory } from './fact-category.js';
+import { RELATION_TYPES } from './types.js';
+const RELATION_TYPE_CHECK_SQL = `relation_type IN (${RELATION_TYPES.map((t) => `'${t}'`).join(',')})`;
 export const VEC_INT8_SCALE = 127;
 /**
  * Authoritative vector dtype for vec_exchanges.
@@ -89,6 +92,233 @@ export function migrateSchema(db) {
         console.error('Migration complete.');
     }
 }
+/**
+ * Enforce the facts.category controlled vocabulary on legacy DBs.
+ *
+ * facts.category was plain TEXT with no constraint, so LLM output drift
+ * accumulated out-of-vocabulary values ('requirement' ×44, enum echoes,
+ * 'null', NULL — measured 2026-07-07). SQLite cannot ADD a CHECK constraint,
+ * so this rebuilds the table once: normalize existing rows through the same
+ * deterministic mapping the write path uses, then copy into a table that
+ * carries NOT NULL + CHECK. Generic column copy via pragma_table_info keeps
+ * the rebuild independent of which optional columns this DB already has.
+ *
+ * Idempotent: guarded on the CHECK already being present in sqlite_master.
+ * FK clauses in fact_revisions/ontology_relations reference the table name
+ * only and enforcement is off (better-sqlite3 default), so drop+rename is
+ * safe.
+ */
+/**
+ * Run a table-rebuild transaction with foreign_keys OFF.
+ *
+ * better-sqlite3 enables FK enforcement by default, and DROP TABLE on a
+ * referenced parent performs an implicit DELETE that trips child constraints
+ * (facts is referenced by fact_revisions and ontology_relations — 8,948 rows
+ * live). The standard SQLite rebuild procedure toggles the pragma around the
+ * transaction; toggling inside one is a no-op, hence this wrapper.
+ */
+function withForeignKeysOff(db, fn) {
+    const wasOn = db.pragma('foreign_keys', { simple: true }) === 1;
+    if (wasOn)
+        db.pragma('foreign_keys = OFF');
+    try {
+        fn();
+    }
+    finally {
+        if (wasOn)
+            db.pragma('foreign_keys = ON');
+    }
+}
+/**
+ * Extend the ontology_relations CHECK to the current relation vocabulary.
+ * SQLite cannot alter a CHECK, so legacy tables (4-type constraint) are
+ * rebuilt once; existing rows are all valid under the extended list, so this
+ * is a pure schema copy. Idempotent: guarded on every vocabulary member
+ * already appearing in the stored DDL.
+ */
+/**
+ * DEFAULT clause for a rebuilt column from pragma_table_info's dflt_value:
+ * literals (quoted strings, numbers, already-parenthesized expressions) pass
+ * through; bare expressions like datetime('now') must be re-wrapped in
+ * parens or the generated DDL is a syntax error.
+ */
+function defaultClause(dfltValue) {
+    if (dfltValue == null)
+        return '';
+    const v = dfltValue.trim();
+    const literal = /^['"(]|^-?\d/.test(v) || /^(NULL|TRUE|FALSE|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP)$/i.test(v);
+    return ` DEFAULT ${literal ? v : `(${v})`}`;
+}
+export function migrateRelationTypeVocabulary(db) {
+    const tbl = db
+        .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='ontology_relations'`)
+        .get();
+    if (!tbl?.sql)
+        return;
+    if (RELATION_TYPES.every((t) => tbl.sql.includes(`'${t}'`)))
+        return;
+    // Fail-safe for hand-modified DBs: the two shipped FKs (source/target →
+    // facts.id) are reconstructed below; any OTHER foreign key is DDL this
+    // rebuild cannot reproduce, so leave the table alone (new relation types
+    // are then rejected by the old CHECK on that DB — detection probes treat
+    // that as a non-fatal skip).
+    const fks = db.pragma(`foreign_key_list('ontology_relations')`);
+    const isShippedFk = (fk) => fk.table === 'facts' && (fk.from === 'source_fact_id' || fk.from === 'target_fact_id');
+    if (fks.some((fk) => !isShippedFk(fk))) {
+        console.error('ontology_relations vocabulary migration skipped: custom FOREIGN KEY present — legacy CHECK stays in place.');
+        return;
+    }
+    // Same fail-safe for other irreproducible constraint DDL: the shipped
+    // table has exactly ONE CHECK (the relation_type vocabulary this rebuild
+    // replaces) and no UNIQUE/GENERATED — anything beyond that is custom.
+    const checkCount = (tbl.sql.match(/CHECK/gi) ?? []).length;
+    if (checkCount > 1 || /UNIQUE|GENERATED/i.test(tbl.sql)) {
+        console.error('ontology_relations vocabulary migration skipped: custom constraint DDL present — legacy CHECK stays in place (new relation types are rejected on this DB).');
+        return;
+    }
+    // Column-generic copy (custom columns and their data are preserved), plus
+    // capture/replay of attached indexes/triggers — nothing outside a
+    // hardcoded list may be silently dropped.
+    const cols = db
+        .prepare(`SELECT name, type, "notnull" AS nn, dflt_value, pk FROM pragma_table_info('ontology_relations')`)
+        .all();
+    const attachedDdl = db
+        .prepare(`SELECT sql FROM sqlite_master WHERE tbl_name='ontology_relations' AND type IN ('index','trigger') AND sql IS NOT NULL`)
+        .all().map((r) => r.sql);
+    // Mirror-what-exists: reproduce the shipped FK clauses only when the
+    // legacy table actually declared them. A hand-made no-FK table must not
+    // gain constraints its (possibly dangling) rows never satisfied.
+    const hadShippedFk = (col) => fks.some((fk) => fk.table === 'facts' && fk.from === col);
+    const rebuild = db.transaction(() => {
+        const defs = cols.map((c) => {
+            const base = `${c.name} ${c.type}${c.pk ? ' PRIMARY KEY' : ''}${c.nn ? ' NOT NULL' : ''}${defaultClause(c.dflt_value)}`;
+            if (c.name === 'relation_type')
+                return `${base} CHECK(${RELATION_TYPE_CHECK_SQL})`;
+            if ((c.name === 'source_fact_id' || c.name === 'target_fact_id') && hadShippedFk(c.name)) {
+                return `${base} REFERENCES facts(id)`;
+            }
+            return base;
+        });
+        const names = cols.map((c) => c.name).join(', ');
+        db.exec(`CREATE TABLE ontology_relations_vocab_rebuild (${defs.join(', ')})`);
+        db.exec(`INSERT INTO ontology_relations_vocab_rebuild (${names}) SELECT ${names} FROM ontology_relations`);
+        db.exec(`DROP TABLE ontology_relations`);
+        db.exec(`ALTER TABLE ontology_relations_vocab_rebuild RENAME TO ontology_relations`);
+        for (const ddl of attachedDdl)
+            db.exec(ddl);
+        // Standard indexes may not exist yet on very old DBs (created later in
+        // init on the fresh path) — ensure them regardless of the capture.
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_source ON ontology_relations(source_fact_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_target ON ontology_relations(target_fact_id)`);
+    });
+    try {
+        withForeignKeysOff(db, () => rebuild.immediate());
+    }
+    catch (error) {
+        // A failed migration must never brick startup: the transaction rolled
+        // back, the legacy table (old CHECK) stays — new relation types are
+        // rejected on this DB until repaired, which detection treats as
+        // non-fatal per-probe skips.
+        console.error('ontology_relations vocabulary migration failed — keeping legacy table:', error);
+        return;
+    }
+    console.error('Migrated ontology_relations: vocabulary extended (DEPENDS_ON, DERIVED_FROM).');
+    // Observability, not enforcement: dangling relation rows (facts hard-deleted
+    // out from under an edge) predate this rebuild and are copied verbatim —
+    // surface the count so they can be repaired instead of silently vanishing
+    // from JOIN-based graph queries.
+    try {
+        const dangling = db.pragma(`foreign_key_check('ontology_relations')`);
+        if (dangling.length > 0) {
+            console.error(`ontology_relations: ${dangling.length} dangling relation rows reference missing facts (pre-existing; see PRAGMA foreign_key_check).`);
+        }
+    }
+    catch {
+        /* pragma unavailable on very old SQLite builds */
+    }
+}
+export function migrateFactsCategoryVocabulary(db) {
+    const tbl = db
+        .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facts'`)
+        .get();
+    if (!tbl?.sql)
+        return;
+    // Already enforced only when EVERY vocabulary member is present AND the
+    // column is NOT NULL — a narrower prior CHECK must be rebuilt (valid
+    // writes like category='constraint' would trip it), and a nullable column
+    // must be rebuilt too: SQLite CHECKs pass on NULL, so without NOT NULL
+    // the vocabulary invariant is hollow.
+    const categoryNotNull = db
+        .prepare(`SELECT "notnull" AS nn FROM pragma_table_info('facts') WHERE name = 'category'`)
+        .get()?.nn === 1;
+    if (/CHECK\s*\(\s*category\s+IN/i.test(tbl.sql) &&
+        FACT_CATEGORIES.every((c) => tbl.sql.includes(`'${c}'`)) &&
+        categoryNotNull) {
+        return;
+    }
+    // Fail-safe for hand-modified DBs: a pragma-based column rebuild cannot
+    // reproduce arbitrary table-level or custom column constraints (FKs,
+    // UNIQUE, custom CHECKs, generated columns). No shipped facts schema ever
+    // carried any of these, so after excluding OUR vocabulary CHECK (which
+    // this migration owns and replaces), any remaining constraint keyword is
+    // custom DDL. Leaving the vocabulary write-path-enforced-only beats
+    // silently dropping someone's data-integrity constraints.
+    const withoutOwnCheck = tbl.sql.replace(/CHECK\s*\(\s*category\s+IN\s*\([^)]*\)\s*\)/i, '');
+    if (/FOREIGN\s+KEY|REFERENCES|UNIQUE|CHECK|GENERATED/i.test(withoutOwnCheck)) {
+        console.error('facts.category migration skipped: custom constraint DDL on facts — vocabulary stays write-path-enforced only.');
+        return;
+    }
+    // Everything hanging off the table (indexes incl. user-added ones,
+    // triggers) is dropped with it — capture the DDL now and replay after the
+    // rename. A hardcoded recreate list would silently drop custom artifacts.
+    const attachedDdl = db
+        .prepare(`SELECT sql FROM sqlite_master WHERE tbl_name='facts' AND type IN ('index','trigger') AND sql IS NOT NULL`)
+        .all().map((r) => r.sql);
+    const cols = db
+        // NOTNULL is an SQLite keyword (IS NOTNULL), so the pragma column must be
+        // re-aliased to a neutral name.
+        .prepare(`SELECT name, type, "notnull" AS nn, dflt_value, pk FROM pragma_table_info('facts')`)
+        .all();
+    const rebuild = db.transaction(() => {
+        // 1) Normalize legacy rows first — the copy below must not violate the
+        //    new constraint. DISTINCT keeps this to a handful of UPDATEs.
+        const distinct = db.prepare(`SELECT DISTINCT category FROM facts`).all();
+        const update = db.prepare(`UPDATE facts SET category = ? WHERE category IS ?`);
+        for (const { category } of distinct) {
+            const normalized = normalizeFactCategory(category);
+            if (normalized !== category)
+                update.run(normalized, category);
+        }
+        // 2) Rebuild with NOT NULL + CHECK, copying every existing column.
+        const defs = cols.map((c) => {
+            const notNull = c.name === 'category' ? ' NOT NULL' : c.nn ? ' NOT NULL' : '';
+            const pk = c.pk ? ' PRIMARY KEY' : '';
+            return `${c.name} ${c.type}${pk}${notNull}${defaultClause(c.dflt_value)}`;
+        });
+        const names = cols.map((c) => c.name).join(', ');
+        db.exec(`CREATE TABLE facts_vocab_rebuild (${defs.join(', ')}, CHECK (${FACT_CATEGORY_CHECK_SQL}))`);
+        db.exec(`INSERT INTO facts_vocab_rebuild (${names}) SELECT ${names} FROM facts`);
+        db.exec(`DROP TABLE facts`);
+        db.exec(`ALTER TABLE facts_vocab_rebuild RENAME TO facts`);
+        // 3) Replay every captured index/trigger DDL (standard indexes were
+        //    created earlier in this same init, so they are in the capture too).
+        for (const ddl of attachedDdl)
+            db.exec(ddl);
+    });
+    // facts is a referenced parent (fact_revisions, ontology_relations) — the
+    // DROP inside the rebuild needs FK enforcement suspended.
+    try {
+        withForeignKeysOff(db, () => rebuild.immediate());
+    }
+    catch (error) {
+        // Never brick startup on a migration: the transaction rolled back, the
+        // legacy table stays, and the vocabulary remains write-path-enforced
+        // only on this DB until repaired.
+        console.error('facts.category vocabulary migration failed — keeping legacy table:', error);
+        return;
+    }
+    console.error('Migrated facts.category: vocabulary normalized, CHECK constraint added.');
+}
 export function initDatabase() {
     const dbPath = getDbPath();
     // Ensure directory exists
@@ -102,6 +332,12 @@ export function initDatabase() {
     // Enable WAL mode for better concurrency
     db.pragma('journal_mode = WAL');
     db.pragma('busy_timeout = 5000');
+    // Referential integrity is a pinned invariant, not a driver default:
+    // better-sqlite3 currently ships with foreign_keys ON, but the graph
+    // (facts ↔ fact_revisions/ontology_relations) and the rebuild migrations
+    // depend on it — enable explicitly so a driver-default change can never
+    // silently disable enforcement.
+    db.pragma('foreign_keys = ON');
     // Cap the -wal file so it is truncated back after each checkpoint. The default
     // (-1 = unlimited) let the WAL grow WITHOUT BOUND under this workload: many
     // long-lived MCP-server readers (one per session) keep a read mark active
@@ -271,7 +507,7 @@ export function initDatabase() {
     CREATE TABLE IF NOT EXISTS facts (
       id TEXT PRIMARY KEY,
       fact TEXT NOT NULL,
-      category TEXT,
+      category TEXT NOT NULL CHECK (${FACT_CATEGORY_CHECK_SQL}),
       scope_type TEXT NOT NULL DEFAULT 'project',
       scope_project TEXT,
       source_exchange_ids TEXT,
@@ -391,6 +627,12 @@ export function initDatabase() {
     if (!factColumnNames.has('ontology_last_attempt_at')) {
         db.prepare('ALTER TABLE facts ADD COLUMN ontology_last_attempt_at TEXT').run();
     }
+    // Extraction confidence (0..1). Previously consumed only as the extraction
+    // gate and discarded; persisting it gives each fact a reliability signal
+    // alongside consolidated_count. NULL on pre-migration rows (unknown).
+    if (!factColumnNames.has('confidence')) {
+        db.prepare('ALTER TABLE facts ADD COLUMN confidence REAL').run();
+    }
     const exchangeColumns = db.prepare(`SELECT name FROM pragma_table_info('exchanges')`).all();
     if (!exchangeColumns.some((c) => c.name === 'embedding_version')) {
         db.prepare('ALTER TABLE exchanges ADD COLUMN embedding_version INTEGER NOT NULL DEFAULT 0').run();
@@ -399,7 +641,7 @@ export function initDatabase() {
     CREATE TABLE IF NOT EXISTS ontology_relations (
       id TEXT PRIMARY KEY,
       source_fact_id TEXT NOT NULL REFERENCES facts(id),
-      relation_type TEXT NOT NULL CHECK(relation_type IN ('INFLUENCES','SUPERSEDES','SUPPORTS','CONTRADICTS')),
+      relation_type TEXT NOT NULL CHECK(${RELATION_TYPE_CHECK_SQL}),
       target_fact_id TEXT NOT NULL REFERENCES facts(id),
       reasoning TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -444,6 +686,11 @@ export function initDatabase() {
       saved INTEGER NOT NULL DEFAULT 0
     )
   `);
+    // Vocabulary migrations (one-time rebuilds on legacy DBs; fresh DBs already
+    // carry both CHECKs from CREATE TABLE above). Run after the ALTER block so
+    // the generic column copy sees every column.
+    migrateRelationTypeVocabulary(db);
+    migrateFactsCategoryVocabulary(db);
     // Self-heal slug-format scope_project rows (cheap probe; no-op when clean).
     // Keeps the canonical path format intact even when other devices sync in
     // facts written by older code.
@@ -463,12 +710,38 @@ export function insertExchange(db, exchange, embedding, _toolNames) {
     //     serializes against the swap, so we can never quantize for a schema
     //     that changed between the read and the write.
     const insertAll = db.transaction(() => {
+        // UPSERT, not INSERT OR REPLACE: REPLACE deletes the pre-existing row
+        // before reinserting, and with foreign_keys ON that implicit delete
+        // trips tool_calls.exchange_id on every re-index of an exchange that
+        // already has tool calls. ON CONFLICT DO UPDATE rewrites in place — no
+        // parent delete, and the exchanges_fts AFTER UPDATE trigger keeps the
+        // FTS index consistent.
         db.prepare(`
-      INSERT OR REPLACE INTO exchanges
+      INSERT INTO exchanges
       (id, project, timestamp, user_message, assistant_message, archive_path, line_start, line_end, last_indexed,
        parent_uuid, is_sidechain, session_id, cwd, git_branch, claude_version,
        thinking_level, thinking_disabled, thinking_triggers, coding_agent, embedding_version)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        project = excluded.project,
+        timestamp = excluded.timestamp,
+        user_message = excluded.user_message,
+        assistant_message = excluded.assistant_message,
+        archive_path = excluded.archive_path,
+        line_start = excluded.line_start,
+        line_end = excluded.line_end,
+        last_indexed = excluded.last_indexed,
+        parent_uuid = excluded.parent_uuid,
+        is_sidechain = excluded.is_sidechain,
+        session_id = excluded.session_id,
+        cwd = excluded.cwd,
+        git_branch = excluded.git_branch,
+        claude_version = excluded.claude_version,
+        thinking_level = excluded.thinking_level,
+        thinking_disabled = excluded.thinking_disabled,
+        thinking_triggers = excluded.thinking_triggers,
+        coding_agent = excluded.coding_agent,
+        embedding_version = excluded.embedding_version
     `).run(exchange.id, exchange.project, exchange.timestamp, exchange.userMessage, exchange.assistantMessage, exchange.archivePath, exchange.lineStart, exchange.lineEnd, now, exchange.parentUuid || null, exchange.isSidechain ? 1 : 0, exchange.sessionId || null, exchange.cwd || null, exchange.gitBranch || null, exchange.claudeVersion || null, exchange.thinkingLevel || null, exchange.thinkingDisabled ? 1 : 0, exchange.thinkingTriggers || null, exchange.codingAgent || 'claude-code', 
         // The embedding parameter was just generated with the current model, so
         // stamp the current version — search filters on it and the re-embed
@@ -479,6 +752,11 @@ export function insertExchange(db, exchange, embedding, _toolNames) {
         db.prepare('DELETE FROM vec_exchanges WHERE id = ?').run(exchange.id);
         db.prepare(`INSERT INTO vec_exchanges (id, embedding) VALUES (?, ${vecParamSql(vecDtype)})`)
             .run(exchange.id, embeddingToVecBlob(embedding, vecDtype));
+        // The archive is the source of truth for this exchange's tool calls —
+        // clear the previous set so a re-index cannot leave stale tool history
+        // behind (REPLACE never cleaned these up either; the upsert makes the
+        // contract explicit).
+        db.prepare('DELETE FROM tool_calls WHERE exchange_id = ?').run(exchange.id);
         if (exchange.toolCalls && exchange.toolCalls.length > 0) {
             const toolStmt = db.prepare(`
         INSERT OR REPLACE INTO tool_calls
@@ -486,7 +764,11 @@ export function insertExchange(db, exchange, embedding, _toolNames) {
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `);
             for (const toolCall of exchange.toolCalls) {
-                toolStmt.run(toolCall.id, toolCall.exchangeId, toolCall.toolName, toolCall.toolInput ? JSON.stringify(toolCall.toolInput) : null, toolCall.toolResult || null, toolCall.isError ? 1 : 0, toolCall.timestamp);
+                toolStmt.run(toolCall.id, 
+                // The parent id is authoritative: a malformed/stale archive entry
+                // whose exchangeId disagrees would trip the FK and roll back the
+                // whole exchange instead of indexing it.
+                exchange.id, toolCall.toolName, toolCall.toolInput ? JSON.stringify(toolCall.toolInput) : null, toolCall.toolResult || null, toolCall.isError ? 1 : 0, toolCall.timestamp);
             }
         }
     });
@@ -511,6 +793,9 @@ export function getFileLastIndexed(db, archivePath) {
 export function deleteExchange(db, id) {
     // Delete from vector table
     db.prepare(`DELETE FROM vec_exchanges WHERE id = ?`).run(id);
+    // Children first: tool_calls.exchange_id references exchanges(id) and
+    // foreign_keys is ON — deleting the parent first would throw.
+    db.prepare(`DELETE FROM tool_calls WHERE exchange_id = ?`).run(id);
     // Delete from main table
     db.prepare(`DELETE FROM exchanges WHERE id = ?`).run(id);
 }

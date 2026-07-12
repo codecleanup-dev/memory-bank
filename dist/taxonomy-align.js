@@ -1,10 +1,7 @@
 import { listCategories, listDomains } from './ontology-db.js';
+import { getVecTableDtype, vecParamSql, normalizeVecDistance, l2DistanceToSimilarity } from './db.js';
 export const DEFAULT_MERGE_THRESHOLD = 0.9;
 const NEIGHBORS_PER_CATEGORY = 4;
-/** vec0 L2 distance on (near-)normalized embeddings → cosine similarity. */
-function l2ToCosine(distance) {
-    return 1 - (distance * distance) / 2;
-}
 function isParkingCategory(cat, domainNames) {
     return cat.name === 'Misc' && (domainNames.get(cat.domain_id) ?? '') === 'General';
 }
@@ -24,9 +21,15 @@ export function findMergeCandidates(db, opts = {}) {
         counts.set(row.id, row.n);
     let embStmt;
     let knnStmt;
+    let dt;
     try {
+        // Fork-only module: the shared read/write paths (ontology-db.ts) became
+        // dtype-aware upstream (v1.3.4 int8 migration), but upstream can't see
+        // this file — the MATCH param must be wrapped per the table's dtype or
+        // int8 tables reject the query and every category looks unindexed.
+        dt = getVecTableDtype(db, 'vec_categories');
         embStmt = db.prepare('SELECT embedding FROM vec_categories WHERE id = ?');
-        knnStmt = db.prepare('SELECT id, distance FROM vec_categories WHERE embedding MATCH ? ORDER BY distance LIMIT ?');
+        knnStmt = db.prepare(`SELECT id, distance FROM vec_categories WHERE embedding MATCH ${vecParamSql(dt)} ORDER BY distance LIMIT ?`);
     }
     catch {
         // Index table absent (very old DB) — nothing detectable.
@@ -57,7 +60,7 @@ export function findMergeCandidates(db, opts = {}) {
         for (const hit of hits) {
             if (hit.id === cat.id)
                 continue;
-            const similarity = l2ToCosine(hit.distance);
+            const similarity = l2DistanceToSimilarity(normalizeVecDistance(hit.distance, dt));
             if (similarity < threshold)
                 continue;
             const other = byId.get(hit.id);

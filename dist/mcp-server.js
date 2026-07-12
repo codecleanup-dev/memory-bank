@@ -3108,6 +3108,9 @@ var require_utils = __commonJS({
     "use strict";
     var isUUID = RegExp.prototype.test.bind(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu);
     var isIPv4 = RegExp.prototype.test.bind(/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u);
+    var isHexPair = RegExp.prototype.test.bind(/^[\da-f]{2}$/iu);
+    var isUnreserved = RegExp.prototype.test.bind(/^[\da-z\-._~]$/iu);
+    var isPathCharacter = RegExp.prototype.test.bind(/^[\da-z\-._~!$&'()*+,;=:@/]$/iu);
     function stringArrayToHexStripped(input) {
       let acc = "";
       let code = 0;
@@ -3300,27 +3303,77 @@ var require_utils = __commonJS({
       }
       return output.join("");
     }
-    function normalizeComponentEncoding(component, esc2) {
-      const func = esc2 !== true ? escape : unescape;
-      if (component.scheme !== void 0) {
-        component.scheme = func(component.scheme);
+    var HOST_DELIMS = { "@": "%40", "/": "%2F", "?": "%3F", "#": "%23", ":": "%3A" };
+    var HOST_DELIM_RE = /[@/?#:]/g;
+    var HOST_DELIM_NO_COLON_RE = /[@/?#]/g;
+    function reescapeHostDelimiters(host, isIP) {
+      const re2 = isIP ? HOST_DELIM_NO_COLON_RE : HOST_DELIM_RE;
+      re2.lastIndex = 0;
+      return host.replace(re2, (ch) => HOST_DELIMS[ch]);
+    }
+    function normalizePercentEncoding(input, decodeUnreserved = false) {
+      if (input.indexOf("%") === -1) {
+        return input;
       }
-      if (component.userinfo !== void 0) {
-        component.userinfo = func(component.userinfo);
+      let output = "";
+      for (let i = 0; i < input.length; i++) {
+        if (input[i] === "%" && i + 2 < input.length) {
+          const hex = input.slice(i + 1, i + 3);
+          if (isHexPair(hex)) {
+            const normalizedHex = hex.toUpperCase();
+            const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
+            if (decodeUnreserved && isUnreserved(decoded)) {
+              output += decoded;
+            } else {
+              output += "%" + normalizedHex;
+            }
+            i += 2;
+            continue;
+          }
+        }
+        output += input[i];
       }
-      if (component.host !== void 0) {
-        component.host = func(component.host);
+      return output;
+    }
+    function normalizePathEncoding(input) {
+      let output = "";
+      for (let i = 0; i < input.length; i++) {
+        if (input[i] === "%" && i + 2 < input.length) {
+          const hex = input.slice(i + 1, i + 3);
+          if (isHexPair(hex)) {
+            const normalizedHex = hex.toUpperCase();
+            const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
+            if (decoded !== "." && isUnreserved(decoded)) {
+              output += decoded;
+            } else {
+              output += "%" + normalizedHex;
+            }
+            i += 2;
+            continue;
+          }
+        }
+        if (isPathCharacter(input[i])) {
+          output += input[i];
+        } else {
+          output += escape(input[i]);
+        }
       }
-      if (component.path !== void 0) {
-        component.path = func(component.path);
+      return output;
+    }
+    function escapePreservingEscapes(input) {
+      let output = "";
+      for (let i = 0; i < input.length; i++) {
+        if (input[i] === "%" && i + 2 < input.length) {
+          const hex = input.slice(i + 1, i + 3);
+          if (isHexPair(hex)) {
+            output += "%" + hex.toUpperCase();
+            i += 2;
+            continue;
+          }
+        }
+        output += escape(input[i]);
       }
-      if (component.query !== void 0) {
-        component.query = func(component.query);
-      }
-      if (component.fragment !== void 0) {
-        component.fragment = func(component.fragment);
-      }
-      return component;
+      return output;
     }
     function recomposeAuthority(component) {
       const uriTokens = [];
@@ -3335,7 +3388,7 @@ var require_utils = __commonJS({
           if (ipV6res.isIPV6 === true) {
             host = `[${ipV6res.escapedHost}]`;
           } else {
-            host = component.host;
+            host = reescapeHostDelimiters(host, false);
           }
         }
         uriTokens.push(host);
@@ -3349,7 +3402,10 @@ var require_utils = __commonJS({
     module.exports = {
       nonSimpleDomain,
       recomposeAuthority,
-      normalizeComponentEncoding,
+      reescapeHostDelimiters,
+      normalizePercentEncoding,
+      normalizePathEncoding,
+      escapePreservingEscapes,
       removeDotSegments,
       isIPv4,
       isUUID,
@@ -3573,12 +3629,12 @@ var require_schemes = __commonJS({
 var require_fast_uri = __commonJS({
   "node_modules/fast-uri/index.js"(exports, module) {
     "use strict";
-    var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizeComponentEncoding, isIPv4, nonSimpleDomain } = require_utils();
+    var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, escapePreservingEscapes, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = require_utils();
     var { SCHEMES, getSchemeHandler } = require_schemes();
     function normalize(uri, options) {
       if (typeof uri === "string") {
         uri = /** @type {T} */
-        serialize(parse3(uri, options), options);
+        normalizeString(uri, options);
       } else if (typeof uri === "object") {
         uri = /** @type {T} */
         parse3(serialize(uri, options), options);
@@ -3645,19 +3701,9 @@ var require_fast_uri = __commonJS({
       return target;
     }
     function equal(uriA, uriB, options) {
-      if (typeof uriA === "string") {
-        uriA = unescape(uriA);
-        uriA = serialize(normalizeComponentEncoding(parse3(uriA, options), true), { ...options, skipEscape: true });
-      } else if (typeof uriA === "object") {
-        uriA = serialize(normalizeComponentEncoding(uriA, true), { ...options, skipEscape: true });
-      }
-      if (typeof uriB === "string") {
-        uriB = unescape(uriB);
-        uriB = serialize(normalizeComponentEncoding(parse3(uriB, options), true), { ...options, skipEscape: true });
-      } else if (typeof uriB === "object") {
-        uriB = serialize(normalizeComponentEncoding(uriB, true), { ...options, skipEscape: true });
-      }
-      return uriA.toLowerCase() === uriB.toLowerCase();
+      const normalizedA = normalizeComparableURI(uriA, options);
+      const normalizedB = normalizeComparableURI(uriB, options);
+      return normalizedA !== void 0 && normalizedB !== void 0 && normalizedA.toLowerCase() === normalizedB.toLowerCase();
     }
     function serialize(cmpts, opts) {
       const component = {
@@ -3682,12 +3728,12 @@ var require_fast_uri = __commonJS({
       if (schemeHandler && schemeHandler.serialize) schemeHandler.serialize(component, options);
       if (component.path !== void 0) {
         if (!options.skipEscape) {
-          component.path = escape(component.path);
+          component.path = escapePreservingEscapes(component.path);
           if (component.scheme !== void 0) {
             component.path = component.path.split("%3A").join(":");
           }
         } else {
-          component.path = unescape(component.path);
+          component.path = normalizePercentEncoding(component.path);
         }
       }
       if (options.reference !== "suffix" && component.scheme) {
@@ -3722,7 +3768,16 @@ var require_fast_uri = __commonJS({
       return uriTokens.join("");
     }
     var URI_PARSE = /^(?:([^#/:?]+):)?(?:\/\/((?:([^#/?@]*)@)?(\[[^#/?\]]+\]|[^#/:?]*)(?::(\d*))?))?([^#?]*)(?:\?([^#]*))?(?:#((?:.|[\n\r])*))?/u;
-    function parse3(uri, opts) {
+    function getParseError(parsed, matches) {
+      if (matches[2] !== void 0 && parsed.path && parsed.path[0] !== "/") {
+        return 'URI path must start with "/" when authority is present.';
+      }
+      if (typeof parsed.port === "number" && (parsed.port < 0 || parsed.port > 65535)) {
+        return "URI port is malformed.";
+      }
+      return void 0;
+    }
+    function parseWithStatus(uri, opts) {
       const options = Object.assign({}, opts);
       const parsed = {
         scheme: void 0,
@@ -3733,6 +3788,7 @@ var require_fast_uri = __commonJS({
         query: void 0,
         fragment: void 0
       };
+      let malformedAuthorityOrPort = false;
       let isIP = false;
       if (options.reference === "suffix") {
         if (options.scheme) {
@@ -3752,6 +3808,11 @@ var require_fast_uri = __commonJS({
         parsed.fragment = matches[8];
         if (isNaN(parsed.port)) {
           parsed.port = matches[5];
+        }
+        const parseError = getParseError(parsed, matches);
+        if (parseError !== void 0) {
+          parsed.error = parsed.error || parseError;
+          malformedAuthorityOrPort = true;
         }
         if (parsed.host) {
           const ipv4result = isIPv4(parsed.host);
@@ -3779,7 +3840,7 @@ var require_fast_uri = __commonJS({
         if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport)) {
           if (parsed.host && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && nonSimpleDomain(parsed.host)) {
             try {
-              parsed.host = URL.domainToASCII(parsed.host.toLowerCase());
+              parsed.host = new URL("http://" + parsed.host).hostname;
             } catch (e) {
               parsed.error = parsed.error || "Host's domain name can not be converted to ASCII: " + e;
             }
@@ -3791,14 +3852,18 @@ var require_fast_uri = __commonJS({
               parsed.scheme = unescape(parsed.scheme);
             }
             if (parsed.host !== void 0) {
-              parsed.host = unescape(parsed.host);
+              parsed.host = reescapeHostDelimiters(unescape(parsed.host), isIP);
             }
           }
           if (parsed.path) {
-            parsed.path = escape(unescape(parsed.path));
+            parsed.path = normalizePathEncoding(parsed.path);
           }
           if (parsed.fragment) {
-            parsed.fragment = encodeURI(decodeURIComponent(parsed.fragment));
+            try {
+              parsed.fragment = encodeURI(decodeURIComponent(parsed.fragment));
+            } catch {
+              parsed.error = parsed.error || "URI malformed";
+            }
           }
         }
         if (schemeHandler && schemeHandler.parse) {
@@ -3807,7 +3872,29 @@ var require_fast_uri = __commonJS({
       } else {
         parsed.error = parsed.error || "URI can not be parsed.";
       }
-      return parsed;
+      return { parsed, malformedAuthorityOrPort };
+    }
+    function parse3(uri, opts) {
+      return parseWithStatus(uri, opts).parsed;
+    }
+    function normalizeString(uri, opts) {
+      return normalizeStringWithStatus(uri, opts).normalized;
+    }
+    function normalizeStringWithStatus(uri, opts) {
+      const { parsed, malformedAuthorityOrPort } = parseWithStatus(uri, opts);
+      return {
+        normalized: malformedAuthorityOrPort ? uri : serialize(parsed, opts),
+        malformedAuthorityOrPort
+      };
+    }
+    function normalizeComparableURI(uri, opts) {
+      if (typeof uri === "string") {
+        const { normalized, malformedAuthorityOrPort } = normalizeStringWithStatus(uri, opts);
+        return malformedAuthorityOrPort ? void 0 : normalized;
+      }
+      if (typeof uri === "object") {
+        return serialize(uri, opts);
+      }
     }
     var fastUri = {
       SCHEMES,
@@ -3947,7 +4034,7 @@ var require_core = __commonJS({
       constructor(opts = {}) {
         this.schemas = {};
         this.refs = {};
-        this.formats = {};
+        this.formats = /* @__PURE__ */ Object.create(null);
         this._compilations = /* @__PURE__ */ new Set();
         this._loading = {};
         this._cache = /* @__PURE__ */ new Map();
@@ -19864,10 +19951,9 @@ var ProgressTokenSchema = union([string2(), number2().int()]);
 var CursorSchema = string2();
 var TaskCreationParamsSchema = looseObject({
   /**
-   * Time in milliseconds to keep task results available after completion.
-   * If null, the task has unlimited lifetime until manually cleaned up.
+   * Requested duration in milliseconds to retain task from creation.
    */
-  ttl: union([number2(), _null3()]).optional(),
+  ttl: number2().optional(),
   /**
    * Time in milliseconds to wait between task status requests.
    */
@@ -20167,7 +20253,11 @@ var ClientCapabilitiesSchema = object2({
   /**
    * Present if the client supports task creation.
    */
-  tasks: ClientTasksCapabilitySchema.optional()
+  tasks: ClientTasksCapabilitySchema.optional(),
+  /**
+   * Extensions that the client supports. Keys are extension identifiers (vendor-prefix/extension-name).
+   */
+  extensions: record(string2(), AssertObjectSchema).optional()
 });
 var InitializeRequestParamsSchema = BaseRequestParamsSchema.extend({
   /**
@@ -20228,7 +20318,11 @@ var ServerCapabilitiesSchema = object2({
   /**
    * Present if the server supports task creation.
    */
-  tasks: ServerTasksCapabilitySchema.optional()
+  tasks: ServerTasksCapabilitySchema.optional(),
+  /**
+   * Extensions that the server supports. Keys are extension identifiers (vendor-prefix/extension-name).
+   */
+  extensions: record(string2(), AssertObjectSchema).optional()
 });
 var InitializeResultSchema = ResultSchema.extend({
   /**
@@ -20420,6 +20514,12 @@ var ResourceSchema = object2({
    * The MIME type of this resource, if known.
    */
   mimeType: optional(string2()),
+  /**
+   * The size of the raw resource content, in bytes (i.e., before base64 encoding or any tokenization), if known.
+   *
+   * This can be used by Hosts to display file sizes and estimate context window usage.
+   */
+  size: optional(number2()),
   /**
    * Optional annotations for the client.
    */
@@ -21604,6 +21704,10 @@ var Protocol = class {
     this._progressHandlers.clear();
     this._taskProgressTokens.clear();
     this._pendingDebouncedNotifications.clear();
+    for (const info of this._timeoutInfo.values()) {
+      clearTimeout(info.timeoutId);
+    }
+    this._timeoutInfo.clear();
     for (const controller of this._requestHandlerAbortControllers.values()) {
       controller.abort();
     }
@@ -21734,7 +21838,9 @@ var Protocol = class {
         await capturedTransport?.send(errorResponse);
       }
     }).catch((error2) => this._onerror(new Error(`Failed to send response: ${error2}`))).finally(() => {
-      this._requestHandlerAbortControllers.delete(request.id);
+      if (this._requestHandlerAbortControllers.get(request.id) === abortController) {
+        this._requestHandlerAbortControllers.delete(request.id);
+      }
     });
   }
   _onprogress(notification) {
@@ -23325,7 +23431,43 @@ async function queryBaseline(queryEmbedding) {
   return max;
 }
 
+// src/fact-category.ts
+var FACT_CATEGORIES = [
+  "decision",
+  "preference",
+  "pattern",
+  "knowledge",
+  "constraint"
+];
+var CATEGORY_SET = new Set(FACT_CATEGORIES);
+function normalizeFactCategory(raw) {
+  if (typeof raw === "string") {
+    const v2 = raw.trim().toLowerCase();
+    if (CATEGORY_SET.has(v2)) return v2;
+    if (v2 === "requirement" || v2 === "requirements") return "constraint";
+    if (v2.includes("|")) {
+      for (const part of v2.split("|")) {
+        const p = part.trim();
+        if (CATEGORY_SET.has(p)) return p;
+      }
+    }
+  }
+  return "knowledge";
+}
+var FACT_CATEGORY_CHECK_SQL = `category IN (${FACT_CATEGORIES.map((c) => `'${c}'`).join(",")})`;
+
+// src/types.ts
+var RELATION_TYPES = [
+  "INFLUENCES",
+  "SUPERSEDES",
+  "SUPPORTS",
+  "CONTRADICTS",
+  "DEPENDS_ON",
+  "DERIVED_FROM"
+];
+
 // src/db.ts
+var RELATION_TYPE_CHECK_SQL = `relation_type IN (${RELATION_TYPES.map((t) => `'${t}'`).join(",")})`;
 var VEC_INT8_SCALE = 127;
 var VEC_TABLES = /* @__PURE__ */ new Set(["vec_exchanges", "vec_facts", "vec_facts_kr", "vec_categories"]);
 function getVecTableDtype(db, table) {
@@ -23386,6 +23528,125 @@ function migrateSchema(db) {
     console.error("Migration complete.");
   }
 }
+function withForeignKeysOff(db, fn) {
+  const wasOn = db.pragma("foreign_keys", { simple: true }) === 1;
+  if (wasOn) db.pragma("foreign_keys = OFF");
+  try {
+    fn();
+  } finally {
+    if (wasOn) db.pragma("foreign_keys = ON");
+  }
+}
+function defaultClause(dfltValue) {
+  if (dfltValue == null) return "";
+  const v2 = dfltValue.trim();
+  const literal2 = /^['"(]|^-?\d/.test(v2) || /^(NULL|TRUE|FALSE|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP)$/i.test(v2);
+  return ` DEFAULT ${literal2 ? v2 : `(${v2})`}`;
+}
+function migrateRelationTypeVocabulary(db) {
+  const tbl = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='ontology_relations'`).get();
+  if (!tbl?.sql) return;
+  if (RELATION_TYPES.every((t) => tbl.sql.includes(`'${t}'`))) return;
+  const fks = db.pragma(`foreign_key_list('ontology_relations')`);
+  const isShippedFk = (fk) => fk.table === "facts" && (fk.from === "source_fact_id" || fk.from === "target_fact_id");
+  if (fks.some((fk) => !isShippedFk(fk))) {
+    console.error(
+      "ontology_relations vocabulary migration skipped: custom FOREIGN KEY present \u2014 legacy CHECK stays in place."
+    );
+    return;
+  }
+  const checkCount = (tbl.sql.match(/CHECK/gi) ?? []).length;
+  if (checkCount > 1 || /UNIQUE|GENERATED/i.test(tbl.sql)) {
+    console.error(
+      "ontology_relations vocabulary migration skipped: custom constraint DDL present \u2014 legacy CHECK stays in place (new relation types are rejected on this DB)."
+    );
+    return;
+  }
+  const cols = db.prepare(`SELECT name, type, "notnull" AS nn, dflt_value, pk FROM pragma_table_info('ontology_relations')`).all();
+  const attachedDdl = db.prepare(
+    `SELECT sql FROM sqlite_master WHERE tbl_name='ontology_relations' AND type IN ('index','trigger') AND sql IS NOT NULL`
+  ).all().map((r) => r.sql);
+  const hadShippedFk = (col) => fks.some((fk) => fk.table === "facts" && fk.from === col);
+  const rebuild = db.transaction(() => {
+    const defs = cols.map((c) => {
+      const base = `${c.name} ${c.type}${c.pk ? " PRIMARY KEY" : ""}${c.nn ? " NOT NULL" : ""}${defaultClause(c.dflt_value)}`;
+      if (c.name === "relation_type") return `${base} CHECK(${RELATION_TYPE_CHECK_SQL})`;
+      if ((c.name === "source_fact_id" || c.name === "target_fact_id") && hadShippedFk(c.name)) {
+        return `${base} REFERENCES facts(id)`;
+      }
+      return base;
+    });
+    const names = cols.map((c) => c.name).join(", ");
+    db.exec(`CREATE TABLE ontology_relations_vocab_rebuild (${defs.join(", ")})`);
+    db.exec(`INSERT INTO ontology_relations_vocab_rebuild (${names}) SELECT ${names} FROM ontology_relations`);
+    db.exec(`DROP TABLE ontology_relations`);
+    db.exec(`ALTER TABLE ontology_relations_vocab_rebuild RENAME TO ontology_relations`);
+    for (const ddl of attachedDdl) db.exec(ddl);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_source ON ontology_relations(source_fact_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_target ON ontology_relations(target_fact_id)`);
+  });
+  try {
+    withForeignKeysOff(db, () => rebuild.immediate());
+  } catch (error2) {
+    console.error("ontology_relations vocabulary migration failed \u2014 keeping legacy table:", error2);
+    return;
+  }
+  console.error("Migrated ontology_relations: vocabulary extended (DEPENDS_ON, DERIVED_FROM).");
+  try {
+    const dangling = db.pragma(`foreign_key_check('ontology_relations')`);
+    if (dangling.length > 0) {
+      console.error(
+        `ontology_relations: ${dangling.length} dangling relation rows reference missing facts (pre-existing; see PRAGMA foreign_key_check).`
+      );
+    }
+  } catch {
+  }
+}
+function migrateFactsCategoryVocabulary(db) {
+  const tbl = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facts'`).get();
+  if (!tbl?.sql) return;
+  const categoryNotNull = db.prepare(`SELECT "notnull" AS nn FROM pragma_table_info('facts') WHERE name = 'category'`).get()?.nn === 1;
+  if (/CHECK\s*\(\s*category\s+IN/i.test(tbl.sql) && FACT_CATEGORIES.every((c) => tbl.sql.includes(`'${c}'`)) && categoryNotNull) {
+    return;
+  }
+  const withoutOwnCheck = tbl.sql.replace(/CHECK\s*\(\s*category\s+IN\s*\([^)]*\)\s*\)/i, "");
+  if (/FOREIGN\s+KEY|REFERENCES|UNIQUE|CHECK|GENERATED/i.test(withoutOwnCheck)) {
+    console.error(
+      "facts.category migration skipped: custom constraint DDL on facts \u2014 vocabulary stays write-path-enforced only."
+    );
+    return;
+  }
+  const attachedDdl = db.prepare(
+    `SELECT sql FROM sqlite_master WHERE tbl_name='facts' AND type IN ('index','trigger') AND sql IS NOT NULL`
+  ).all().map((r) => r.sql);
+  const cols = db.prepare(`SELECT name, type, "notnull" AS nn, dflt_value, pk FROM pragma_table_info('facts')`).all();
+  const rebuild = db.transaction(() => {
+    const distinct = db.prepare(`SELECT DISTINCT category FROM facts`).all();
+    const update = db.prepare(`UPDATE facts SET category = ? WHERE category IS ?`);
+    for (const { category } of distinct) {
+      const normalized = normalizeFactCategory(category);
+      if (normalized !== category) update.run(normalized, category);
+    }
+    const defs = cols.map((c) => {
+      const notNull = c.name === "category" ? " NOT NULL" : c.nn ? " NOT NULL" : "";
+      const pk = c.pk ? " PRIMARY KEY" : "";
+      return `${c.name} ${c.type}${pk}${notNull}${defaultClause(c.dflt_value)}`;
+    });
+    const names = cols.map((c) => c.name).join(", ");
+    db.exec(`CREATE TABLE facts_vocab_rebuild (${defs.join(", ")}, CHECK (${FACT_CATEGORY_CHECK_SQL}))`);
+    db.exec(`INSERT INTO facts_vocab_rebuild (${names}) SELECT ${names} FROM facts`);
+    db.exec(`DROP TABLE facts`);
+    db.exec(`ALTER TABLE facts_vocab_rebuild RENAME TO facts`);
+    for (const ddl of attachedDdl) db.exec(ddl);
+  });
+  try {
+    withForeignKeysOff(db, () => rebuild.immediate());
+  } catch (error2) {
+    console.error("facts.category vocabulary migration failed \u2014 keeping legacy table:", error2);
+    return;
+  }
+  console.error("Migrated facts.category: vocabulary normalized, CHECK constraint added.");
+}
 function initDatabase() {
   const dbPath = getDbPath();
   const dbDir = path2.dirname(dbPath);
@@ -23396,6 +23657,7 @@ function initDatabase() {
   sqliteVec.load(db);
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 5000");
+  db.pragma("foreign_keys = ON");
   db.pragma("journal_size_limit = 67108864");
   db.pragma("recursive_triggers = ON");
   db.exec(`
@@ -23506,7 +23768,7 @@ function initDatabase() {
     CREATE TABLE IF NOT EXISTS facts (
       id TEXT PRIMARY KEY,
       fact TEXT NOT NULL,
-      category TEXT,
+      category TEXT NOT NULL CHECK (${FACT_CATEGORY_CHECK_SQL}),
       scope_type TEXT NOT NULL DEFAULT 'project',
       scope_project TEXT,
       source_exchange_ids TEXT,
@@ -23601,6 +23863,9 @@ function initDatabase() {
   if (!factColumnNames.has("ontology_last_attempt_at")) {
     db.prepare("ALTER TABLE facts ADD COLUMN ontology_last_attempt_at TEXT").run();
   }
+  if (!factColumnNames.has("confidence")) {
+    db.prepare("ALTER TABLE facts ADD COLUMN confidence REAL").run();
+  }
   const exchangeColumns = db.prepare(
     `SELECT name FROM pragma_table_info('exchanges')`
   ).all();
@@ -23611,7 +23876,7 @@ function initDatabase() {
     CREATE TABLE IF NOT EXISTS ontology_relations (
       id TEXT PRIMARY KEY,
       source_fact_id TEXT NOT NULL REFERENCES facts(id),
-      relation_type TEXT NOT NULL CHECK(relation_type IN ('INFLUENCES','SUPERSEDES','SUPPORTS','CONTRADICTS')),
+      relation_type TEXT NOT NULL CHECK(${RELATION_TYPE_CHECK_SQL}),
       target_fact_id TEXT NOT NULL REFERENCES facts(id),
       reasoning TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -23643,6 +23908,8 @@ function initDatabase() {
       saved INTEGER NOT NULL DEFAULT 0
     )
   `);
+  migrateRelationTypeVocabulary(db);
+  migrateFactsCategoryVocabulary(db);
   autoHealScopeProjects(db);
   return db;
 }
@@ -23738,7 +24005,8 @@ function rowToFact(row) {
     consolidated_count: row["consolidated_count"],
     is_active: Boolean(row["is_active"]),
     ontology_category_id: row["ontology_category_id"] ?? null,
-    coding_agent: row["coding_agent"] ?? null
+    coding_agent: row["coding_agent"] ?? null,
+    confidence: row["confidence"] ?? null
   };
 }
 
@@ -23751,11 +24019,6 @@ function listCategories(db, domainId) {
     return db.prepare(`SELECT * FROM ontology_categories WHERE domain_id = ? ORDER BY name`).all(domainId);
   }
   return db.prepare(`SELECT * FROM ontology_categories ORDER BY name`).all();
-}
-function getFactsByCategory(db, categoryId) {
-  return db.prepare(
-    `SELECT * FROM facts WHERE ontology_category_id = ? AND is_active = 1 ORDER BY consolidated_count DESC`
-  ).all(categoryId).map(rowToFact2);
 }
 function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance = 0.2, scopeProject) {
   const visited = /* @__PURE__ */ new Set([factId]);
@@ -23790,7 +24053,7 @@ function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance = 0.2, 
         let chosen = null;
         for (const row of rows) {
           const relation = rowToRelation(row);
-          const typeWeight = relation.relation_type === "SUPPORTS" || relation.relation_type === "INFLUENCES" ? 1 : 0.7;
+          const typeWeight = relation.relation_type === "CONTRADICTS" || relation.relation_type === "SUPERSEDES" ? 0.7 : 1;
           const relevance = hopRelevance * typeWeight;
           if (relevance >= minRelevance) {
             chosen = { relation, relevance };
@@ -23826,7 +24089,7 @@ function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance = 0.2, 
         let chosen = null;
         for (const row of rows) {
           const relation = rowToRelation(row);
-          const typeWeight = relation.relation_type === "SUPPORTS" || relation.relation_type === "INFLUENCES" ? 1 : 0.7;
+          const typeWeight = relation.relation_type === "CONTRADICTS" || relation.relation_type === "SUPERSEDES" ? 0.7 : 1;
           const relevance = hopRelevance * typeWeight;
           if (relevance >= minRelevance) {
             chosen = { relation, relevance };
@@ -23844,23 +24107,6 @@ function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance = 0.2, 
   }
   results.sort((a, b2) => b2.relevance - a.relevance);
   return results;
-}
-function getOntologyTree(db) {
-  const domains = listDomains(db);
-  const tree = [];
-  for (const domain of domains) {
-    const categories = listCategories(db, domain.id);
-    const domainEntry = {
-      domain,
-      categories: []
-    };
-    for (const category of categories) {
-      const facts = getFactsByCategory(db, category.id);
-      domainEntry.categories.push({ category, facts });
-    }
-    tree.push(domainEntry);
-  }
-  return tree;
 }
 function rowToFact2(row) {
   const embeddingRaw = row["embedding"];
@@ -26125,6 +26371,200 @@ ${JSON.stringify(value, null, 2)}
   return output;
 }
 
+// src/ontology-view.ts
+var DEFAULT_FACT_LIMIT = 5;
+var MAX_FACT_LIMIT = 50;
+var MAX_CATEGORIES_RENDERED = 40;
+var MAX_RELATIONS_PER_FACT = 5;
+function inert(value, max = 300) {
+  if (!value) return "";
+  return value.replace(/\s+/g, " ").trim().slice(0, max);
+}
+function listCategoryFacts(db, categoryId, limit) {
+  return db.prepare(
+    `SELECT id, fact, category, consolidated_count, created_at
+       FROM facts
+       WHERE ontology_category_id = ? AND is_active = 1
+       ORDER BY consolidated_count DESC, created_at DESC
+       LIMIT ?`
+  ).all(categoryId, limit);
+}
+function countCategoryFacts(db, categoryId) {
+  return db.prepare(`SELECT COUNT(*) AS n FROM facts WHERE ontology_category_id = ? AND is_active = 1`).get(categoryId).n;
+}
+function buildOntologyView(db, opts) {
+  const domainFilter = opts.domain?.trim().toLowerCase() || void 0;
+  const categoryFilter = opts.category?.trim().toLowerCase() || void 0;
+  if (!domainFilter && !categoryFilter) return buildSummary(db);
+  const rawLimit = opts.limit ?? DEFAULT_FACT_LIMIT;
+  const limit = Math.max(1, Math.min(MAX_FACT_LIMIT, Math.floor(rawLimit)));
+  return buildDetail(db, domainFilter, categoryFilter, limit, opts.includeRelations === true);
+}
+function buildSummary(db) {
+  const activeFacts = db.prepare("SELECT COUNT(*) AS n FROM facts WHERE is_active = 1").get().n;
+  const classified = db.prepare("SELECT COUNT(*) AS n FROM facts WHERE is_active = 1 AND ontology_category_id IS NOT NULL").get().n;
+  const totalCategories = db.prepare("SELECT COUNT(*) AS n FROM ontology_categories").get().n;
+  const domains = db.prepare(
+    `SELECT d.name, d.description,
+              COUNT(DISTINCT c.id) AS categories,
+              COUNT(f.id) AS facts
+       FROM ontology_domains d
+       LEFT JOIN ontology_categories c ON c.domain_id = d.id
+       LEFT JOIN facts f ON f.ontology_category_id = c.id AND f.is_active = 1
+       GROUP BY d.id
+       ORDER BY facts DESC, d.name`
+  ).all();
+  let out = `# Ontology Summary
+
+`;
+  out += `| Metric | Count |
+|--------|-------|
+`;
+  out += `| Active facts | ${activeFacts} |
+`;
+  out += `| Classified facts | ${classified} |
+`;
+  out += `| Domains | ${domains.length} |
+`;
+  out += `| Categories | ${totalCategories} |
+
+`;
+  if (domains.length === 0) {
+    out += `_No ontology data found. Facts are classified automatically as they are extracted._
+`;
+    return out;
+  }
+  out += `## Domains (by fact count)
+
+`;
+  for (const d2 of domains) {
+    out += `- **${inert(d2.name, 80)}** \u2014 ${d2.categories} categories, ${d2.facts} facts`;
+    if (d2.description) out += ` \xB7 ${inert(d2.description, 160)}`;
+    out += "\n";
+  }
+  out += `
+_Facts are not listed in summary mode. Pass \`domain\` and/or \`category\` to list facts (\`limit\` caps facts per category, default ${DEFAULT_FACT_LIMIT})._
+`;
+  return out;
+}
+function buildDetail(db, domainFilter, categoryFilter, limit, includeRelations) {
+  const domains = listDomains(db).filter(
+    (d2) => !domainFilter || d2.name.toLowerCase().includes(domainFilter)
+  );
+  const matches = [];
+  for (const domain of domains) {
+    for (const category of listCategories(db, domain.id)) {
+      if (categoryFilter && !category.name.toLowerCase().includes(categoryFilter)) continue;
+      matches.push({
+        domainName: domain.name,
+        domainDescription: domain.description,
+        categoryId: category.id,
+        categoryName: category.name,
+        categoryDescription: category.description
+      });
+    }
+  }
+  let out = `# Ontology Tree
+
+`;
+  if (matches.length === 0) {
+    out += `_No ontology data matched the filters (domain: ${domainFilter ?? "-"}, category: ${categoryFilter ?? "-"})._
+`;
+    return out;
+  }
+  const rendered = matches.slice(0, MAX_CATEGORIES_RENDERED);
+  let currentDomain = null;
+  for (const m2 of rendered) {
+    if (m2.domainName !== currentDomain) {
+      currentDomain = m2.domainName;
+      out += `## ${inert(m2.domainName, 80)}
+`;
+      if (m2.domainDescription) out += `> ${inert(m2.domainDescription, 200)}
+`;
+      out += "\n";
+    }
+    const total = countCategoryFacts(db, m2.categoryId);
+    const facts = listCategoryFacts(db, m2.categoryId, limit);
+    out += `### ${inert(m2.categoryName, 80)}`;
+    if (m2.categoryDescription) out += ` \u2014 ${inert(m2.categoryDescription, 200)}`;
+    out += `
+(showing ${facts.length} of ${total} facts)
+
+`;
+    for (const fact of facts) {
+      out += `- **[${fact.category}]** ${inert(fact.fact)}
+`;
+      out += `  - ID: ${fact.id} | Confirmed: ${fact.consolidated_count}x | ${fact.created_at.slice(0, 10)}
+`;
+      if (includeRelations) {
+        const related = getRelatedFacts(db, fact.id, 1);
+        for (const { fact: relFact, relation } of related.slice(0, MAX_RELATIONS_PER_FACT)) {
+          out += `  - \u2194 [${relation.relation_type}] "${inert(relFact.fact, 160)}"
+`;
+        }
+        if (related.length > MAX_RELATIONS_PER_FACT) {
+          out += `  - _\u2026+${related.length - MAX_RELATIONS_PER_FACT} more relations (use explore_graph for full traversal)._
+`;
+        }
+      }
+    }
+    if (total > facts.length) {
+      out += `  _\u2026+${total - facts.length} more facts in this category (raise \`limit\` or narrow the filter)._
+`;
+    }
+    out += "\n";
+  }
+  if (matches.length > rendered.length) {
+    out += `
+_\u2026+${matches.length - rendered.length} more categories matched \u2014 narrow \`domain\`/\`category\` to see them._
+`;
+  }
+  return out;
+}
+
+// src/consistency.ts
+function countActiveActive(db, type) {
+  return db.prepare(
+    `SELECT COUNT(*) AS n
+         FROM ontology_relations r
+         JOIN facts a ON a.id = r.source_fact_id
+         JOIN facts b ON b.id = r.target_fact_id
+         WHERE r.relation_type = ? AND a.is_active = 1 AND b.is_active = 1`
+  ).get(type).n;
+}
+function getConsistencyCounts(db) {
+  const activeFacts = db.prepare("SELECT COUNT(*) AS n FROM facts WHERE is_active = 1").get().n;
+  const orphanFacts = db.prepare(
+    `SELECT COUNT(*) AS n FROM facts f
+         WHERE f.is_active = 1
+           AND NOT EXISTS (
+             SELECT 1 FROM ontology_relations r
+             WHERE r.source_fact_id = f.id OR r.target_fact_id = f.id
+           )`
+  ).get().n;
+  const totalCategories = db.prepare("SELECT COUNT(*) AS n FROM ontology_categories").get().n;
+  const singleFactCategories = db.prepare(
+    `SELECT COUNT(*) AS n FROM (
+           SELECT ontology_category_id FROM facts
+           WHERE is_active = 1 AND ontology_category_id IS NOT NULL
+           GROUP BY ontology_category_id
+           HAVING COUNT(*) = 1
+         )`
+  ).get().n;
+  return {
+    activeFacts,
+    activeContradictsPairs: countActiveActive(db, "CONTRADICTS"),
+    activeSupersedesPairs: countActiveActive(db, "SUPERSEDES"),
+    orphanFacts,
+    orphanRate: activeFacts > 0 ? orphanFacts / activeFacts : 0,
+    totalCategories,
+    singleFactCategories
+  };
+}
+function hasActiveConflicts(counts) {
+  return counts.activeContradictsPairs + counts.activeSupersedesPairs > 0;
+}
+
 // src/llm.ts
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import fs7 from "node:fs";
@@ -26402,7 +26842,8 @@ var SearchFactsInputSchema = external_exports.object({
 var SearchOntologyInputSchema = external_exports.object({
   domain: external_exports.string().optional().describe("Filter by domain name (case-insensitive partial match)"),
   category: external_exports.string().optional().describe("Filter by category name (case-insensitive partial match)"),
-  include_relations: external_exports.boolean().default(false).describe("Include 1-hop fact relations")
+  include_relations: external_exports.boolean().default(false).describe("Include 1-hop fact relations"),
+  limit: external_exports.number().int().min(1).max(50).optional().describe("Max facts listed per category (default 5; only applies with domain/category filters)")
 }).strict();
 var AskAvatarInputSchema = external_exports.object({
   question: external_exports.string().min(2, "Question must be at least 2 characters").max(1e4, "Question too long (max 10000 chars)").describe("Question to ask"),
@@ -26509,13 +26950,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "search_ontology",
-        description: "Browse the ontology hierarchy (Domain > Category > Facts). Use to understand how past decisions are organized, or to find all facts in a specific domain/category.",
+        description: "Browse the ontology hierarchy (Domain > Category > Facts). Unfiltered calls return a bounded summary (counts only, no fact lines); pass domain and/or category to list facts. Use to understand how past decisions are organized, or to find all facts in a specific domain/category.",
         inputSchema: {
           type: "object",
           properties: {
             domain: { type: "string", description: "Filter by domain name (partial, case-insensitive)" },
             category: { type: "string", description: "Filter by category name (partial, case-insensitive)" },
-            include_relations: { type: "boolean", default: false, description: "Include 1-hop relations for each fact" }
+            include_relations: { type: "boolean", default: false, description: "Include 1-hop relations for each fact" },
+            limit: { type: "number", minimum: 1, maximum: 50, description: "Max facts listed per category (default 5; only applies with domain/category filters)" }
           },
           additionalProperties: false
         },
@@ -26781,7 +27223,8 @@ Results: ${filtered.length}
           const factAgent = fact.coding_agent || "claude-code";
           output += `- Scope: ${fact.scope_type}${fact.scope_project ? ` (${fact.scope_project})` : ""} | Agent: ${factAgent}
 `;
-          output += `- Confirmed: ${fact.consolidated_count}x | Similarity: ${similarity}
+          const confidenceLabel = fact.confidence != null ? ` | Extraction confidence: ${fact.confidence.toFixed(2)}` : "";
+          output += `- Confirmed: ${fact.consolidated_count}x | Similarity: ${similarity}${confidenceLabel}
 `;
           if (domainName) output += `- Ontology: ${domainName}/${catName}
 `;
@@ -26824,60 +27267,17 @@ Results: ${filtered.length}
       const params = SearchOntologyInputSchema.parse(args);
       try {
         const db = initDatabase();
-        const tree = getOntologyTree(db);
-        const domainFilter = params.domain?.toLowerCase();
-        const categoryFilter = params.category?.toLowerCase();
-        const filtered = tree.filter((entry) => {
-          if (domainFilter && !entry.domain.name.toLowerCase().includes(domainFilter)) return false;
-          return true;
-        });
-        let output = `# Ontology Tree
-
-`;
-        if (filtered.length === 0) {
-          output += "_No ontology data found. Facts are classified automatically as they are extracted._\n";
-        }
-        for (const { domain, categories } of filtered) {
-          output += `## ${domain.name}
-`;
-          if (domain.description) output += `> ${domain.description}
-`;
-          output += "\n";
-          const filteredCategories = categories.filter(({ category }) => {
-            if (categoryFilter && !category.name.toLowerCase().includes(categoryFilter)) return false;
-            return true;
+        try {
+          const output = buildOntologyView(db, {
+            domain: params.domain,
+            category: params.category,
+            includeRelations: params.include_relations,
+            limit: params.limit
           });
-          if (filteredCategories.length === 0) {
-            output += "_No matching categories._\n\n";
-            continue;
-          }
-          for (const { category, facts } of filteredCategories) {
-            output += `### ${category.name}`;
-            if (category.description) output += ` \u2014 ${category.description}`;
-            output += `
-(${facts.length} facts)
-
-`;
-            for (const fact of facts) {
-              output += `- **[${fact.category}]** ${fact.fact}
-`;
-              output += `  - ID: ${fact.id} | Confirmed: ${fact.consolidated_count}x | ${fact.created_at.slice(0, 10)}
-`;
-              if (params.include_relations) {
-                const related = getRelatedFacts(db, fact.id, 1);
-                if (related.length > 0) {
-                  for (const { fact: relFact, relation } of related) {
-                    output += `  - \u2194 [${relation.relation_type}] "${relFact.fact}"
-`;
-                  }
-                }
-              }
-            }
-            output += "\n";
-          }
+          return { content: [{ type: "text", text: output }] };
+        } finally {
+          db.close();
         }
-        db.close();
-        return { content: [{ type: "text", text: output }] };
       } catch (error2) {
         return {
           content: [{ type: "text", text: handleError(error2) }],
@@ -27088,6 +27488,24 @@ _Source exchanges not available._
 `;
           output += "\n";
         }
+        const health = getConsistencyCounts(db);
+        output += `## Graph Health
+
+`;
+        output += `- Orphan facts (no relations): ${health.orphanFacts} / ${health.activeFacts} (${(health.orphanRate * 100).toFixed(1)}%)
+`;
+        output += `- Active CONTRADICTS pairs (both sides still active): ${health.activeContradictsPairs}
+`;
+        output += `- Active SUPERSEDES pairs (superseded fact still active): ${health.activeSupersedesPairs}
+`;
+        output += `- Single-fact categories: ${health.singleFactCategories} / ${health.totalCategories}
+`;
+        if (hasActiveConflicts(health)) {
+          output += `
+_Resolution queue available: run \`memory-bank consistency\` (\`--gate\` exits non-zero on violations)._
+`;
+        }
+        output += "\n";
         return { content: [{ type: "text", text: output }] };
       } catch (error2) {
         return { content: [{ type: "text", text: handleError(error2) }], isError: true };
