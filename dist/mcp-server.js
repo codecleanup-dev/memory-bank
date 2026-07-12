@@ -24942,6 +24942,8 @@ function injectSocketPath() {
 }
 function startInjectDaemon() {
   const sockPath = injectSocketPath();
+  const MAX_INFLIGHT = 4;
+  let inflight = 0;
   const server2 = net.createServer((conn) => {
     let buf = "";
     let handled = false;
@@ -24958,6 +24960,14 @@ function startInjectDaemon() {
       }
       handled = true;
       const line = buf.slice(0, nl);
+      if (inflight >= MAX_INFLIGHT) {
+        try {
+          conn.end(JSON.stringify({ ok: false }) + "\n");
+        } catch {
+        }
+        return;
+      }
+      inflight++;
       void (async () => {
         try {
           const req = JSON.parse(line);
@@ -24972,6 +24982,8 @@ function startInjectDaemon() {
             conn.end(JSON.stringify({ ok: false }) + "\n");
           } catch {
           }
+        } finally {
+          inflight--;
         }
       })();
     });
@@ -24998,6 +25010,10 @@ function startInjectDaemon() {
     });
   };
   try {
+    try {
+      fs6.chmodSync(getIndexDir(), 448);
+    } catch {
+    }
     server2.listen(sockPath, onListen);
     server2.unref();
   } catch {

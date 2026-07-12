@@ -33,6 +33,14 @@ export function injectSocketPath(): string {
 export function startInjectDaemon(): void {
   const sockPath = injectSocketPath();
 
+  // [fork] Global in-flight cap: each request runs an embedding+search on the
+  // MCP server's thread pool; unbounded concurrent connections would let one
+  // runaway same-user client degrade every session. Over the cap we answer
+  // {ok:false} immediately — the thin client cold-falls-back in its own
+  // process, so the MCP server itself stays responsive.
+  const MAX_INFLIGHT = 4;
+  let inflight = 0;
+
   const server = net.createServer((conn) => {
     let buf = '';
     // [fork] one request per connection, enforced: without this, any data
@@ -53,6 +61,11 @@ export function startInjectDaemon(): void {
       }
       handled = true;
       const line = buf.slice(0, nl);
+      if (inflight >= MAX_INFLIGHT) {
+        try { conn.end(JSON.stringify({ ok: false }) + '\n'); } catch { /* gone */ }
+        return;
+      }
+      inflight++;
       void (async () => {
         try {
           const req = JSON.parse(line) as { prompt?: string; cwd?: string };
@@ -64,6 +77,8 @@ export function startInjectDaemon(): void {
           conn.end(JSON.stringify({ ok: true, context }) + '\n');
         } catch {
           try { conn.end(JSON.stringify({ ok: false }) + '\n'); } catch { /* gone */ }
+        } finally {
+          inflight--;
         }
       })();
     });
@@ -91,6 +106,13 @@ export function startInjectDaemon(): void {
   };
 
   try {
+    // [fork] Close the bind→chmod race at the directory level: listen()
+    // creates the socket with umask-derived perms for a moment before the
+    // 0600 chmod lands. The index dir also holds the private conversation DB
+    // (found live at 0755 dir / 0644 db — world-readable), so 0700 here is
+    // the real boundary: no traversal for other users means neither the
+    // pre-chmod socket nor the DB is reachable during (or after) the window.
+    try { fs.chmodSync(getIndexDir(), 0o700); } catch { /* best-effort */ }
     server.listen(sockPath, onListen);
     server.unref();
   } catch { /* sidecar is best-effort */ }
