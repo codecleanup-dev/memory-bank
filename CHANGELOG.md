@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-07-12
+
+_Fork release: merges upstream v1.3.4 + post-tag autoresearch fixes (iter18~38,
+merged at 0b879d2 — the pre-galaxy "drain complete" baseline; its 1.3.4 section
+below), plus fork-side hook-runtime hardening._
+
+Version jumps 1.4.2 -> 1.5.0: upstream published its own v1.4.0-v1.4.3 while this
+release was in flight, so the fork leaves the 1.4.x namespace to avoid two
+different codebases sharing a version string.
+
+### Added (fork)
+- **`cli/node-pin.sh`** — single bash launcher that resolves the pinned runtime
+  for every session-hook entry (same contract as the MCP wrapper:
+  `MEMORY_BANK_NODE_BIN` -> `memory-bank.env` pin (allowlisted) -> `.nvmrc` ->
+  PATH). All 5 `hooks.json` commands and the inject cold-fallback now go
+  through it — bare PATH `node` in hooks was the remaining ABI-split surface
+  (2026-07-05 / 2026-07-09 class). Regression tests in
+  `test/node-pin-resolution.test.ts`.
+- **Codex x worker-prompt seam test** (`test/codex-worker-prompt.test.ts`) —
+  pins that upstream's `isWorkerPromptMessage` guard (v1.3.4) also fires for
+  exchanges produced by the fork-only codex discovery path.
+- **upstream-watch release-tag alerts** — a new upstream `v*` tag now raises an
+  emphasized notification (head-only alerts let 48 commits pile up silently
+  between v1.3.3 and v1.3.4).
+
+### Merged (upstream v1.3.4 + iter18~38, see 1.3.4 section below)
+- Warm inject daemon (per-prompt ~2.3s -> ~0.2s), fact/category vector int8
+  (25.4 -> 3.8ms), reembed stamp-vector self-heal + spawn-condition fixes,
+  formatResults 199~1600ms -> 26ms, WAL `journal_size_limit` 64MiB, pollution
+  predicate single-source + `purge-llm-sessions` script, DRY/test hardening.
+- Excluded for now: 3D Knowledge Galaxy (`ui/relations/`) — the fork operates a
+  separate visualization stack (knowledge-graph-viz); re-evaluate next sync.
+- `src/sync-import.ts` upstream delta hand-ported (ancestor had raw NUL bytes ->
+  git binary merge): dtype-aware vec inserts + unicode-escape contentKey
+  separator, applied on top of the fork's per-fact atomic transaction shape.
+
 ## [1.4.2] - 2026-07-08
 
 _Fork release: ships the ontology work below compiled into dist, and merges
