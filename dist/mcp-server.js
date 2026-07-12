@@ -24942,6 +24942,8 @@ function injectSocketPath() {
 }
 function startInjectDaemon() {
   const sockPath = injectSocketPath();
+  if (process.platform === "win32") return;
+  const selfUid = typeof process.getuid === "function" ? process.getuid() : -1;
   const MAX_INFLIGHT = 4;
   let inflight = 0;
   const server2 = net.createServer((conn) => {
@@ -25004,16 +25006,24 @@ function startInjectDaemon() {
   const onListen = () => {
     try {
       fs6.chmodSync(sockPath, 384);
+      const st = fs6.statSync(sockPath);
+      if ((st.mode & 511) !== 384 || st.uid !== selfUid) throw new Error("socket perms");
     } catch {
+      try {
+        server2.close();
+        fs6.unlinkSync(sockPath);
+      } catch {
+      }
+      return;
     }
     void initEmbeddings().catch(() => {
     });
   };
   try {
-    try {
-      fs6.chmodSync(getIndexDir(), 448);
-    } catch {
-    }
+    const dir = getIndexDir();
+    fs6.chmodSync(dir, 448);
+    const dst = fs6.statSync(dir);
+    if ((dst.mode & 511) !== 448 || dst.uid !== selfUid) return;
     server2.listen(sockPath, onListen);
     server2.unref();
   } catch {

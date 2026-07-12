@@ -29,6 +29,12 @@ export function injectSocketPath() {
 }
 export function startInjectDaemon() {
     const sockPath = injectSocketPath();
+    // POSIX-only hardening surface: mode bits + uid are meaningless on win32
+    // (and process.getuid does not exist there) — the daemon itself is a unix-
+    // socket design, so simply don't serve on win32.
+    if (process.platform === 'win32')
+        return;
+    const selfUid = typeof process.getuid === 'function' ? process.getuid() : -1;
     // [fork] Global in-flight cap: each request runs an embedding+search on the
     // MCP server's thread pool; unbounded concurrent connections would let one
     // runaway same-user client degrade every session. Over the cap we answer
@@ -100,10 +106,23 @@ export function startInjectDaemon() {
         });
     });
     const onListen = () => {
+        // [fork] Fail closed: the daemon serves private facts, so if the socket
+        // can't be verified at 0600/self-owned, don't serve at all — the client
+        // sees no daemon and every prompt takes the cold path (status quo ante).
         try {
             fs.chmodSync(sockPath, 0o600);
+            const st = fs.statSync(sockPath);
+            if ((st.mode & 0o777) !== 0o600 || st.uid !== selfUid)
+                throw new Error('socket perms');
         }
-        catch { /* best-effort */ }
+        catch {
+            try {
+                server.close();
+                fs.unlinkSync(sockPath);
+            }
+            catch { /* already gone */ }
+            return;
+        }
         // Pre-warm the embedding model so even the FIRST prompt after session
         // start gets the fast path (load happens once, off the request path).
         void initEmbeddings().catch(() => { });
@@ -115,12 +134,15 @@ export function startInjectDaemon() {
         // (found live at 0755 dir / 0644 db — world-readable), so 0700 here is
         // the real boundary: no traversal for other users means neither the
         // pre-chmod socket nor the DB is reachable during (or after) the window.
-        try {
-            fs.chmodSync(getIndexDir(), 0o700);
-        }
-        catch { /* best-effort */ }
+        // Fail closed (same rationale as the socket check): if the directory
+        // can't be verified at 0700/self-owned, the daemon does not start.
+        const dir = getIndexDir();
+        fs.chmodSync(dir, 0o700);
+        const dst = fs.statSync(dir);
+        if ((dst.mode & 0o777) !== 0o700 || dst.uid !== selfUid)
+            return;
         server.listen(sockPath, onListen);
         server.unref();
     }
-    catch { /* sidecar is best-effort */ }
+    catch { /* sidecar is best-effort — cold path still works */ }
 }
