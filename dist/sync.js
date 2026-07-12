@@ -197,6 +197,17 @@ export async function syncConversations(sourceDir, destDir, options = {}) {
                 });
             }
         }
+        // [fork] Active WAL reclaim at the end of this batch writer:
+        // journal_size_limit only truncates after a checkpoint actually resets the
+        // WAL, and long-lived MCP readers can keep deferring auto-checkpoints
+        // while a big sync commits thousands of writes. One explicit TRUNCATE
+        // attempt here (best-effort — skipped harmlessly if a reader holds a
+        // mark) mirrors the reembed worker's periodic truncate for the other
+        // heavy writer in the system.
+        try {
+            db.pragma('wal_checkpoint(TRUNCATE)');
+        }
+        catch { /* reader active — next writer retries */ }
         db.close();
     }
     // Generate summaries for files that need them

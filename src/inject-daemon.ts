@@ -59,11 +59,13 @@ export function startInjectDaemon(): void {
     conn.on('data', (chunk) => {
       if (handled) return; // request already consumed — protocol is 1 line per conn
       buf += chunk.toString('utf8');
+      // [fork] Length gate BEFORE newline handling: a single chunk carrying a
+      // huge line + newline used to skip the cap entirely (the check lived
+      // only in the no-newline branch) and feed attacker-sized JSON straight
+      // into parse/embed inside the MCP process.
+      if (buf.length > 1_000_000) { conn.destroy(); return; } // absurd request — drop
       const nl = buf.indexOf('\n');
-      if (nl < 0) {
-        if (buf.length > 1_000_000) conn.destroy(); // absurd request — drop
-        return;
-      }
+      if (nl < 0) return;
       handled = true;
       const line = buf.slice(0, nl);
       if (inflight >= MAX_INFLIGHT) {

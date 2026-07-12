@@ -24955,11 +24955,12 @@ function startInjectDaemon() {
     conn.on("data", (chunk) => {
       if (handled) return;
       buf += chunk.toString("utf8");
-      const nl = buf.indexOf("\n");
-      if (nl < 0) {
-        if (buf.length > 1e6) conn.destroy();
+      if (buf.length > 1e6) {
+        conn.destroy();
         return;
       }
+      const nl = buf.indexOf("\n");
+      if (nl < 0) return;
       handled = true;
       const line = buf.slice(0, nl);
       if (inflight >= MAX_INFLIGHT) {
