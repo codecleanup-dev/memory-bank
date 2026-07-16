@@ -4,6 +4,7 @@ import {
   parseLockMeta,
   decideTakeover,
   staleWorkerVersion,
+  isSyncCliCommand,
 } from '../src/version-guard.js';
 
 const CACHE = '/Users/u/.claude/plugins/cache/memory-bank-dev/memory-bank';
@@ -118,5 +119,21 @@ describe('staleWorkerVersion', () => {
   it('matches with an absolute node path and node flags', () => {
     expect(staleWorkerVersion(`/usr/local/bin/node --max-old-space-size=4096 ${CACHE}/1.3.3/scripts/reembed-worker.js`, '1.4.4')).toBe('1.3.3');
     expect(staleWorkerVersion(`/Users/u/.nvm/versions/node/v22.22.3/bin/node ${CACHE}/1.4.0/dist/sync-cli.js --background`, '1.4.4')).toBe('1.4.0');
+  });
+});
+
+describe('isSyncCliCommand (pid-recycle kill gate)', () => {
+  it('matches real sync-cli holders', () => {
+    expect(isSyncCliCommand('node /Users/u/.claude/plugins/cache/memory-bank-dev/memory-bank/1.5.0/dist/sync-cli.js')).toBe(true);
+    expect(isSyncCliCommand('/usr/local/bin/node --max-old-space-size=4096 /repo/memory-bank/dist/sync-cli.js --background')).toBe(true);
+    expect(isSyncCliCommand('node /repo/memory-bank/cli/memory-bank.js sync --background')).toBe(true);
+  });
+
+  it('never matches recycled pids that merely carry the substrings as data', () => {
+    expect(isSyncCliCommand('node /tmp/sync-cli-helper.js memory-bank')).toBe(false); // reviewer repro
+    expect(isSyncCliCommand('vim /repo/memory-bank/dist/sync-cli.js')).toBe(false);
+    expect(isSyncCliCommand('node /repo/app.js /x/dist/sync-cli.js')).toBe(false); // later arg, not the script
+    expect(isSyncCliCommand('node /repo/memory-bank/cli/memory-bank.js search sync-cli')).toBe(false); // wrong subcommand
+    expect(isSyncCliCommand('grep -r sync-cli /repo/memory-bank')).toBe(false);
   });
 });

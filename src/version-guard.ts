@@ -97,6 +97,22 @@ export function decideTakeover(
 const WORKER_RE =
   /^\s*(?:\S*\/)?node(?:js)?(?:\s+--\S+)*\s+\S*plugins\/cache\/memory-bank-dev\/memory-bank\/(\d+(?:\.\d+)*)\/(?:dist\/sync-cli\.js|scripts\/(?:backfill-extract-worker|backfill-ontology-worker|fact-consolidate-worker|fact-extract-worker|reembed-worker)\.js)(?:\s|$)/;
 
+
+/**
+ * True if a ps command line IS a running memory-bank sync-cli — anchored the
+ * same way as WORKER_RE: the executable must be a node binary and the executed
+ * script (first non-flag argv) must be a sync entrypoint (dist/sync-cli.js, or
+ * cli/memory-bank.js with the `sync` subcommand). Used as the pid-recycle
+ * guard before the lock takeover kills a holder: a recycled pid whose argv
+ * merely CONTAINS "memory-bank"/"sync-cli" as data must never be killed.
+ */
+const SYNC_CLI_RE =
+  /^\s*(?:\S*\/)?node(?:js)?(?:\s+--\S+)*\s+(?:\S*\/)?(?:dist\/sync-cli\.js(?:\s|$)|cli\/memory-bank\.js\s+sync\b)/;
+
+export function isSyncCliCommand(command: string): boolean {
+  return SYNC_CLI_RE.test(command);
+}
+
 /**
  * If `command` is a memory-bank detached worker from a version OLDER than
  * `myVersion`, return that stale version string; otherwise null.

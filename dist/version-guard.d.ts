@@ -37,6 +37,7 @@ export type TakeoverDecision = 'takeover-stale-version' | 'takeover-wedged' | 'd
  *    minutes). holderRunMs null (unknown start) → no wedge judgement.
  */
 export declare function decideTakeover(holder: LockMeta, myVersion: string, holderRunMs: number | null, wedgeMaxMs: number): TakeoverDecision;
+export declare function isSyncCliCommand(command: string): boolean;
 /**
  * If `command` is a memory-bank detached worker from a version OLDER than
  * `myVersion`, return that stale version string; otherwise null.

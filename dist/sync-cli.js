@@ -1,6 +1,6 @@
 import { syncConversations } from './sync.js';
 import { getArchiveDir, getAgentSources } from './paths.js';
-import { parseLockMeta, decideTakeover } from './version-guard.js';
+import { parseLockMeta, decideTakeover, isSyncCliCommand } from './version-guard.js';
 import path from 'path';
 import os from 'os';
 import { spawn, execFileSync } from 'child_process';
@@ -86,11 +86,12 @@ function __pidAlive(pid) {
     }
 }
 /** Pid-recycling guard: only treat the holder as "our" process if its command
- * line is actually a memory-bank sync-cli. A recycled pid must not be killed. */
+ * line IS a running sync-cli (anchored to the node executable + script argv —
+ * see isSyncCliCommand). A recycled pid must not be killed. */
 function __isSyncCliProcess(pid) {
     try {
         const cmd = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' });
-        return cmd.includes('memory-bank') && cmd.includes('sync-cli');
+        return isSyncCliCommand(cmd);
     }
     catch {
         return false;
@@ -129,8 +130,13 @@ function __reclaimLock() {
     try {
         fs.renameSync(__lockDir, grave);
     }
-    catch {
-        return false;
+    catch (e) {
+        if (e.code !== 'ENOENT')
+            return false;
+        // The (killed) holder released the lock itself via its ownership-checked
+        // cleanup between our decision and the rename — the path is simply free;
+        // fall through and recreate. Any OTHER contender that got here first will
+        // have recreated the dir already, making our mkdir below fail → defer.
     }
     try {
         fs.rmSync(grave, { recursive: true, force: true });
@@ -197,10 +203,20 @@ if (!(await __acquireLock())) {
     console.log('Sync already running - skip (singleton lock)');
     process.exit(0);
 }
-process.on('exit', () => { try {
-    fs.rmSync(__lockDir, { recursive: true, force: true });
+// Ownership-checked release: after a takeover the lock belongs to the
+// PREEMPTOR — a dying (preempted) holder must remove the lock only while the
+// pid file still records ITS pid, never a successor's fresh lock. If the
+// preemptor already renamed the dir away, the read fails → nothing to do.
+function __releaseLockIfOwned() {
+    try {
+        const meta = parseLockMeta(fs.readFileSync(__pidFile, 'utf8'));
+        if (meta && meta.pid === process.pid) {
+            fs.rmSync(__lockDir, { recursive: true, force: true });
+        }
+    }
+    catch { /* lock gone or unreadable — not ours to release */ }
 }
-catch { } });
+process.on('exit', __releaseLockIfOwned);
 // Default signal death skips 'exit' handlers (observed: SIGTERM left a stale
 // lock behind). Route signals through process.exit so the lock is released.
 for (const sig of ['SIGTERM', 'SIGINT']) {
