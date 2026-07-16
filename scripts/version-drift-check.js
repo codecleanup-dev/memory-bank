@@ -42,12 +42,30 @@ function pidAlive(pid) {
   catch (e) { return !!e && e.code === 'EPERM'; }
 }
 
-async function killAndConfirm(pid) {
+/** Re-read this pid's ppid+command and confirm it is STILL a stale orphaned
+ * worker — called immediately before EVERY signal to shrink the pid-reuse
+ * (TOCTOU) window: the original ps snapshot may be seconds old, and a worker
+ * that exited naturally could have its pid recycled by an unrelated process. */
+function stillStaleOrphan(pid, version) {
+  try {
+    const out = execFileSync('ps', ['-o', 'ppid=,command=', '-p', String(pid)], { encoding: 'utf8' });
+    const m = /^\s*(\d+)\s+(.*)$/.exec(out.trim());
+    if (!m) return false;
+    if (parseInt(m[1], 10) !== 1) return false;
+    return staleWorkerVersion(m[2], version) !== null;
+  } catch {
+    return false; // pid gone (or ps failed) — nothing to kill
+  }
+}
+
+async function killAndConfirm(pid, version) {
+  if (!stillStaleOrphan(pid, version)) return !pidAlive(pid);
   try { process.kill(pid, 'SIGTERM'); } catch {}
   for (let i = 0; i < 5; i++) {
     await new Promise((r) => setTimeout(r, 300));
     if (!pidAlive(pid)) return true;
   }
+  if (!stillStaleOrphan(pid, version)) return !pidAlive(pid);
   try { process.kill(pid, 'SIGKILL'); } catch {}
   await new Promise((r) => setTimeout(r, 300));
   return !pidAlive(pid);
@@ -84,7 +102,7 @@ async function main() {
       console.error(`[memory-bank drift] stale v${stale} candidate pid=${pid} skipped (attached, ppid=${ppid})`);
       continue;
     }
-    const dead = await killAndConfirm(pid);
+    const dead = await killAndConfirm(pid, version);
     swept.push({ pid, stale, dead });
     console.error(`[memory-bank drift] stale v${stale} worker pid=${pid} ${dead ? 'terminated' : 'TERMINATION FAILED'}`);
   }

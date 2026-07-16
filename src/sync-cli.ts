@@ -98,11 +98,18 @@ function __isSyncCliProcess(pid: number): boolean {
 }
 
 async function __killAndConfirm(pid: number): Promise<boolean> {
+  // Re-verify the holder's command line immediately before EVERY signal — the
+  // earlier check is a separate ps read, and a holder that exits in between
+  // could have its pid recycled by an unrelated process (TOCTOU). ps-based
+  // identity can't be fully atomic with kill(2), but re-checking right before
+  // each signal shrinks the window from seconds to microseconds.
+  if (!__isSyncCliProcess(pid)) return !__pidAlive(pid);
   try { process.kill(pid, 'SIGTERM'); } catch {}
   for (let i = 0; i < 8; i++) {
     await new Promise((r) => setTimeout(r, 400));
     if (!__pidAlive(pid)) return true;
   }
+  if (!__isSyncCliProcess(pid)) return !__pidAlive(pid);
   try { process.kill(pid, 'SIGKILL'); } catch {}
   await new Promise((r) => setTimeout(r, 500));
   return !__pidAlive(pid);
