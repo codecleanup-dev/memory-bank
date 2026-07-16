@@ -120,8 +120,23 @@ function __writeLockMeta() {
     catch { }
 }
 function __reclaimLock() {
+    // Atomic takeover: rename(2) is the single mutual-exclusion point — exactly
+    // ONE contender can move the stale dir aside; every loser's rename throws
+    // (ENOENT) and it must NOT touch the winner's freshly recreated lock. The
+    // previous rm+mkdir pair had a window where a second contender's rmSync
+    // deleted the winner's brand-new lock and BOTH proceeded as writers.
+    const grave = `${__lockDir}.stale.${process.pid}.${Date.now()}`;
     try {
-        fs.rmSync(__lockDir, { recursive: true, force: true });
+        fs.renameSync(__lockDir, grave);
+    }
+    catch {
+        return false;
+    }
+    try {
+        fs.rmSync(grave, { recursive: true, force: true });
+    }
+    catch { /* leftover grave dir is inert */ }
+    try {
         fs.mkdirSync(__lockDir, { recursive: false });
         return true;
     }

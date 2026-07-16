@@ -100,6 +100,10 @@ export function deactivateFact(db, id) {
 export function deleteFact(db, id) {
     db.prepare('DELETE FROM vec_facts WHERE id = ?').run(id);
     db.prepare('DELETE FROM vec_facts_kr WHERE id = ?').run(id);
+    // ontology_relations REFERENCES facts(id) and connections run with
+    // foreign_keys=ON — remove edges touching this fact (either direction)
+    // BEFORE the fact row, or the delete throws SQLITE_CONSTRAINT_FOREIGNKEY.
+    db.prepare('DELETE FROM ontology_relations WHERE source_fact_id = ? OR target_fact_id = ?').run(id, id);
     db.prepare('DELETE FROM fact_revisions WHERE fact_id = ?').run(id);
     db.prepare('DELETE FROM facts WHERE id = ?').run(id);
 }

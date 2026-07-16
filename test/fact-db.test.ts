@@ -10,7 +10,9 @@ import {
   getRevisions,
   getTopFacts,
   getNewFactsSince,
+  deleteFact,
 } from '../src/fact-db.js';
+import { createRelation } from '../src/ontology-db.js';
 import { suppressConsole } from './test-utils.js';
 import fs from 'fs';
 import path from 'path';
@@ -164,5 +166,16 @@ describe('Fact CRUD', () => {
     const newFacts = getNewFactsSince(db, '/proj', past);
     expect(newFacts).toHaveLength(1);
     expect(newFacts[0].fact).toBe('New fact');
+  });
+
+  it('deleteFact removes a fact that has ontology relations (foreign_keys=ON)', () => {
+    const a = insertFact(db, { fact: 'edge source', category: 'decision', scope_type: 'global', scope_project: null, source_exchange_ids: [], embedding: null });
+    const b = insertFact(db, { fact: 'edge target', category: 'decision', scope_type: 'global', scope_project: null, source_exchange_ids: [], embedding: null });
+    createRelation(db, a, 'SUPPORTS', b, 'test edge');
+    // ontology_relations REFERENCES facts(id) — without pre-clearing the edges
+    // this throws SQLITE_CONSTRAINT_FOREIGNKEY under foreign_keys=ON.
+    expect(() => deleteFact(db, a)).not.toThrow();
+    expect(db.prepare('SELECT COUNT(*) AS n FROM facts WHERE id = ?').get(a)).toEqual({ n: 0 });
+    expect(db.prepare('SELECT COUNT(*) AS n FROM ontology_relations WHERE source_fact_id = ? OR target_fact_id = ?').get(a, a)).toEqual({ n: 0 });
   });
 });

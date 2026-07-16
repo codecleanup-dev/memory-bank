@@ -299,6 +299,7 @@ describe('consolidateAllPending', () => {
     expect(classifyLlmError(Object.assign(new Error('nope'), { status: 401 }))).toBe('transient');
     expect(classifyLlmError(new Error('ETIMEDOUT'))).toBe('transient');
     expect(classifyLlmError(new Error('status: 503 upstream'))).toBe('transient'); // labelled status
+    expect(classifyLlmError(new Error('API Error: 500 Internal Server Error'))).toBe('transient'); // 'internal server error' phrase
     // Incidental digits are NOT read as a status number.
     expect(classifyLlmError(new Error('429 rate limit exceeded; retry after 400 ms'))).toBe('transient'); // 'rate limit' phrase
     expect(classifyLlmError(new Error('503 upstream error after 400 ms'))).toBe('unknown'); // bare numbers, no label/phrase
@@ -329,10 +330,11 @@ describe('consolidateAllPending', () => {
   it('an UNKNOWN provider error HOLDS (unrecognized outage shapes must not drain)', async () => {
     addFact(db, 'mystery A', 'global', null);
     addFact(db, 'mystery B', 'global', null);
-    // "API Error: 500 Internal Server Error" classifies as unknown (no labelled
-    // status, no phrase). Only DETERMINISTIC rejections skip — unknown holds so a
-    // weird outage shape never silently drains the backlog.
-    (callHaiku as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('API Error: 500 Internal Server Error'));
+    // A truly unrecognized shape (no structured status, no labelled status, no
+    // known phrase — "internal server error" now classifies as transient). Only
+    // DETERMINISTIC rejections skip — unknown holds so a weird outage shape
+    // never silently drains the backlog.
+    (callHaiku as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('provider exploded in a novel way'));
 
     let cursor: { createdAt: string; id: string } | null = null;
     for (let r = 0; r < 8; r++) cursor = (await consolidateAllPending(db, cursor)).cursor;
