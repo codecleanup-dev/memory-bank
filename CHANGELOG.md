@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-07-16
+
+### Added (upstream v1.4.4 port — the last piece past the v1.5.0 sync point)
+- **Version drift guard** (`src/version-guard.ts`): the sync singleton lock now
+  carries `{pid, version, startedAt}` — a newer sync PREEMPTS an older-version
+  or wedged (>6h) holder instead of skipping forever (upstream incident: a
+  stale sync wedged 23h froze indexing). Lock reclaim is rename-atomic (two
+  contenders can never both win), holder identity is re-verified against ps
+  before any kill (pid-recycle guard), and SIGTERM/SIGINT release the lock.
+- **SessionStart stale-worker sweep** (`scripts/version-drift-check.js`, wired
+  through the node-pin launcher): detached workers running from an OLDER
+  versioned plugin cache dir are terminated at session start; MCP servers are
+  never touched. Matching is ANCHORED to the executing node binary + script
+  argv position, so unrelated processes merely carrying a worker path as data
+  (editor/grep/another script) can never be killed — locked by 6 regression
+  cases.
+
+### Fixed
+- `deleteFact` deletes `ontology_relations` edges (either direction) before
+  the fact row — `REFERENCES facts(id)` + `foreign_keys=ON` made deleting a
+  related fact throw `SQLITE_CONSTRAINT_FOREIGNKEY` (latent since the FK was
+  declared; regression test added).
+- `consolidator` error-classification docs matched the superseded R23
+  semantics ("unknown → bounded advance") while the code implements the final
+  R24 contract (unknown HOLDS, like transient — an outage must never silently
+  drain the backlog); docs now state the real contract, and
+  "internal server error" message text classifies as transient.
+
 ## [1.5.0] - 2026-07-12
 
 _Fork release: merges upstream v1.3.4 + post-tag autoresearch fixes (iter18~38,

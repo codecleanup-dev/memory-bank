@@ -28,12 +28,15 @@ export declare class LlmCallError extends Error {
  *   - 'deterministic' recognized per-request rejection (400/413/422, too-long,
  *                     max_tokens, bad request...). Only THIS fact is at fault, so
  *                     the caller burns an attempt and advances after MAX.
- *   - 'unknown'       neither recognized. Treated like 'deterministic' by the
- *                     caller (bounded retry → advance) so an UNRECOGNIZED error
- *                     can never wedge the whole backlog forever. This is safe:
- *                     "skipping" a fact only means it isn't consolidated/deduped
- *                     — the fact stays active and searchable, it is never deleted
- *                     — whereas an unbounded hold halts ALL future consolidation.
+ *   - 'unknown'       neither recognized. The caller HOLDS on it, same as
+ *                     transient: an unrecognized provider error is far more
+ *                     likely an unusual outage shape than a poison fact, and
+ *                     holding can never silently drain the backlog during an
+ *                     outage. Residual: a per-fact poison whose error never
+ *                     presents as a recognized deterministic rejection holds —
+ *                     loud in the log (same fact id every run) and bounded by
+ *                     the single-run lock + per-run budget, so it stops rather
+ *                     than floods.
  *
  * Numbers are read from the STRUCTURED status, or from a status number that is
  * explicitly LABELLED in the message ("status code 400"). A bare incidental
@@ -44,8 +47,8 @@ export declare function classifyLlmError(err: unknown): LlmErrorClass;
 /**
  * Back-compat boolean: true only for a RECOGNIZED transient (outage/auth). An
  * 'unknown' error is NOT a recognized transient, so this returns false for it —
- * the drain loop uses classifyLlmError directly and bounds 'unknown' rather than
- * holding on it.
+ * the drain loop uses classifyLlmError directly ('deterministic' is the only
+ * class that advances; transient AND unknown both hold).
  */
 export declare function isTransientLlmError(err: unknown): boolean;
 /**
