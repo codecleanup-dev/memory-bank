@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-07-17
+
+_Fork release: true merge of upstream v1.4.0–v1.4.4 (`0b879d2..1c8e465`) — restores
+shared history (behind count converges to 0) and closes the v1.5.0 sync-point gap._
+
+### Added (upstream v1.4.0 "injection pipeline v2", adopted)
+- **Per-session dedup ledger** (`src/inject-ledger.ts`): each fact is injected at
+  most once per session — bounded (400 cap, oldest-evict) + 7-day TTL +
+  session_id sanitize + atomic writes + fail-open (a corrupt ledger never blocks
+  injection). Upstream measured ~10k tokens of duplicate injection removed over
+  a 30-prompt session.
+- **Token budget**: facts truncated at 160 chars, whole block capped at 1,000
+  chars; inject log now reports `chars` (block size) and `deduped` (savings).
+- **session_id plumbing**: hook stdin → daemon payload / cold fallback →
+  `computeInjectContext` — integrated into the fork's tri-state cold-fallback
+  (`ok`/`no-daemon`/`gave-up`) without weakening the daemon-saturation guards.
+- **Cold-path deps self-heal** (upstream v1.4.2): one-shot detached
+  `npm install` when the cold import hits missing native deps.
+- **detectRepeat elapsed-budget gate** (upstream v1.4.3): replaces the
+  ineffective wall-clock timebox.
+
+### Kept (fork side on merge conflicts)
+- Version-guard trio + sync-cli lock logic: fork's hardened port (1.6.0) is a
+  strict superset of upstream v1.4.4 (self-declared script identity, etime
+  start-time check, mkdir-atomic acquire, ownership-checked release) — kept
+  wholesale.
+- `hooks/hooks.json` node-pin launcher wrapping (hook lists verified identical).
+
+### Excluded at merge
+- Knowledge Galaxy (`ui/relations/`, 2 commits): hold decision from 1.5.0
+  maintained — the fork runs its own knowledge-graph-viz stack. Re-evaluate at
+  the next sync.
+- Upstream runtime artifacts (process-state JSONs, results.tsv): not plugin code.
+
 ## [1.6.0] - 2026-07-16
 
 ### Added (upstream v1.4.4 port — the last piece past the v1.5.0 sync point)
