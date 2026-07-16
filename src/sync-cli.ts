@@ -132,10 +132,26 @@ async function __killAndConfirm(pid: number): Promise<boolean> {
   return !__pidAlive(pid);
 }
 
-function __writeLockMeta(): void {
+/** Atomically INSTALL a complete lock: stage dir + pid meta elsewhere, then
+ * rename into place. rename(2) is the acquire — no observer can ever see this
+ * lock without its pid meta (the old mkdir-then-write pair had a window where
+ * a contender read a missing pid file and reclaimed a LIVE lock; repro:
+ * pause the creator between mkdir and write). Loser's rename throws
+ * (EEXIST/ENOTEMPTY) → defer. Transitional edge: POSIX rename may replace an
+ * EMPTY existing dir, which only a legacy (<=1.5.0) creator inside its own
+ * microsecond mkdir->write gap can present — accepted for the transition,
+ * new-code locks are never observable empty. */
+function __installLock(): boolean {
+  const stage = `${__lockDir}.acquire.${process.pid}.${Date.now()}`;
   try {
-    fs.writeFileSync(__pidFile, JSON.stringify({ pid: process.pid, version: __myVersion, startedAt: Date.now() }));
-  } catch {}
+    fs.mkdirSync(stage, { recursive: false });
+    fs.writeFileSync(path.join(stage, 'pid'), JSON.stringify({ pid: process.pid, version: __myVersion, startedAt: Date.now() }));
+    fs.renameSync(stage, __lockDir);
+    return true;
+  } catch {
+    try { fs.rmSync(stage, { recursive: true, force: true }); } catch {}
+    return false;
+  }
 }
 
 function __reclaimLock(expectedPid: number | null): boolean {
@@ -168,17 +184,28 @@ function __reclaimLock(expectedPid: number | null): boolean {
     }
   }
   try { fs.rmSync(grave, { recursive: true, force: true }); } catch { /* leftover grave dir is inert */ }
-  try { fs.mkdirSync(__lockDir, { recursive: false }); return true; } catch { return false; }
+  // Leave the path ABSENT — the caller finishes with the atomic __installLock,
+  // so the lock is never observable in a half-built (meta-less) state.
+  return true;
 }
 
 async function __acquireLock(): Promise<boolean> {
-  try {
-    fs.mkdirSync(__lockDir, { recursive: false });
-  } catch {
+  if (__installLock()) return true; // fast path: lock was absent
+  {
     let raw = '';
     try { raw = fs.readFileSync(__pidFile, 'utf8'); } catch {}
     const holder = parseLockMeta(raw);
     if (!holder || !__pidAlive(holder.pid)) {
+      if (!holder) {
+        // No/garbage meta. A LEGACY (<=1.5.0) creator writes its pid AFTER
+        // mkdir — if the dir is brand new, its creator is likely mid-write:
+        // grace-defer instead of reclaiming a live lock out from under it.
+        // A crashed half-built lock simply ages past the grace and is then
+        // reclaimed as garbage.
+        try {
+          if (Date.now() - fs.statSync(__lockDir).mtimeMs < 15_000) return false;
+        } catch { /* dir vanished — fall through, reclaim will no-op via ENOENT */ }
+      }
       // Garbage or dead holder — reclaim (pre-existing behavior).
       if (!__reclaimLock(holder ? holder.pid : null)) return false;
     } else {
@@ -227,8 +254,9 @@ async function __acquireLock(): Promise<boolean> {
       }
     }
   }
-  __writeLockMeta();
-  return true;
+  // Reclaim succeeded and left the path absent — finish with the atomic
+  // install; if another contender slipped in first, this fails → defer.
+  return __installLock();
 }
 
 if (!(await __acquireLock())) {
