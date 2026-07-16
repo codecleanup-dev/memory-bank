@@ -195,6 +195,20 @@ async function __acquireLock() {
                     if (!__reclaimLock())
                         return false;
                 }
+                else if (runMs !== null && runMs > WEDGE_MAX_MS) {
+                    // Live but unrecognizable AND the lock is older than any real sync
+                    // can run (the same wedge bound used for recognized holders): the
+                    // only consistent explanation is a stale pid file whose pid was
+                    // RECYCLED by a long-lived unrelated process. Reclaim WITHOUT
+                    // killing — never signal an unidentified pid — because deferring
+                    // forever here would freeze indexing until a manual rm (the
+                    // original 23h-wedge incident class). Bounded trade-off: an
+                    // unrecognizable REAL sync is protected for the full wedge window,
+                    // after which it is by definition wedged and loses the lock anyway.
+                    console.error(`Sync lock holder pid=${holder.pid} unrecognized and lock exceeds wedge bound - treating as recycled-pid garbage, reclaiming without kill`);
+                    if (!__reclaimLock())
+                        return false;
+                }
                 else {
                     // FAIL-CLOSED: a live pid we cannot POSITIVELY identify as a
                     // memory-bank sync is neither killed nor has its lock reclaimed.
