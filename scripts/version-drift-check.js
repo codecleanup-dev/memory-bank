@@ -21,6 +21,7 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -117,10 +118,15 @@ async function main() {
   // 2) Drift visibility: newer version present in the plugin cache than the
   //    one THIS session runs (i.e. update landed but session not restarted,
   //    or install record lags the cache).
-  const cacheBase = path.join(
-    process.env.HOME || process.env.USERPROFILE || '',
-    '.claude', 'plugins', 'cache', 'memory-bank-dev', 'memory-bank',
-  );
+  // Runtime-anchored cache root: when THIS script runs from the versioned
+  // plugin cache, the cache base is simply its own parent directory — no
+  // environment variable is trusted to locate it (a poisoned HOME could point
+  // the scan at an attacker-controlled tree). A dev checkout (not under the
+  // cache) falls back to os.homedir() for drift VISIBILITY only — nothing in
+  // this branch kills processes.
+  const cacheBase = /[\/]plugins[\/]cache[\/]memory-bank-dev[\/]memory-bank[\/][^\/]+$/.test(ROOT)
+    ? path.dirname(ROOT)
+    : path.join(os.homedir(), '.claude', 'plugins', 'cache', 'memory-bank-dev', 'memory-bank');
   try {
     const versions = fs
       .readdirSync(cacheBase)
