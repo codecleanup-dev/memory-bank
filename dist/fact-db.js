@@ -98,14 +98,20 @@ export function deactivateFact(db, id) {
     db.prepare('DELETE FROM vec_facts_kr WHERE id = ?').run(id);
 }
 export function deleteFact(db, id) {
-    db.prepare('DELETE FROM vec_facts WHERE id = ?').run(id);
-    db.prepare('DELETE FROM vec_facts_kr WHERE id = ?').run(id);
     // ontology_relations REFERENCES facts(id) and connections run with
-    // foreign_keys=ON — remove edges touching this fact (either direction)
+    // foreign_keys=ON — edges touching this fact (either direction) must go
     // BEFORE the fact row, or the delete throws SQLITE_CONSTRAINT_FOREIGNKEY.
-    db.prepare('DELETE FROM ontology_relations WHERE source_fact_id = ? OR target_fact_id = ?').run(id, id);
-    db.prepare('DELETE FROM fact_revisions WHERE fact_id = ?').run(id);
-    db.prepare('DELETE FROM facts WHERE id = ?').run(id);
+    // ONE transaction for all five deletes: if the fact delete itself is ever
+    // rejected (future FK/trigger/schema drift), the vectors/edges/revisions
+    // roll back with it instead of being lost while the fact survives.
+    const run = db.transaction((factId) => {
+        db.prepare('DELETE FROM vec_facts WHERE id = ?').run(factId);
+        db.prepare('DELETE FROM vec_facts_kr WHERE id = ?').run(factId);
+        db.prepare('DELETE FROM ontology_relations WHERE source_fact_id = ? OR target_fact_id = ?').run(factId, factId);
+        db.prepare('DELETE FROM fact_revisions WHERE fact_id = ?').run(factId);
+        db.prepare('DELETE FROM facts WHERE id = ?').run(factId);
+    });
+    run(id);
 }
 export function insertRevision(db, params) {
     const id = randomUUID();
