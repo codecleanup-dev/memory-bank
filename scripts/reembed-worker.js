@@ -7,7 +7,9 @@
  *   1. facts:     rows with embedding_version != current → re-embed `fact`
  *                 (facts.embedding + vec_facts), set version.
  *   2. facts KR:  rows with fact_kr but no vec_facts_kr row → embed fact_kr.
- *   3. exchanges: rows with embedding_version != current → re-embed
+ *   3. exchanges: rows with embedding_version != current, OR rows whose
+ *      vec_exchanges row is MISSING despite a current version stamp
+ *      (stamp-vector mismatch self-heal) → re-embed
  *                 (exchanges.embedding + vec_exchanges), newest first.
  *
  * Idempotent and resumable — progress is tracked by embedding_version /
@@ -19,14 +21,27 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { initDatabase, getVecDtype, embeddingToVecBlob, vecParamSql } from '../dist/db.js';
+import { initDatabase, getVecDtype, getVecTableDtype, embeddingToVecBlob, vecParamSql } from '../dist/db.js';
 import { generateEmbedding, generateExchangeEmbedding, initEmbeddings, EMBEDDING_VERSION, EMBEDDING_MODEL } from '../dist/embeddings.js';
 import { getIndexDir } from '../dist/paths.js';
+import { buildReembedPending } from '../dist/reembed-selector.js';
 
 const FACTS_ONLY = process.argv.includes('--facts-only');
 const maxExArg = process.argv.indexOf('--max-exchanges');
 const MAX_EXCHANGES = maxExArg > -1 ? parseInt(process.argv[maxExArg + 1], 10) : Infinity;
 const BATCH = 200;
+const WAL_CHECKPOINT_EVERY_BATCHES = 10; // ~2000 rows between WAL truncations
+
+// A heavy writer with many long-lived concurrent readers (every session's MCP
+// server holds the DB open) starves SQLite's auto-checkpoint: the checkpointer
+// can never advance past the oldest reader, so the -wal file grows without
+// bound. Observed live: a 1.4 GB WAL that crawled the drain to ~3 rows/s.
+// Periodically fold the WAL back with a TRUNCATE checkpoint. busy_timeout lets
+// it wait briefly for a checkpoint window; if readers never yield it stays a
+// no-op (PASSIVE-equivalent) rather than blocking the drain — best-effort.
+function checkpointWal(db) {
+  try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best-effort */ }
+}
 
 const LOCK = path.join(getIndexDir(), 'reembed.lock');
 const MIGRATE_LOCK = path.join(getIndexDir(), 'migrate-vec-int8.lock');
@@ -90,19 +105,21 @@ async function reembedFacts(db) {
   let done = 0;
   for (const row of pending) {
     const emb = await generateEmbedding(row.fact);
-    const buf = Buffer.from(new Float32Array(emb).buffer);
+    const buf = Buffer.from(new Float32Array(emb).buffer); // facts.embedding column stays float32 (canonical source)
     // KR vector must be rebuilt together with the EN vector — a model change
     // invalidates both, and vec_facts_kr rows are not version-tracked.
     const krEmb = row.fact_kr ? await generateEmbedding(row.fact_kr) : null;
-    const krBuf = krEmb ? Buffer.from(new Float32Array(krEmb).buffer) : null;
     const tx = db.transaction(() => {
+      // dtype read INSIDE the tx — serialized against a migration swap.
+      const dtF = getVecTableDtype(db, 'vec_facts');
+      const dtK = getVecTableDtype(db, 'vec_facts_kr');
       db.prepare('UPDATE facts SET embedding = ?, embedding_version = ? WHERE id = ?')
         .run(buf, EMBEDDING_VERSION, row.id);
       db.prepare('DELETE FROM vec_facts WHERE id = ?').run(row.id);
-      db.prepare('INSERT INTO vec_facts (id, embedding) VALUES (?, ?)').run(row.id, buf);
+      db.prepare(`INSERT INTO vec_facts (id, embedding) VALUES (?, ${vecParamSql(dtF)})`).run(row.id, embeddingToVecBlob(emb, dtF));
       db.prepare('DELETE FROM vec_facts_kr WHERE id = ?').run(row.id);
-      if (krBuf) {
-        db.prepare('INSERT INTO vec_facts_kr (id, embedding) VALUES (?, ?)').run(row.id, krBuf);
+      if (krEmb) {
+        db.prepare(`INSERT INTO vec_facts_kr (id, embedding) VALUES (?, ${vecParamSql(dtK)})`).run(row.id, embeddingToVecBlob(krEmb, dtK));
       }
     });
     tx();
@@ -126,10 +143,10 @@ async function embedKoreanFacts(db) {
   let done = 0;
   for (const row of rows) {
     const emb = await generateEmbedding(row.fact_kr);
-    const buf = Buffer.from(new Float32Array(emb).buffer);
     const tx = db.transaction(() => {
+      const dtK = getVecTableDtype(db, 'vec_facts_kr');
       db.prepare('DELETE FROM vec_facts_kr WHERE id = ?').run(row.id);
-      db.prepare('INSERT INTO vec_facts_kr (id, embedding) VALUES (?, ?)').run(row.id, buf);
+      db.prepare(`INSERT INTO vec_facts_kr (id, embedding) VALUES (?, ${vecParamSql(dtK)})`).run(row.id, embeddingToVecBlob(emb, dtK));
     });
     tx();
     if (++done % 500 === 0) log(`facts-kr: ${done}/${rows.length}`);
@@ -139,22 +156,44 @@ async function embedKoreanFacts(db) {
 }
 
 async function reembedExchanges(db) {
+  // Two repair conditions, both must self-heal:
+  //  (a) stale version   — embedding_version != current (model upgrade)
+  //  (b) MISSING VECTOR  — the row CLAIMS the current version but has no
+  //      vec_exchanges row at all (exact id set-diff via the vec0 shadow
+  //      _rowids table, which carries a UNIQUE index on id). Historical
+  //      non-atomic writers left 197K such rows (measured 2026-07-11:
+  //      53% of the corpus invisible to semantic search while the
+  //      version-only selector saw "nothing pending" forever).
+  // A version-only selector can never see (b) — the stamp lies.
+  //
+  // EXCLUDE the plugin's own worker-prompt exchanges: these are ephemeral state
+  // that should never be indexed at all, but old-code sessions still index them
+  // under real project slugs. Without this guard the (b) missing-vector branch
+  // would "self-heal" freshly-indexed pollution by embedding it straight into
+  // vec_exchanges — re-injecting junk into semantic search. Match the exact
+  // system-prompt leads (substr equality; no LIKE metacharacter pitfalls).
+  const { clause: PENDING, params: pendingParams } = buildReembedPending(EMBEDDING_VERSION);
   const total = db.prepare(
-    'SELECT COUNT(*) AS n FROM exchanges WHERE embedding_version != ?'
-  ).get(EMBEDDING_VERSION).n;
+    `SELECT COUNT(*) AS n FROM exchanges e WHERE ${PENDING}`
+  ).get(...pendingParams).n;
   if (!total) return 0;
   log(`exchanges: ${total} rows pending (processing newest first, max ${MAX_EXCHANGES})`);
 
-  const toolStmt = db.prepare('SELECT tool_name FROM tool_calls WHERE exchange_id = ?');
+  // ORDER BY rowid = insertion order = the parse order the ORIGINAL index used
+  // when it built the 'Tools: a, b, ...' embedding text (exchange.toolCalls in
+  // order). Guarantees a re-embedded vector matches the first-indexed one for
+  // the same row instead of drifting on a nondeterministic tool ordering.
+  const toolStmt = db.prepare('SELECT tool_name FROM tool_calls WHERE exchange_id = ? ORDER BY rowid');
   let done = 0;
+  let batchNo = 0;
   while (done < MAX_EXCHANGES) {
     if (migrationActive()) { log('int8 migration in progress — yielding (resume later)'); return; }
     const batch = db.prepare(`
-      SELECT id, user_message, assistant_message FROM exchanges
-      WHERE embedding_version != ?
-      ORDER BY timestamp DESC
+      SELECT e.id, e.user_message, e.assistant_message FROM exchanges e
+      WHERE ${PENDING}
+      ORDER BY e.timestamp DESC
       LIMIT ?
-    `).all(EMBEDDING_VERSION, BATCH);
+    `).all(...pendingParams, BATCH);
     if (batch.length === 0) break;
 
     for (const row of batch) {
@@ -180,8 +219,10 @@ async function reembedExchanges(db) {
       tx.immediate();
       done++;
     }
+    if (++batchNo % WAL_CHECKPOINT_EVERY_BATCHES === 0) checkpointWal(db);
     log(`exchanges: ${done}/${Math.min(total, MAX_EXCHANGES)}`);
   }
+  checkpointWal(db); // final fold-back before returning
   log(`exchanges: done this run (${done}, remaining ${Math.max(0, total - done)})`);
   return done;
 }

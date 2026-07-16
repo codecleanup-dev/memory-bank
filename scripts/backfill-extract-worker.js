@@ -18,6 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { initDatabase } from '../dist/db.js';
+import { getExtractionConfig, pendingExtractionCoreQuery } from '../dist/pending-extraction.js';
 import { runFactExtraction } from '../dist/fact-extractor.js';
 import { canonicalizeProject } from '../dist/project-canon.js';
 import { getIndexDir } from '../dist/paths.js';
@@ -51,19 +52,8 @@ const CONCURRENCY = Math.max(1, boundedInt(process.env.BACKFILL_CONCURRENCY, 4, 
 // cron sessions). These are ~98% 1-exchange noise that the backfill itself
 // generates, so including them is a feedback loop that never converges.
 // Comma-separated cwd paths; env-overridable.
-const EXCLUDE_PROJECTS = (
-  process.env.BACKFILL_EXCLUDE_PROJECTS ||
-  '/Users/jung-wankim/Project/Claude/memory-bank'
-)
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
+const { minExchanges: MIN_EXCHANGES, excludeProjects: EXCLUDE_PROJECTS } = getExtractionConfig();
 
-// Minimum exchanges per session to be worth extracting. 1-exchange sessions are
-// overwhelmingly automated-worker/monitoring noise (bs-auto-issue, cron checks)
-// that yield no durable facts and never converge. Default 2; set to 1 to include
-// single-turn sessions.
-const MIN_EXCHANGES = parseInt(process.env.BACKFILL_MIN_EXCHANGES || '2', 10);
 
 const LOCK = path.join(getIndexDir(), 'backfill-extract.lock');
 const LOG = path.join(getIndexDir(), 'backfill-extract.log');
@@ -139,28 +129,10 @@ function seedFromExistingFacts(db) {
 }
 
 function pendingSessions(db, limit) {
-  // Content-rich sessions first (more exchanges → more extractable facts),
-  // then recency. 1-exchange sessions are processed last.
-  // Excluded projects (e.g. memory-bank's own monitoring sessions) are dropped
-  // entirely to break the self-referential feedback loop.
-  const exTerms = EXCLUDE_PROJECTS;
-  const exClause = exTerms.length
-    ? `AND e.session_id NOT IN (
-         SELECT DISTINCT x.session_id FROM exchanges x
-         WHERE ${exTerms.map(() => 'x.cwd = ?').join(' OR ')}
-       )`
-    : '';
-  return db.prepare(`
-    SELECT e.session_id AS sid, MAX(e.timestamp) AS ts, COUNT(*) AS n
-    FROM exchanges e
-    WHERE e.is_sidechain = 0 AND e.session_id IS NOT NULL
-      AND NOT EXISTS (SELECT 1 FROM extraction_log l WHERE l.session_id = e.session_id)
-      ${exClause}
-    GROUP BY e.session_id
-    HAVING COUNT(*) >= ${MIN_EXCHANGES}
-    ORDER BY ts DESC
-    LIMIT ?
-  `).all(...exTerms, limit);
+  // Single source (pendingExtractionCoreQuery) shared with the SessionStart
+  // hook's spawn condition so the two can never drift.
+  const { sql, params } = pendingExtractionCoreQuery({ minExchanges: MIN_EXCHANGES, excludeProjects: EXCLUDE_PROJECTS });
+  return db.prepare(`${sql} ORDER BY ts DESC LIMIT ?`).all(...params, limit);
 }
 
 /** Simple concurrency pool — LLM latency dominates, DB writes are sync-safe. */

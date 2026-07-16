@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { SUMMARIZER_CONTEXT_MARKER } from './constants.js';
-import { getExcludedProjects, detectCodingAgent, findJsonlFiles } from './paths.js';
+import { getExcludedProjects, isExcludedProject, isWorkerPromptMessage, detectCodingAgent, findJsonlFiles } from './paths.js';
 import { sniffCodexProject, encodeProjectPath } from './parser.js';
 import { archiveFileExists, readArchiveFile, statArchiveFile } from './archive-io.js';
 
@@ -113,7 +113,7 @@ export async function syncConversations(
   } else {
     relFiles = [];
     for (const project of fs.readdirSync(sourceDir)) {
-      if (excludedProjects.includes(project)) {
+      if (isExcludedProject(project, excludedProjects)) {
         console.error('\nSkipping excluded project: ' + project);
         continue;
       }
@@ -205,8 +205,10 @@ export async function syncConversations(
           const exKey = (codingAgent === 'codex' && exchange.cwd)
             ? encodeProjectPath(exchange.cwd)
             : exchange.project;
-          if (excludedProjects.includes(exKey)) continue;
+          if (isExcludedProject(exKey, excludedProjects)) continue;
 
+          // Worker-prompt exchange = ephemeral state, not knowledge — never index.
+          if (isWorkerPromptMessage(exchange.userMessage)) continue;
           // Tag each exchange with the coding agent
           exchange.codingAgent = codingAgent;
 
