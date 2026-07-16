@@ -1,6 +1,6 @@
 import { syncConversations } from './sync.js';
 import { getArchiveDir, getAgentSources } from './paths.js';
-import { parseLockMeta, decideTakeover, isSyncCliCommand } from './version-guard.js';
+import { parseLockMeta, decideTakeover, isSyncCliCommand, type LockMeta } from './version-guard.js';
 import path from 'path';
 import os from 'os';
 import { spawn, execFileSync } from 'child_process';
@@ -138,9 +138,9 @@ function __writeLockMeta(): void {
   } catch {}
 }
 
-function __reclaimLock(): boolean {
+function __reclaimLock(expectedPid: number | null): boolean {
   // Atomic takeover: rename(2) is the single mutual-exclusion point — exactly
-  // ONE contender can move the stale dir aside; every loser's rename throws
+  // ONE contender can move the lock dir aside; every loser's rename throws
   // (ENOENT) and it must NOT touch the winner's freshly recreated lock. The
   // previous rm+mkdir pair had a window where a second contender's rmSync
   // deleted the winner's brand-new lock and BOTH proceeded as writers.
@@ -153,6 +153,19 @@ function __reclaimLock(): boolean {
     // cleanup between our decision and the rename — the path is simply free;
     // fall through and recreate. Any OTHER contender that got here first will
     // have recreated the dir already, making our mkdir below fail → defer.
+  }
+  // Identity check on what we actually captured: between our takeover
+  // decision and the rename, ANOTHER contender may have completed its own
+  // reclaim and created a FRESH lock — renaming blindly would steal it and
+  // run two writers. If the captured lock's pid is not the holder we decided
+  // to preempt and that pid is alive, hand it back and defer.
+  if (expectedPid !== null) {
+    let captured: LockMeta | null = null;
+    try { captured = parseLockMeta(fs.readFileSync(path.join(grave, 'pid'), 'utf8')); } catch { /* empty/missing meta — treat as the stale lock we expected */ }
+    if (captured && captured.pid !== expectedPid && __pidAlive(captured.pid)) {
+      try { fs.renameSync(grave, __lockDir); } catch { try { fs.rmSync(grave, { recursive: true, force: true }); } catch {} }
+      return false;
+    }
   }
   try { fs.rmSync(grave, { recursive: true, force: true }); } catch { /* leftover grave dir is inert */ }
   try { fs.mkdirSync(__lockDir, { recursive: false }); return true; } catch { return false; }
@@ -167,7 +180,7 @@ async function __acquireLock(): Promise<boolean> {
     const holder = parseLockMeta(raw);
     if (!holder || !__pidAlive(holder.pid)) {
       // Garbage or dead holder — reclaim (pre-existing behavior).
-      if (!__reclaimLock()) return false;
+      if (!__reclaimLock(holder ? holder.pid : null)) return false;
     } else {
       // Live holder: preempt if it runs older code or is wedged.
       let runMs: number | null = holder.startedAt !== null ? Date.now() - holder.startedAt : null;
@@ -179,7 +192,7 @@ async function __acquireLock(): Promise<boolean> {
       if (!__isSyncCliProcess(holder.pid)) {
         if (!__pidAlive(holder.pid)) {
           // Died between checks — normal dead-holder reclaim.
-          if (!__reclaimLock()) return false;
+          if (!__reclaimLock(holder.pid)) return false;
         } else {
           // Live but not recognizable as a sync. Discriminate CREATOR vs
           // RECYCLED pid by process start time: the lock's creator was
@@ -198,7 +211,7 @@ async function __acquireLock(): Promise<boolean> {
           const procStartMs = __processStartMs(holder.pid);
           if (lockBirthMs !== null && procStartMs !== null && procStartMs > lockBirthMs + 60_000) {
             console.error(`Sync lock holder pid=${holder.pid} started after the lock was created - recycled pid, reclaiming without kill`);
-            if (!__reclaimLock()) return false;
+            if (!__reclaimLock(holder.pid)) return false;
           } else {
             console.error(`Sync lock holder pid=${holder.pid} is alive but not recognizable as a memory-bank sync - deferring (to override manually: rm -rf ~/.claude/run-locks/memory-bank-sync.lock)`);
             return false;
@@ -210,7 +223,7 @@ async function __acquireLock(): Promise<boolean> {
           console.error(`Failed to terminate lock holder pid=${holder.pid} - skip`);
           return false;
         }
-        if (!__reclaimLock()) return false;
+        if (!__reclaimLock(holder.pid)) return false;
       }
     }
   }

@@ -105,14 +105,15 @@ const WORKER_RE = /^\s*(?:\S*\/)?node(?:js)?(?:\s+--\S+)*\s+\S*plugins\/cache\/m
  * True if a ps command line IS a running memory-bank sync-cli — anchored the
  * same way as WORKER_RE: the executable must be a node binary and the executed
  * script (first non-flag argv) must be a MEMORY-BANK-marked sync entrypoint
- * (a path containing "memory-bank" ending in dist/sync-cli.js — plugin cache
- * and dev checkouts alike — or cli/memory-bank.js with the `sync`
- * subcommand). The marker keeps an unrelated app's own dist/sync-cli.js out
- * of the kill set. Used as the pid-recycle
+ * (a PATH SEGMENT starting with "memory-bank" — memory-bank/, memory-bank-
+ * fork/, the plugin cache — somewhere above dist/sync-cli.js, or
+ * cli/memory-bank.js with the `sync` subcommand). Segment anchoring keeps
+ * both an unrelated app's own dist/sync-cli.js AND look-alike segments
+ * (not-memory-bank/) out of the kill set. Used as the pid-recycle
  * guard before the lock takeover kills a holder: a recycled pid whose argv
  * merely CONTAINS "memory-bank"/"sync-cli" as data must never be killed.
  */
-const SYNC_CLI_RE = /^\s*(?:\S*\/)?node(?:js)?(?:\s+--\S+)*\s+(?:\S*memory-bank\S*\/dist\/sync-cli\.js(?:\s|$)|\S*\/cli\/memory-bank\.js\s+sync\b)/;
+const SYNC_CLI_RE = /^\s*(?:\S*\/)?node(?:js)?(?:\s+--\S+)*\s+(?:(?:\S*\/)?memory-bank[^/\s]*\/(?:\S*\/)?dist\/sync-cli\.js(?:\s|$)|\S*\/cli\/memory-bank\.js\s+sync\b)/;
 export function isSyncCliCommand(command) {
     return SYNC_CLI_RE.test(command);
 }
