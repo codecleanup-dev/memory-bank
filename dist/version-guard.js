@@ -85,6 +85,12 @@ export function decideTakeover(holder, myVersion, holderRunMs, wedgeMaxMs) {
     const holderVersion = holder.version ?? '0.0.0';
     if (compareVersions(holderVersion, myVersion) < 0)
         return 'takeover-stale-version';
+    // Wedge preemption never DOWNGRADES: an older contender killing a newer
+    // wedged holder would resume indexing on older code. Defer instead — sync
+    // fires at every SessionStart, so the newer plugin's own next session
+    // preempts its wedged sibling (same-version wedge takeover below).
+    if (compareVersions(holderVersion, myVersion) > 0)
+        return 'defer';
     if (holderRunMs !== null && holderRunMs > wedgeMaxMs)
         return 'takeover-wedged';
     return 'defer';

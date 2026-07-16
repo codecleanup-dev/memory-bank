@@ -67,18 +67,25 @@ describe('decideTakeover', () => {
     expect(decideTakeover({ pid: 9, version: '1.4.4', startedAt: null }, '1.4.4', HOUR, WEDGE)).toBe('defer');
   });
 
-  it('preempts a wedged holder regardless of version (starvation is worse)', () => {
+  it('preempts a wedged same-version holder, but never DOWNGRADES onto a newer one', () => {
     expect(decideTakeover({ pid: 9, version: '1.4.4', startedAt: null }, '1.4.4', 23 * HOUR, WEDGE)).toBe(
       'takeover-wedged',
     );
+    // An older contender defers to a newer wedged holder: killing it would
+    // resume indexing on older code, and sync fires at every SessionStart so
+    // the newer plugin's own next session recovers the wedge instead.
     expect(decideTakeover({ pid: 9, version: '1.5.0', startedAt: null }, '1.4.4', 23 * HOUR, WEDGE)).toBe(
-      'takeover-wedged',
+      'defer',
     );
   });
 
   it('defers to a newer holder and to unknown runtime', () => {
     expect(decideTakeover({ pid: 9, version: '1.5.0', startedAt: null }, '1.4.4', HOUR, WEDGE)).toBe('defer');
     expect(decideTakeover({ pid: 9, version: '1.4.4', startedAt: null }, '1.4.4', null, WEDGE)).toBe('defer');
+    // Never downgrade: an OLDER contender must not preempt a NEWER wedged holder.
+    expect(decideTakeover({ pid: 9, version: '1.6.0', startedAt: null }, '1.5.0', 7 * 60 * 60 * 1000, WEDGE)).toBe('defer');
+    // Same-version wedged holder IS preempted (recovery path).
+    expect(decideTakeover({ pid: 9, version: '1.6.0', startedAt: null }, '1.6.0', 7 * 60 * 60 * 1000, WEDGE)).toBe('takeover-wedged');
   });
 });
 
