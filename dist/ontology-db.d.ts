@@ -30,6 +30,23 @@ export declare function getFactsByCategory(db: Database.Database, categoryId: st
 export declare function getFactsByDomain(db: Database.Database, domainId: string): Fact[];
 export declare function createRelation(db: Database.Database, sourceFactId: string, relationType: RelationType, targetFactId: string, reasoning?: string): OntologyRelation;
 /**
+ * Duplicate-edge check used by the detection channels, honouring relation
+ * semantics:
+ *
+ * - type given, SYMMETRIC (SUPPORTS/CONTRADICTS): either direction counts as
+ *   a duplicate — the reverse edge carries the same claim.
+ * - type given, DIRECTIONAL (DEPENDS_ON/DERIVED_FROM/SUPERSEDES/INFLUENCES):
+ *   only the exact a→b edge is a duplicate. The reverse edge is a distinct
+ *   claim (dependency cycle, competing canonicality) that the graph — and
+ *   the consistency queue — must be able to record.
+ * - no type: any edge in either direction (coarse existence probe).
+ *
+ * A DIFFERENT type between the same pair is never a duplicate: that is
+ * relationship evolution (a SUPPORTS pair can turn CONTRADICTS after a fact
+ * is revised in place) and must stay recordable.
+ */
+export declare function relationExistsBetween(db: Database.Database, factIdA: string, factIdB: string, relationType?: RelationType): boolean;
+/**
  * Get related facts with relevance decay.
  *
  * Each hop reduces relevance by the decay factor:

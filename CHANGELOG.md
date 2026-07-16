@@ -5,7 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-07-16
+
+Fork-independent versioning: upstream memory-bank's v1.4.x line carries a
+DIFFERENT 1.4.0 than this fork's 1.4.0 — the 2.x line removes that ambiguity.
+This release ships the fork's ontology-gaps work (sections below) plus a
+selective port of upstream integrity fixes (upstream v1.3.1–v1.4.4 range,
+cherry-picked; no wholesale merge).
+
+### Ported from upstream (integrity set)
+- **LLM worker pollution blocking** (upstream v1.3.3): built-in exclusion of
+  `memory-bank-llm` session slugs + `WORKER_PROMPT_PREFIXES` content
+  discriminator (`src/pollution-predicate.ts`) wired into indexer/sync/verify;
+  worker transcript TTL pruning in `llm.ts`; `scripts/purge-llm-sessions.mjs`
+  for legacy pollution cleanup; summarizer gains the same cwd/settings
+  containment as `callHaiku`. Prompt↔prefix drift is locked by
+  `test/worker-prompt-coupling.test.ts` (fork prompt leads verified identical).
+- **Consolidation gates** (upstream R2–R25 series): same-scope-only candidate
+  search (`searchSimilarFactsSameScope` — project/global facts can never
+  merge across the boundary), keyset `(created_at, id)` drain cursor with
+  persist (`getAllNewFactsSince` + covering index), 3-class LLM error
+  classification (transient/deterministic/unknown) with circuit breaker,
+  cross-run attempt ledger (`facts.consolidation_attempts`), and the
+  single-run lock in `scripts/fact-consolidate-worker.js`.
+- **Reembed/pending self-heal**: stamp–vector mismatch self-heal + periodic
+  WAL truncate + ORDER BY rowid in `scripts/reembed-worker.js`, extracted
+  selector with pollution re-injection guard (`src/reembed-selector.ts`),
+  pending predicates single-sourced (`src/pending-extraction.ts`) and spawn
+  conditions that see missing-vector/KR backlogs
+  (`scripts/fact-consolidate-hook.js`).
+- **WAL cap**: `journal_size_limit = 64MiB` on every connection (upstream
+  observed an unbounded 1.4GB WAL crawling the reembed drain).
+- **Version drift guard** (upstream v1.4.4): sync singleton lock now carries
+  `{pid, version, startedAt}` — a newer sync preempts an older or wedged
+  (>6h) holder (`src/version-guard.ts`); SessionStart sweeps detached workers
+  running from older plugin versions (`scripts/version-drift-check.js`).
+- **Relation exact-duplicate guard**: UNIQUE index on the
+  (source, type, target) TRIPLE with one-time dedup — compatible with the
+  fork's direction/symmetry dedup semantics (strictly narrower);
+  `createRelation` writes with `INSERT OR IGNORE` to absorb the insert race.
+- Deliberately NOT ported: inject pipeline v2 / warm daemon, fact-vector int8
+  migration (fact vec tables stay FLOAT; dtype-aware code handles either),
+  Knowledge Galaxy UI, upstream ontology-classifier R9–R20 internals (the
+  fork has its own reviewed dedup/consistency layer), replacement-os/hue-os.
+
+### Fixed (release hygiene)
+- `dist/` rebuilt and recommitted — PR #3 merged src without a dist rebuild,
+  so `main`'s dist lacked the fact-category/consistency/taxonomy-align
+  modules entirely.
 
 ### Added
 - **Controlled category vocabulary**: `facts.category` now carries

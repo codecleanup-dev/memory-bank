@@ -1,11 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 import { initDatabase, insertExchange } from './db.js';
 import { parseConversation } from './parser.js';
 import { initEmbeddings, generateExchangeEmbedding } from './embeddings.js';
 import { summarizeConversation } from './summarizer.js';
-import { getArchiveDir, getExcludedProjects } from './paths.js';
+import { getArchiveDir, getExcludedProjects, isExcludedProject, isWorkerPromptMessage, getProjectsDir } from './paths.js';
 import { archiveFileExists, statArchiveFile } from './archive-io.js';
 /**
  * Copy source → archive unless a current copy (plain or .zst) already exists.
@@ -24,10 +23,7 @@ process.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = '20000';
 // Increase max listeners for concurrent API calls
 import { EventEmitter } from 'events';
 EventEmitter.defaultMaxListeners = 20;
-// Allow overriding paths for testing
-function getProjectsDir() {
-    return process.env.TEST_PROJECTS_DIR || path.join(os.homedir(), '.claude', 'projects');
-}
+// Projects dir (with TEST_PROJECTS_DIR override) now lives in paths.ts.
 // Process items in batches with limited concurrency
 export async function processBatch(items, processor, concurrency) {
     const results = [];
@@ -54,8 +50,8 @@ export async function indexConversations(limitToProject, maxConversations, concu
     let conversationsProcessed = 0;
     const excludedProjects = getExcludedProjects();
     for (const project of projects) {
-        // Skip excluded projects
-        if (excludedProjects.includes(project)) {
+        // Skip excluded projects (user list + built-in LLM worker sessions)
+        if (isExcludedProject(project, excludedProjects)) {
             console.log(`\nSkipping excluded project: ${project}`);
             continue;
         }
@@ -123,6 +119,11 @@ export async function indexConversations(limitToProject, maxConversations, concu
         // Now process embeddings and DB inserts (fast, sequential is fine)
         for (const conv of toProcess) {
             for (const exchange of conv.exchanges) {
+                // The plugin's own worker-prompt sessions are ephemeral state, not
+                // knowledge — never index them (legacy transcripts sit under REAL
+                // project slugs, so the slug exclusion can't catch them).
+                if (isWorkerPromptMessage(exchange.userMessage))
+                    continue;
                 const toolNames = exchange.toolCalls?.map(tc => tc.toolName);
                 const embedding = await generateExchangeEmbedding(exchange.userMessage, exchange.assistantMessage, toolNames);
                 insertExchange(db, exchange, embedding, toolNames);
@@ -150,7 +151,7 @@ export async function indexSession(sessionId, concurrency = 1, noSummaries = fal
     const excludedProjects = getExcludedProjects();
     let found = false;
     for (const project of projects) {
-        if (excludedProjects.includes(project))
+        if (isExcludedProject(project, excludedProjects))
             continue;
         const projectPath = path.join(PROJECTS_DIR, project);
         if (!fs.statSync(projectPath).isDirectory())
@@ -179,6 +180,8 @@ export async function indexSession(sessionId, concurrency = 1, noSummaries = fal
                 }
                 // Index
                 for (const exchange of exchanges) {
+                    if (isWorkerPromptMessage(exchange.userMessage))
+                        continue; // worker prompt = ephemeral state, not knowledge
                     const toolNames = exchange.toolCalls?.map(tc => tc.toolName);
                     const embedding = await generateExchangeEmbedding(exchange.userMessage, exchange.assistantMessage, toolNames);
                     insertExchange(db, exchange, embedding, toolNames);
@@ -208,7 +211,7 @@ export async function indexUnprocessed(concurrency = 1, noSummaries = false) {
     const unprocessed = [];
     // Collect all unprocessed conversations
     for (const project of projects) {
-        if (excludedProjects.includes(project))
+        if (isExcludedProject(project, excludedProjects))
             continue;
         const projectPath = path.join(PROJECTS_DIR, project);
         if (!fs.statSync(projectPath).isDirectory())
@@ -267,6 +270,8 @@ export async function indexUnprocessed(concurrency = 1, noSummaries = false) {
     console.log(`\nIndexing embeddings...`);
     for (const conv of unprocessed) {
         for (const exchange of conv.exchanges) {
+            if (isWorkerPromptMessage(exchange.userMessage))
+                continue; // worker prompt = ephemeral state, not knowledge
             const toolNames = exchange.toolCalls?.map(tc => tc.toolName);
             const embedding = await generateExchangeEmbedding(exchange.userMessage, exchange.assistantMessage, toolNames);
             insertExchange(db, exchange, embedding, toolNames);

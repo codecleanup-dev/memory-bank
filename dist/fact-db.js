@@ -1,31 +1,52 @@
 import { randomUUID } from 'crypto';
 import { canonicalizeProject } from './project-canon.js';
 import { EMBEDDING_VERSION } from './embeddings.js';
+import { normalizeFactCategory } from './fact-category.js';
+import { getVecTableDtype, embeddingToVecBlob, vecParamSql, normalizeVecDistance, l2DistanceToSimilarity } from './db.js';
+/** dtype-aware MATCH/INSERT param for a fact-side vec table: the SQL
+ * placeholder (vec_int8(?) wrap for int8) and the correctly-encoded blob.
+ * float32 tables (pre-migration DBs) and int8 tables (fresh DBs / migrated)
+ * are both served — the actual schema decides. */
+function vecParamFor(db, table, embedding) {
+    const dt = getVecTableDtype(db, table);
+    return { sql: vecParamSql(dt), blob: embeddingToVecBlob(embedding, dt), dt };
+}
 export function insertFact(db, params) {
     const id = randomUUID();
     const now = new Date().toISOString();
     const scopeProject = params.scope_project
         ? canonicalizeProject(db, params.scope_project)
         : params.scope_project;
+    // Defensive clamp: extraction guarantees >= 0.7, but sync/import paths may
+    // carry arbitrary values — persist only a sane 0..1 number or NULL.
+    const confidence = typeof params.confidence === 'number' && Number.isFinite(params.confidence)
+        ? Math.min(1, Math.max(0, params.confidence))
+        : null;
     db.prepare(`
-    INSERT INTO facts (id, fact, category, scope_type, scope_project, source_exchange_ids, embedding, created_at, updated_at, consolidated_count, is_active, coding_agent, fact_kr, embedding_version)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
-  `).run(id, params.fact, params.category, params.scope_type, scopeProject, JSON.stringify(params.source_exchange_ids), params.embedding ? Buffer.from(new Float32Array(params.embedding).buffer) : null, now, now, params.coding_agent || 'claude-code', params.fact_kr ?? null, EMBEDDING_VERSION);
+    INSERT INTO facts (id, fact, category, scope_type, scope_project, source_exchange_ids, embedding, created_at, updated_at, consolidated_count, is_active, coding_agent, fact_kr, embedding_version, confidence)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?)
+  `).run(id, params.fact, 
+    // Chokepoint normalization: every caller (extractor, backfill, sync)
+    // funnels through here, so out-of-vocabulary LLM output is mapped to the
+    // controlled vocabulary instead of tripping the facts.category CHECK.
+    normalizeFactCategory(params.category), params.scope_type, scopeProject, JSON.stringify(params.source_exchange_ids), params.embedding ? Buffer.from(new Float32Array(params.embedding).buffer) : null, now, now, params.coding_agent || 'claude-code', params.fact_kr ?? null, EMBEDDING_VERSION, confidence);
     // Insert into vector index (atomic DELETE+INSERT via transaction)
     if (params.embedding) {
+        const p = vecParamFor(db, 'vec_facts', params.embedding);
         const upsertVec = db.transaction((vecId, buf) => {
             db.prepare('DELETE FROM vec_facts WHERE id = ?').run(vecId);
-            db.prepare('INSERT INTO vec_facts (id, embedding) VALUES (?, ?)').run(vecId, buf);
+            db.prepare(`INSERT INTO vec_facts (id, embedding) VALUES (?, ${p.sql})`).run(vecId, buf);
         });
-        upsertVec(id, Buffer.from(new Float32Array(params.embedding).buffer));
+        upsertVec(id, p.blob);
     }
     // Korean-text vector index (same-language matching for Korean queries)
     if (params.embedding_kr) {
+        const pk = vecParamFor(db, 'vec_facts_kr', params.embedding_kr);
         const upsertVecKr = db.transaction((vecId, buf) => {
             db.prepare('DELETE FROM vec_facts_kr WHERE id = ?').run(vecId);
-            db.prepare('INSERT INTO vec_facts_kr (id, embedding) VALUES (?, ?)').run(vecId, buf);
+            db.prepare(`INSERT INTO vec_facts_kr (id, embedding) VALUES (?, ${pk.sql})`).run(vecId, buf);
         });
-        upsertVecKr(id, Buffer.from(new Float32Array(params.embedding_kr).buffer));
+        upsertVecKr(id, pk.blob);
     }
     return id;
 }
@@ -62,11 +83,12 @@ export function updateFact(db, id, params) {
     db.prepare(`UPDATE facts SET ${updates.join(', ')} WHERE id = ?`).run(...values);
     // Update vector index (atomic DELETE+INSERT via transaction)
     if (params.embedding) {
+        const p = vecParamFor(db, 'vec_facts', params.embedding);
         const upsertVec = db.transaction((vecId, buf) => {
             db.prepare('DELETE FROM vec_facts WHERE id = ?').run(vecId);
-            db.prepare('INSERT INTO vec_facts (id, embedding) VALUES (?, ?)').run(vecId, buf);
+            db.prepare(`INSERT INTO vec_facts (id, embedding) VALUES (?, ${p.sql})`).run(vecId, buf);
         });
-        upsertVec(id, Buffer.from(new Float32Array(params.embedding).buffer));
+        upsertVec(id, p.blob);
     }
 }
 export function deactivateFact(db, id) {
@@ -94,7 +116,6 @@ export function getRevisions(db, factId) {
 }
 export function searchSimilarFacts(db, embedding, project, limit = 5, threshold = 0.85) {
     const canonProject = project ? canonicalizeProject(db, project) : project;
-    const buf = Buffer.from(new Float32Array(embedding).buffer);
     // Search both language indexes: the query language is unknown, and
     // multilingual models score same-language pairs far higher than
     // cross-language pairs. Keep the best (smallest) distance per fact id.
@@ -104,14 +125,21 @@ export function searchSimilarFacts(db, embedding, project, limit = 5, threshold 
     // dominated by other projects' facts — fetching only limit*2 starves the
     // requested scope of candidates entirely.
     const candidateFetch = Math.max(limit * 2, 50);
+    // Per-table dtype: the two language indexes can be at DIFFERENT dtypes
+    // mid-migration, and int8 distances come back ×127-scaled — normalize
+    // BEFORE the cross-table merge or the scales are incomparable.
     const fetch = (table) => {
         try {
-            return db.prepare(`
+            const p = vecParamFor(db, table, embedding);
+            const rows = db.prepare(`
         SELECT id, distance FROM ${table}
-        WHERE embedding MATCH ?
+        WHERE embedding MATCH ${p.sql}
         ORDER BY distance
         LIMIT ?
-      `).all(buf, candidateFetch);
+      `).all(p.blob, candidateFetch);
+            for (const r of rows)
+                r.distance = normalizeVecDistance(r.distance, p.dt);
+            return rows;
         }
         catch {
             return []; // table may not exist on very old DBs
@@ -129,7 +157,7 @@ export function searchSimilarFacts(db, embedding, project, limit = 5, threshold 
     const results = [];
     for (const vr of merged) {
         // L2 distance -> cosine similarity approximation
-        const similarity = 1 - (vr.distance * vr.distance) / 2;
+        const similarity = l2DistanceToSimilarity(vr.distance);
         if (similarity < threshold)
             continue;
         // embedding_version filter: during a model migration the vector tables
@@ -145,6 +173,89 @@ export function searchSimilarFacts(db, embedding, project, limit = 5, threshold 
         results.push({ fact, distance: vr.distance });
         if (results.length >= limit)
             break;
+    }
+    return results;
+}
+/**
+ * Nearest active facts restricted to EXACTLY one scope — used by consolidation
+ * so a project-private fact and a global fact can never be compared/merged
+ * across the boundary (which would leak private text into global memory or let
+ * one project mutate shared global facts). The scope filter is applied to the
+ * FULL overfetched candidate list BEFORE truncation, so a same-scope match is
+ * not starved out by closer out-of-scope rows (which the general
+ * searchSimilarFacts truncates first).
+ *
+ * scope: { type:'global' } → global facts only.
+ *        { type:'project', project } → that project's own facts only (no global).
+ */
+export function searchSimilarFactsSameScope(db, embedding, scope, limit = 5, threshold = 0.85) {
+    const canonProject = scope.type === 'project' ? canonicalizeProject(db, scope.project) : null;
+    // Early out only if the scope is genuinely empty (nothing to match against).
+    const scopeCount = scope.type === 'global'
+        ? db.prepare("SELECT COUNT(*) AS n FROM facts WHERE is_active = 1 AND scope_type = 'global' AND embedding_version = ?").get(EMBEDDING_VERSION).n
+        : db.prepare("SELECT COUNT(*) AS n FROM facts WHERE is_active = 1 AND scope_type = 'project' AND scope_project = ? AND embedding_version = ?").get(canonProject, EMBEDDING_VERSION).n;
+    if (scopeCount === 0)
+        return [];
+    // fetchN returns rows AND whether the index returned fewer than requested
+    // (i.e. it was exhausted). We page on the VECTOR-TABLE row count, not the
+    // active-fact count: the vec tables can hold stale/old-version rows that rank
+    // ahead of a valid in-scope row and are only rejected later by the
+    // embedding_version filter, so bounding by active facts could stop before
+    // reaching the match. `exhausted` is the correct, index-size-independent stop.
+    const fetchN = (table, n) => {
+        try {
+            const p = vecParamFor(db, table, embedding);
+            const rows = db.prepare(`
+        SELECT id, distance FROM ${table}
+        WHERE embedding MATCH ${p.sql} ORDER BY distance LIMIT ?
+      `).all(p.blob, n);
+            // Normalize ×127-scaled int8 distances BEFORE the cross-table merge.
+            for (const r of rows)
+                r.distance = normalizeVecDistance(r.distance, p.dt);
+            return { rows, exhausted: rows.length < n };
+        }
+        catch {
+            return { rows: [], exhausted: true };
+        }
+    };
+    const HARD_CAP = 100_000; // safety ceiling so a pathological index can't loop unbounded
+    let fetchCount = Math.max(limit * 20, 200);
+    let results = [];
+    for (;;) {
+        const a = fetchN('vec_facts', fetchCount);
+        const b = fetchN('vec_facts_kr', fetchCount);
+        const best = new Map();
+        for (const vr of [...a.rows, ...b.rows]) {
+            const cur = best.get(vr.id);
+            if (cur === undefined || vr.distance < cur)
+                best.set(vr.id, vr.distance);
+        }
+        const merged = [...best.entries()].map(([id, distance]) => ({ id, distance })).sort((x, y) => x.distance - y.distance);
+        results = [];
+        for (const vr of merged) {
+            const similarity = l2DistanceToSimilarity(vr.distance);
+            if (similarity < threshold)
+                continue;
+            const row = db.prepare('SELECT * FROM facts WHERE id = ? AND is_active = 1 AND embedding_version = ?').get(vr.id, EMBEDDING_VERSION);
+            if (!row)
+                continue;
+            const fact = rowToFact(row);
+            if (scope.type === 'global') {
+                if (fact.scope_type !== 'global')
+                    continue;
+            }
+            else if (fact.scope_type !== 'project' || fact.scope_project !== canonProject) {
+                continue;
+            }
+            results.push({ fact, distance: vr.distance });
+            if (results.length >= limit)
+                break;
+        }
+        // Stop when we have enough, both indexes are exhausted, or we hit the cap.
+        const bothExhausted = a.exhausted && b.exhausted;
+        if (results.length >= limit || bothExhausted || fetchCount >= HARD_CAP)
+            break;
+        fetchCount = Math.min(fetchCount * 4, HARD_CAP);
     }
     return results;
 }
@@ -219,20 +330,59 @@ export function getNewFactsSince(db, project, since) {
   `).all(since, canonicalizeProject(db, project)).map(rowToFact);
 }
 /**
+ * All active facts after a KEYSET cursor `(createdAt, id)`, EVERY scope/project,
+ * each row once, ordered by (created_at, id). The composite key is what makes
+ * the consolidate cursor strictly monotonic PER FACT: ordering by created_at
+ * alone stalls when a whole timestamp group is larger than the per-run budget
+ * (the cursor can't advance into a shared timestamp without risking a skip), so
+ * `id` is the unique tiebreaker that lets the drain progress one fact at a time.
+ *
+ * cursor null → from the beginning (all active facts).
+ *
+ * KNOWN LIMITATION (best-effort dedup): a fact IMPORTED mid-drain with an old
+ * `created_at` that sorts before the current cursor is not re-driven by this
+ * pass (it's still a similarity CANDIDATE for future facts, so a duplicate is
+ * still caught opportunistically). Consolidation is a background convenience,
+ * not an exhaustive guarantee, so this is accepted rather than adding a
+ * full re-scan on every import.
+ */
+export function getAllNewFactsSince(db, cursor, limit = 2000) {
+    // Bounded page (keyset) — NEVER materialize the whole table: seeding from the
+    // beginning could otherwise pull tens of thousands of rows into memory in one
+    // query. The keyset cursor makes each run resume exactly where the last ended,
+    // so the backlog drains page-by-page. The idx_facts_active_created_id index
+    // (is_active, created_at, id) serves both the filter and the ORDER BY without
+    // a temp sort.
+    if (!cursor) {
+        return db.prepare(`
+      SELECT * FROM facts WHERE is_active = 1 ORDER BY created_at ASC, id ASC LIMIT ?
+    `).all(limit).map(rowToFact);
+    }
+    return db.prepare(`
+    SELECT * FROM facts
+    WHERE is_active = 1
+      AND (created_at > ? OR (created_at = ? AND id > ?))
+    ORDER BY created_at ASC, id ASC LIMIT ?
+  `).all(cursor.createdAt, cursor.createdAt, cursor.id, limit).map(rowToFact);
+}
+/**
  * Search facts across ALL projects (no scope filter).
  * Used for cross-project knowledge transfer.
  */
 export function searchAllFacts(db, embedding, limit = 10, threshold = 0.6) {
+    const pAll = vecParamFor(db, 'vec_facts', embedding);
     const vecResults = db.prepare(`
     SELECT id, distance
     FROM vec_facts
-    WHERE embedding MATCH ?
+    WHERE embedding MATCH ${pAll.sql}
     ORDER BY distance
     LIMIT ?
-  `).all(Buffer.from(new Float32Array(embedding).buffer), limit * 2);
+  `).all(pAll.blob, limit * 2);
+    for (const r of vecResults)
+        r.distance = normalizeVecDistance(r.distance, pAll.dt);
     const results = [];
     for (const vr of vecResults) {
-        const similarity = 1 - (vr.distance * vr.distance) / 2;
+        const similarity = l2DistanceToSimilarity(vr.distance);
         if (similarity < threshold)
             continue;
         const row = db.prepare('SELECT * FROM facts WHERE id = ? AND is_active = 1').get(vr.id);
@@ -269,5 +419,6 @@ function rowToFact(row) {
         is_active: Boolean(row['is_active']),
         ontology_category_id: row['ontology_category_id'] ?? null,
         coding_agent: row['coding_agent'] ?? null,
+        confidence: row['confidence'] ?? null,
     };
 }

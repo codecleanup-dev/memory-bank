@@ -32,9 +32,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// node_modules/ajv/dist/compile/codegen/code.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/codegen/code.js
 var require_code = __commonJS({
-  "node_modules/ajv/dist/compile/codegen/code.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/codegen/code.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.regexpCode = exports.getEsmExportName = exports.getProperty = exports.safeStringify = exports.stringify = exports.strConcat = exports.addCodeArg = exports.str = exports._ = exports.nil = exports._Code = exports.Name = exports.IDENTIFIER = exports._CodeOrName = void 0;
@@ -186,9 +186,9 @@ var require_code = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/codegen/scope.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/codegen/scope.js
 var require_scope = __commonJS({
-  "node_modules/ajv/dist/compile/codegen/scope.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/codegen/scope.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ValueScope = exports.ValueScopeName = exports.Scope = exports.varKinds = exports.UsedValueState = void 0;
@@ -331,9 +331,9 @@ var require_scope = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/codegen/index.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/codegen/index.js
 var require_codegen = __commonJS({
-  "node_modules/ajv/dist/compile/codegen/index.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/codegen/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.or = exports.and = exports.not = exports.CodeGen = exports.operators = exports.varKinds = exports.ValueScopeName = exports.ValueScope = exports.Scope = exports.Name = exports.regexpCode = exports.stringify = exports.getProperty = exports.nil = exports.strConcat = exports.str = exports._ = void 0;
@@ -1051,9 +1051,9 @@ var require_codegen = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/util.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/util.js
 var require_util = __commonJS({
-  "node_modules/ajv/dist/compile/util.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/util.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.checkStrictMode = exports.getErrorPath = exports.Type = exports.useFunc = exports.setEvaluated = exports.evaluatedPropsToName = exports.mergeEvaluated = exports.eachItem = exports.unescapeJsonPointer = exports.escapeJsonPointer = exports.escapeFragment = exports.unescapeFragment = exports.schemaRefOrVal = exports.schemaHasRulesButRef = exports.schemaHasRules = exports.checkUnknownRules = exports.alwaysValidSchema = exports.toHash = void 0;
@@ -1218,9 +1218,9 @@ var require_util = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/names.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/names.js
 var require_names = __commonJS({
-  "node_modules/ajv/dist/compile/names.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/names.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -1257,9 +1257,9 @@ var require_names = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/errors.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/errors.js
 var require_errors = __commonJS({
-  "node_modules/ajv/dist/compile/errors.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/errors.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.extendErrors = exports.resetErrorsCount = exports.reportExtraError = exports.reportError = exports.keyword$DataError = exports.keywordError = void 0;
@@ -1379,9 +1379,9 @@ var require_errors = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/boolSchema.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/boolSchema.js
 var require_boolSchema = __commonJS({
-  "node_modules/ajv/dist/compile/validate/boolSchema.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/boolSchema.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.boolOrEmptySchema = exports.topBoolOrEmptySchema = void 0;
@@ -1430,9 +1430,9 @@ var require_boolSchema = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/rules.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/rules.js
 var require_rules = __commonJS({
-  "node_modules/ajv/dist/compile/rules.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/rules.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getRules = exports.isJSONType = void 0;
@@ -1461,9 +1461,9 @@ var require_rules = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/applicability.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/applicability.js
 var require_applicability = __commonJS({
-  "node_modules/ajv/dist/compile/validate/applicability.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/applicability.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.shouldUseRule = exports.shouldUseGroup = exports.schemaHasRulesForType = void 0;
@@ -1484,9 +1484,9 @@ var require_applicability = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/dataType.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/dataType.js
 var require_dataType = __commonJS({
-  "node_modules/ajv/dist/compile/validate/dataType.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/dataType.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.reportTypeError = exports.checkDataTypes = exports.checkDataType = exports.coerceAndCheckDataType = exports.getJSONTypes = exports.getSchemaTypes = exports.DataType = void 0;
@@ -1668,9 +1668,9 @@ var require_dataType = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/defaults.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/defaults.js
 var require_defaults = __commonJS({
-  "node_modules/ajv/dist/compile/validate/defaults.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/defaults.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.assignDefaults = void 0;
@@ -1705,9 +1705,9 @@ var require_defaults = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/code.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/code.js
 var require_code2 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/code.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/code.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateUnion = exports.validateArray = exports.usePattern = exports.callValidateCode = exports.schemaProperties = exports.allSchemaProperties = exports.noPropertyInData = exports.propertyInData = exports.isOwnProperty = exports.hasPropFunc = exports.reportMissingProp = exports.checkMissingProp = exports.checkReportMissingProp = void 0;
@@ -1838,9 +1838,9 @@ var require_code2 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/keyword.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/keyword.js
 var require_keyword = __commonJS({
-  "node_modules/ajv/dist/compile/validate/keyword.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/keyword.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateKeywordUsage = exports.validSchemaType = exports.funcKeywordCode = exports.macroKeywordCode = void 0;
@@ -1956,9 +1956,9 @@ var require_keyword = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/subschema.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/subschema.js
 var require_subschema = __commonJS({
-  "node_modules/ajv/dist/compile/validate/subschema.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/subschema.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.extendSubschemaMode = exports.extendSubschemaData = exports.getSubschema = void 0;
@@ -2039,9 +2039,9 @@ var require_subschema = __commonJS({
   }
 });
 
-// node_modules/fast-deep-equal/index.js
+// ../memory-bank-fork/node_modules/fast-deep-equal/index.js
 var require_fast_deep_equal = __commonJS({
-  "node_modules/fast-deep-equal/index.js"(exports, module) {
+  "../memory-bank-fork/node_modules/fast-deep-equal/index.js"(exports, module) {
     "use strict";
     module.exports = function equal(a, b2) {
       if (a === b2) return true;
@@ -2074,9 +2074,9 @@ var require_fast_deep_equal = __commonJS({
   }
 });
 
-// node_modules/json-schema-traverse/index.js
+// ../memory-bank-fork/node_modules/json-schema-traverse/index.js
 var require_json_schema_traverse = __commonJS({
-  "node_modules/json-schema-traverse/index.js"(exports, module) {
+  "../memory-bank-fork/node_modules/json-schema-traverse/index.js"(exports, module) {
     "use strict";
     var traverse = module.exports = function(schema, opts, cb) {
       if (typeof opts == "function") {
@@ -2162,9 +2162,9 @@ var require_json_schema_traverse = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/resolve.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/resolve.js
 var require_resolve = __commonJS({
-  "node_modules/ajv/dist/compile/resolve.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/resolve.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getSchemaRefs = exports.resolveUrl = exports.normalizeId = exports._getFullPath = exports.getFullPath = exports.inlineRef = void 0;
@@ -2318,9 +2318,9 @@ var require_resolve = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/validate/index.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/index.js
 var require_validate = __commonJS({
-  "node_modules/ajv/dist/compile/validate/index.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getData = exports.KeywordCxt = exports.validateFunctionCode = void 0;
@@ -2826,9 +2826,9 @@ var require_validate = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/runtime/validation_error.js
+// ../memory-bank-fork/node_modules/ajv/dist/runtime/validation_error.js
 var require_validation_error = __commonJS({
-  "node_modules/ajv/dist/runtime/validation_error.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/runtime/validation_error.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var ValidationError = class extends Error {
@@ -2842,9 +2842,9 @@ var require_validation_error = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/ref_error.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/ref_error.js
 var require_ref_error = __commonJS({
-  "node_modules/ajv/dist/compile/ref_error.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/ref_error.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var resolve_1 = require_resolve();
@@ -2859,9 +2859,9 @@ var require_ref_error = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/index.js
+// ../memory-bank-fork/node_modules/ajv/dist/compile/index.js
 var require_compile = __commonJS({
-  "node_modules/ajv/dist/compile/index.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/compile/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.resolveSchema = exports.getCompilingSchema = exports.resolveRef = exports.compileSchema = exports.SchemaEnv = void 0;
@@ -3083,9 +3083,9 @@ var require_compile = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/refs/data.json
+// ../memory-bank-fork/node_modules/ajv/dist/refs/data.json
 var require_data = __commonJS({
-  "node_modules/ajv/dist/refs/data.json"(exports, module) {
+  "../memory-bank-fork/node_modules/ajv/dist/refs/data.json"(exports, module) {
     module.exports = {
       $id: "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#",
       description: "Meta-schema for $data reference (JSON AnySchema extension proposal)",
@@ -3102,9 +3102,9 @@ var require_data = __commonJS({
   }
 });
 
-// node_modules/fast-uri/lib/utils.js
+// ../memory-bank-fork/node_modules/fast-uri/lib/utils.js
 var require_utils = __commonJS({
-  "node_modules/fast-uri/lib/utils.js"(exports, module) {
+  "../memory-bank-fork/node_modules/fast-uri/lib/utils.js"(exports, module) {
     "use strict";
     var isUUID = RegExp.prototype.test.bind(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu);
     var isIPv4 = RegExp.prototype.test.bind(/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u);
@@ -3415,9 +3415,9 @@ var require_utils = __commonJS({
   }
 });
 
-// node_modules/fast-uri/lib/schemes.js
+// ../memory-bank-fork/node_modules/fast-uri/lib/schemes.js
 var require_schemes = __commonJS({
-  "node_modules/fast-uri/lib/schemes.js"(exports, module) {
+  "../memory-bank-fork/node_modules/fast-uri/lib/schemes.js"(exports, module) {
     "use strict";
     var { isUUID } = require_utils();
     var URN_REG = /([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-.:;=@]|%[\da-f]{2})+)/iu;
@@ -3625,9 +3625,9 @@ var require_schemes = __commonJS({
   }
 });
 
-// node_modules/fast-uri/index.js
+// ../memory-bank-fork/node_modules/fast-uri/index.js
 var require_fast_uri = __commonJS({
-  "node_modules/fast-uri/index.js"(exports, module) {
+  "../memory-bank-fork/node_modules/fast-uri/index.js"(exports, module) {
     "use strict";
     var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, escapePreservingEscapes, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = require_utils();
     var { SCHEMES, getSchemeHandler } = require_schemes();
@@ -3840,7 +3840,7 @@ var require_fast_uri = __commonJS({
         if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport)) {
           if (parsed.host && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && nonSimpleDomain(parsed.host)) {
             try {
-              parsed.host = new URL("http://" + parsed.host).hostname;
+              parsed.host = URL.domainToASCII(parsed.host.toLowerCase());
             } catch (e) {
               parsed.error = parsed.error || "Host's domain name can not be converted to ASCII: " + e;
             }
@@ -3911,9 +3911,9 @@ var require_fast_uri = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/runtime/uri.js
+// ../memory-bank-fork/node_modules/ajv/dist/runtime/uri.js
 var require_uri = __commonJS({
-  "node_modules/ajv/dist/runtime/uri.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/runtime/uri.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var uri = require_fast_uri();
@@ -3922,9 +3922,9 @@ var require_uri = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/core.js
+// ../memory-bank-fork/node_modules/ajv/dist/core.js
 var require_core = __commonJS({
-  "node_modules/ajv/dist/core.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/core.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = void 0;
@@ -4533,9 +4533,9 @@ var require_core = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/core/id.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/core/id.js
 var require_id = __commonJS({
-  "node_modules/ajv/dist/vocabularies/core/id.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/core/id.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var def = {
@@ -4548,9 +4548,9 @@ var require_id = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/core/ref.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/core/ref.js
 var require_ref = __commonJS({
-  "node_modules/ajv/dist/vocabularies/core/ref.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/core/ref.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.callRef = exports.getValidate = void 0;
@@ -4670,9 +4670,9 @@ var require_ref = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/core/index.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/core/index.js
 var require_core2 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/core/index.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/core/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var id_1 = require_id();
@@ -4691,9 +4691,9 @@ var require_core2 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/limitNumber.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitNumber.js
 var require_limitNumber = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4723,9 +4723,9 @@ var require_limitNumber = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/multipleOf.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/multipleOf.js
 var require_multipleOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4751,9 +4751,9 @@ var require_multipleOf = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/runtime/ucs2length.js
+// ../memory-bank-fork/node_modules/ajv/dist/runtime/ucs2length.js
 var require_ucs2length = __commonJS({
-  "node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     function ucs2length(str) {
@@ -4777,9 +4777,9 @@ var require_ucs2length = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/limitLength.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitLength.js
 var require_limitLength = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4809,9 +4809,9 @@ var require_limitLength = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/pattern.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/pattern.js
 var require_pattern = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -4846,9 +4846,9 @@ var require_pattern = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/limitProperties.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitProperties.js
 var require_limitProperties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4875,9 +4875,9 @@ var require_limitProperties = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/required.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/required.js
 var require_required = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/required.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/required.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -4957,9 +4957,9 @@ var require_required = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/limitItems.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitItems.js
 var require_limitItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4986,9 +4986,9 @@ var require_limitItems = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/runtime/equal.js
+// ../memory-bank-fork/node_modules/ajv/dist/runtime/equal.js
 var require_equal = __commonJS({
-  "node_modules/ajv/dist/runtime/equal.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/runtime/equal.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var equal = require_fast_deep_equal();
@@ -4997,9 +4997,9 @@ var require_equal = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/uniqueItems.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/uniqueItems.js
 var require_uniqueItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var dataType_1 = require_dataType();
@@ -5064,9 +5064,9 @@ var require_uniqueItems = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/const.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/const.js
 var require_const = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/const.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/const.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5093,9 +5093,9 @@ var require_const = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/enum.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/enum.js
 var require_enum = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/enum.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/enum.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5142,9 +5142,9 @@ var require_enum = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/validation/index.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/index.js
 var require_validation = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/index.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var limitNumber_1 = require_limitNumber();
@@ -5180,9 +5180,9 @@ var require_validation = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/additionalItems.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/additionalItems.js
 var require_additionalItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateAdditionalItems = void 0;
@@ -5233,9 +5233,9 @@ var require_additionalItems = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/items.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/items.js
 var require_items = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/items.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/items.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateTuple = void 0;
@@ -5290,9 +5290,9 @@ var require_items = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/prefixItems.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/prefixItems.js
 var require_prefixItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var items_1 = require_items();
@@ -5307,9 +5307,9 @@ var require_prefixItems = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/items2020.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/items2020.js
 var require_items2020 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5342,9 +5342,9 @@ var require_items2020 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/contains.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/contains.js
 var require_contains = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5436,9 +5436,9 @@ var require_contains = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/dependencies.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/dependencies.js
 var require_dependencies = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateSchemaDeps = exports.validatePropertyDeps = exports.error = void 0;
@@ -5530,9 +5530,9 @@ var require_dependencies = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/propertyNames.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/propertyNames.js
 var require_propertyNames = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5573,9 +5573,9 @@ var require_propertyNames = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js
 var require_additionalProperties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5679,9 +5679,9 @@ var require_additionalProperties = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/properties.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/properties.js
 var require_properties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var validate_1 = require_validate();
@@ -5737,9 +5737,9 @@ var require_properties = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/patternProperties.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/patternProperties.js
 var require_patternProperties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5811,9 +5811,9 @@ var require_patternProperties = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/not.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/not.js
 var require_not = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/not.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/not.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5842,9 +5842,9 @@ var require_not = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/anyOf.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/anyOf.js
 var require_anyOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5859,9 +5859,9 @@ var require_anyOf = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/oneOf.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/oneOf.js
 var require_oneOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5917,9 +5917,9 @@ var require_oneOf = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/allOf.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/allOf.js
 var require_allOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5944,9 +5944,9 @@ var require_allOf = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/if.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/if.js
 var require_if = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/if.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/if.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6013,9 +6013,9 @@ var require_if = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/thenElse.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/thenElse.js
 var require_thenElse = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -6031,9 +6031,9 @@ var require_thenElse = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/applicator/index.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/index.js
 var require_applicator = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/index.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var additionalItems_1 = require_additionalItems();
@@ -6079,9 +6079,9 @@ var require_applicator = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/format/format.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/format/format.js
 var require_format = __commonJS({
-  "node_modules/ajv/dist/vocabularies/format/format.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/format/format.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6169,9 +6169,9 @@ var require_format = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/format/index.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/format/index.js
 var require_format2 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/format/index.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/format/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var format_1 = require_format();
@@ -6180,9 +6180,9 @@ var require_format2 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/metadata.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/metadata.js
 var require_metadata = __commonJS({
-  "node_modules/ajv/dist/vocabularies/metadata.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/metadata.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.contentVocabulary = exports.metadataVocabulary = void 0;
@@ -6203,9 +6203,9 @@ var require_metadata = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/draft7.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/draft7.js
 var require_draft7 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/draft7.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/draft7.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var core_1 = require_core2();
@@ -6225,9 +6225,9 @@ var require_draft7 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/discriminator/types.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/discriminator/types.js
 var require_types = __commonJS({
-  "node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.DiscrError = void 0;
@@ -6239,9 +6239,9 @@ var require_types = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/vocabularies/discriminator/index.js
+// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/discriminator/index.js
 var require_discriminator = __commonJS({
-  "node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6344,9 +6344,9 @@ var require_discriminator = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/refs/json-schema-draft-07.json
+// ../memory-bank-fork/node_modules/ajv/dist/refs/json-schema-draft-07.json
 var require_json_schema_draft_07 = __commonJS({
-  "node_modules/ajv/dist/refs/json-schema-draft-07.json"(exports, module) {
+  "../memory-bank-fork/node_modules/ajv/dist/refs/json-schema-draft-07.json"(exports, module) {
     module.exports = {
       $schema: "http://json-schema.org/draft-07/schema#",
       $id: "http://json-schema.org/draft-07/schema#",
@@ -6501,9 +6501,9 @@ var require_json_schema_draft_07 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/ajv.js
+// ../memory-bank-fork/node_modules/ajv/dist/ajv.js
 var require_ajv = __commonJS({
-  "node_modules/ajv/dist/ajv.js"(exports, module) {
+  "../memory-bank-fork/node_modules/ajv/dist/ajv.js"(exports, module) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.MissingRefError = exports.ValidationError = exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = exports.Ajv = void 0;
@@ -6571,9 +6571,9 @@ var require_ajv = __commonJS({
   }
 });
 
-// node_modules/ajv-formats/dist/formats.js
+// ../memory-bank-fork/node_modules/ajv-formats/dist/formats.js
 var require_formats = __commonJS({
-  "node_modules/ajv-formats/dist/formats.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv-formats/dist/formats.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatNames = exports.fastFormats = exports.fullFormats = void 0;
@@ -6774,9 +6774,9 @@ var require_formats = __commonJS({
   }
 });
 
-// node_modules/ajv-formats/dist/limit.js
+// ../memory-bank-fork/node_modules/ajv-formats/dist/limit.js
 var require_limit = __commonJS({
-  "node_modules/ajv-formats/dist/limit.js"(exports) {
+  "../memory-bank-fork/node_modules/ajv-formats/dist/limit.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatLimitDefinition = void 0;
@@ -6846,9 +6846,9 @@ var require_limit = __commonJS({
   }
 });
 
-// node_modules/ajv-formats/dist/index.js
+// ../memory-bank-fork/node_modules/ajv-formats/dist/index.js
 var require_dist = __commonJS({
-  "node_modules/ajv-formats/dist/index.js"(exports, module) {
+  "../memory-bank-fork/node_modules/ajv-formats/dist/index.js"(exports, module) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var formats_1 = require_formats();
@@ -6888,7 +6888,7 @@ var require_dist = __commonJS({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/tslib.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/tslib.mjs
 function __classPrivateFieldSet(receiver, state, value, kind, f) {
   if (kind === "m")
     throw new TypeError("Private method is not writable");
@@ -6906,14 +6906,14 @@ function __classPrivateFieldGet(receiver, state, kind, f) {
   return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 }
 var init_tslib = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/tslib.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/tslib.mjs"() {
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/utils/uuid.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/uuid.mjs
 var uuid4;
 var init_uuid = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/utils/uuid.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/uuid.mjs"() {
     uuid4 = function() {
       const { crypto } = globalThis;
       if (crypto?.randomUUID) {
@@ -6927,7 +6927,7 @@ var init_uuid = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/errors.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/errors.mjs
 function isAbortError(err) {
   return typeof err === "object" && err !== null && // Spec-compliant fetch implementations
   ("name" in err && err.name === "AbortError" || // Expo fetch
@@ -6935,7 +6935,7 @@ function isAbortError(err) {
 }
 var castToError;
 var init_errors = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/errors.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/errors.mjs"() {
     castToError = (err) => {
       if (err instanceof Error)
         return err;
@@ -6963,10 +6963,10 @@ var init_errors = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/core/error.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/error.mjs
 var AnthropicError, APIError, APIUserAbortError, APIConnectionError, APIConnectionTimeoutError, BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError, ConflictError, UnprocessableEntityError, RateLimitError, InternalServerError;
 var init_error = __esm({
-  "node_modules/@anthropic-ai/sdk/core/error.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/error.mjs"() {
     init_errors();
     AnthropicError = class extends Error {
     };
@@ -7059,7 +7059,7 @@ var init_error = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/utils/values.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/values.mjs
 function maybeObj(x2) {
   if (typeof x2 !== "object") {
     return {};
@@ -7078,7 +7078,7 @@ function hasOwn(obj, key) {
 }
 var startsWithSchemeRegexp, isAbsoluteURL, isArray, isReadonlyArray, validatePositiveInteger, safeJSON;
 var init_values = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/utils/values.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/values.mjs"() {
     init_error();
     startsWithSchemeRegexp = /^[a-z][a-z0-9+.-]*:/i;
     isAbsoluteURL = (url) => {
@@ -7105,23 +7105,23 @@ var init_values = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/utils/sleep.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/sleep.mjs
 var sleep;
 var init_sleep = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/utils/sleep.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/sleep.mjs"() {
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   }
 });
 
-// node_modules/@anthropic-ai/sdk/version.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/version.mjs
 var VERSION;
 var init_version = __esm({
-  "node_modules/@anthropic-ai/sdk/version.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/version.mjs"() {
     VERSION = "0.78.0";
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/detect-platform.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/detect-platform.mjs
 function getDetectedPlatform() {
   if (typeof Deno !== "undefined" && Deno.build != null) {
     return "deno";
@@ -7159,7 +7159,7 @@ function getBrowserInfo() {
 }
 var isRunningInBrowser, getPlatformProperties, normalizeArch, normalizePlatform, _platformHeaders, getPlatformHeaders;
 var init_detect_platform = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/detect-platform.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/detect-platform.mjs"() {
     init_version();
     isRunningInBrowser = () => {
       return (
@@ -7260,7 +7260,7 @@ var init_detect_platform = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/shims.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/shims.mjs
 function getDefaultFetch() {
   if (typeof fetch !== "undefined") {
     return fetch;
@@ -7332,14 +7332,14 @@ async function CancelReadableStream(stream) {
   await cancelPromise;
 }
 var init_shims = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/shims.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/shims.mjs"() {
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/request-options.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/request-options.mjs
 var FallbackEncoder;
 var init_request_options = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/request-options.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/request-options.mjs"() {
     FallbackEncoder = ({ headers, body }) => {
       return {
         bodyHeaders: {
@@ -7351,7 +7351,7 @@ var init_request_options = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/utils/bytes.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/bytes.mjs
 function concatBytes(buffers) {
   let length = 0;
   for (const buffer of buffers) {
@@ -7375,11 +7375,11 @@ function decodeUTF8(bytes) {
 }
 var encodeUTF8_, decodeUTF8_;
 var init_bytes = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/utils/bytes.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/bytes.mjs"() {
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/decoders/line.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/decoders/line.mjs
 function findNewlineIndex(buffer, startIndex) {
   const newline = 10;
   const carriage = 13;
@@ -7411,7 +7411,7 @@ function findDoubleNewlineIndex(buffer) {
 }
 var _LineDecoder_buffer, _LineDecoder_carriageReturnIndex, LineDecoder;
 var init_line = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/decoders/line.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/decoders/line.mjs"() {
     init_tslib();
     init_bytes();
     LineDecoder = class {
@@ -7461,7 +7461,7 @@ var init_line = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/utils/log.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/log.mjs
 function noop() {
 }
 function makeLogFn(fnLevel, logger, logLevel) {
@@ -7492,7 +7492,7 @@ function loggerFor(client) {
 }
 var levelNumbers, parseLogLevel, noopLogger, cachedLoggers, formatRequestDetails;
 var init_log = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/utils/log.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/log.mjs"() {
     init_values();
     levelNumbers = {
       off: 0,
@@ -7540,7 +7540,7 @@ var init_log = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/core/streaming.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/streaming.mjs
 async function* _iterSSEMessages(response, controller) {
   if (!response.body) {
     controller.abort();
@@ -7595,7 +7595,7 @@ function partition(str, delimiter) {
 }
 var _Stream_client, Stream, SSEDecoder;
 var init_streaming = __esm({
-  "node_modules/@anthropic-ai/sdk/core/streaming.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/streaming.mjs"() {
     init_tslib();
     init_error();
     init_shims();
@@ -7803,7 +7803,7 @@ var init_streaming = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/parse.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/parse.mjs
 async function defaultParseResponse(client, props) {
   const { response, requestLogID, retryOfRequestLogID, startTime } = props;
   const body = await (async () => {
@@ -7853,16 +7853,16 @@ function addRequestID(value, response) {
   });
 }
 var init_parse = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/parse.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/parse.mjs"() {
     init_streaming();
     init_log();
   }
 });
 
-// node_modules/@anthropic-ai/sdk/core/api-promise.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/api-promise.mjs
 var _APIPromise_client, APIPromise;
 var init_api_promise = __esm({
-  "node_modules/@anthropic-ai/sdk/core/api-promise.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/api-promise.mjs"() {
     init_tslib();
     init_parse();
     APIPromise = class _APIPromise extends Promise {
@@ -7928,10 +7928,10 @@ var init_api_promise = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/core/pagination.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/pagination.mjs
 var _AbstractPage_client, AbstractPage, PagePromise, Page, PageCursor;
 var init_pagination = __esm({
-  "node_modules/@anthropic-ai/sdk/core/pagination.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/pagination.mjs"() {
     init_tslib();
     init_error();
     init_parse();
@@ -8069,7 +8069,7 @@ var init_pagination = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/uploads.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/uploads.mjs
 function makeFile(fileBits, fileName, options) {
   checkFileSupport();
   return new File(fileBits, fileName ?? "unknown_file", options);
@@ -8100,7 +8100,7 @@ function supportsFormData(fetchObject) {
 }
 var checkFileSupport, isAsyncIterable, multipartFormRequestOptions, supportsFormDataMap, createForm, isNamedBlob, addFormValue;
 var init_uploads = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/uploads.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/uploads.mjs"() {
     init_shims();
     checkFileSupport = () => {
       if (typeof File === "undefined") {
@@ -8153,7 +8153,7 @@ var init_uploads = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/to-file.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/to-file.mjs
 async function toFile(value, name, options) {
   checkFileSupport();
   value = await value;
@@ -8207,7 +8207,7 @@ function propsForError(value) {
 }
 var isBlobLike, isFileLike, isResponseLike;
 var init_to_file = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/to-file.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/to-file.mjs"() {
     init_uploads();
     init_uploads();
     isBlobLike = (value) => value != null && typeof value === "object" && typeof value.size === "number" && typeof value.type === "string" && typeof value.text === "function" && typeof value.slice === "function" && typeof value.arrayBuffer === "function";
@@ -8216,23 +8216,23 @@ var init_to_file = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/core/uploads.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/uploads.mjs
 var init_uploads2 = __esm({
-  "node_modules/@anthropic-ai/sdk/core/uploads.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/uploads.mjs"() {
     init_to_file();
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/shared.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/shared.mjs
 var init_shared = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/shared.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/shared.mjs"() {
   }
 });
 
-// node_modules/@anthropic-ai/sdk/core/resource.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/resource.mjs
 var APIResource;
 var init_resource = __esm({
-  "node_modules/@anthropic-ai/sdk/core/resource.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/resource.mjs"() {
     APIResource = class {
       constructor(client) {
         this._client = client;
@@ -8241,7 +8241,7 @@ var init_resource = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/headers.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/headers.mjs
 function* iterateHeaders(headers) {
   if (!headers)
     return;
@@ -8282,7 +8282,7 @@ function* iterateHeaders(headers) {
 }
 var brand_privateNullableHeaders, buildHeaders;
 var init_headers = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/headers.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/headers.mjs"() {
     init_values();
     brand_privateNullableHeaders = Symbol.for("brand.privateNullableHeaders");
     buildHeaders = (newHeaders) => {
@@ -8310,7 +8310,7 @@ var init_headers = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/lib/stainless-helper-header.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/stainless-helper-header.mjs
 function wasCreatedByStainlessHelper(value) {
   return typeof value === "object" && value !== null && SDK_HELPER_SYMBOL in value;
 }
@@ -8353,18 +8353,18 @@ function stainlessHelperHeaderFromFile(file) {
 }
 var SDK_HELPER_SYMBOL;
 var init_stainless_helper_header = __esm({
-  "node_modules/@anthropic-ai/sdk/lib/stainless-helper-header.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/stainless-helper-header.mjs"() {
     SDK_HELPER_SYMBOL = Symbol("anthropic.sdk.stainlessHelper");
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/utils/path.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/path.mjs
 function encodeURIPath(str) {
   return str.replace(/[^A-Za-z0-9\-._~!$&'()*+,;=:@]+/g, encodeURIComponent);
 }
 var EMPTY, createPathTagFunction, path3;
 var init_path = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/utils/path.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/path.mjs"() {
     init_error();
     EMPTY = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.create(null));
     createPathTagFunction = (pathEncoder = encodeURIPath) => function path6(statics, ...params) {
@@ -8419,10 +8419,10 @@ ${underline}`);
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/beta/files.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/files.mjs
 var Files;
 var init_files = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/beta/files.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/files.mjs"() {
     init_resource();
     init_pagination();
     init_headers();
@@ -8544,10 +8544,10 @@ var init_files = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/beta/models.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/models.mjs
 var Models;
 var init_models = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/beta/models.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/models.mjs"() {
     init_resource();
     init_pagination();
     init_headers();
@@ -8605,17 +8605,17 @@ var init_models = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/error.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/error.mjs
 var init_error2 = __esm({
-  "node_modules/@anthropic-ai/sdk/error.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/error.mjs"() {
     init_error();
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/constants.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/constants.mjs
 var MODEL_NONSTREAMING_TOKENS;
 var init_constants = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/constants.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/constants.mjs"() {
     MODEL_NONSTREAMING_TOKENS = {
       "claude-opus-4-20250514": 8192,
       "claude-opus-4-0": 8192,
@@ -8629,7 +8629,7 @@ var init_constants = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/lib/beta-parser.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/beta-parser.mjs
 function getOutputFormat(params) {
   return params?.output_format ?? params?.output_config?.format;
 }
@@ -8702,15 +8702,15 @@ function parseBetaOutputFormat(params, content) {
   }
 }
 var init_beta_parser = __esm({
-  "node_modules/@anthropic-ai/sdk/lib/beta-parser.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/beta-parser.mjs"() {
     init_error();
   }
 });
 
-// node_modules/@anthropic-ai/sdk/_vendor/partial-json-parser/parser.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/_vendor/partial-json-parser/parser.mjs
 var tokenize, strip, unstrip, generate, partialParse;
 var init_parser = __esm({
-  "node_modules/@anthropic-ai/sdk/_vendor/partial-json-parser/parser.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/_vendor/partial-json-parser/parser.mjs"() {
     tokenize = (input) => {
       let current = 0;
       let tokens = [];
@@ -8932,14 +8932,14 @@ var init_parser = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/streaming.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/streaming.mjs
 var init_streaming2 = __esm({
-  "node_modules/@anthropic-ai/sdk/streaming.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/streaming.mjs"() {
     init_streaming();
   }
 });
 
-// node_modules/@anthropic-ai/sdk/lib/BetaMessageStream.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/BetaMessageStream.mjs
 function tracksToolInput(content) {
   return content.type === "tool_use" || content.type === "server_tool_use" || content.type === "mcp_tool_use";
 }
@@ -8947,7 +8947,7 @@ function checkNever(x2) {
 }
 var _BetaMessageStream_instances, _BetaMessageStream_currentMessageSnapshot, _BetaMessageStream_params, _BetaMessageStream_connectedPromise, _BetaMessageStream_resolveConnectedPromise, _BetaMessageStream_rejectConnectedPromise, _BetaMessageStream_endPromise, _BetaMessageStream_resolveEndPromise, _BetaMessageStream_rejectEndPromise, _BetaMessageStream_listeners, _BetaMessageStream_ended, _BetaMessageStream_errored, _BetaMessageStream_aborted, _BetaMessageStream_catchingPromiseCreated, _BetaMessageStream_response, _BetaMessageStream_request_id, _BetaMessageStream_logger, _BetaMessageStream_getFinalMessage, _BetaMessageStream_getFinalText, _BetaMessageStream_handleError, _BetaMessageStream_beginRequest, _BetaMessageStream_addStreamEvent, _BetaMessageStream_endRequest, _BetaMessageStream_accumulateMessage, JSON_BUF_PROPERTY, BetaMessageStream;
 var init_BetaMessageStream = __esm({
-  "node_modules/@anthropic-ai/sdk/lib/BetaMessageStream.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/BetaMessageStream.mjs"() {
     init_tslib();
     init_parser();
     init_error2();
@@ -9541,10 +9541,10 @@ var init_BetaMessageStream = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/lib/tools/ToolError.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/tools/ToolError.mjs
 var ToolError;
 var init_ToolError = __esm({
-  "node_modules/@anthropic-ai/sdk/lib/tools/ToolError.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/tools/ToolError.mjs"() {
     ToolError = class extends Error {
       constructor(content) {
         const message = typeof content === "string" ? content : content.map((block) => {
@@ -9560,10 +9560,10 @@ var init_ToolError = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/lib/tools/CompactionControl.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/tools/CompactionControl.mjs
 var DEFAULT_TOKEN_THRESHOLD, DEFAULT_SUMMARY_PROMPT;
 var init_CompactionControl = __esm({
-  "node_modules/@anthropic-ai/sdk/lib/tools/CompactionControl.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/tools/CompactionControl.mjs"() {
     DEFAULT_TOKEN_THRESHOLD = 1e5;
     DEFAULT_SUMMARY_PROMPT = `You have been working on the task described above but have not yet completed it. Write a continuation summary that will allow you (or another instance of yourself) to resume work efficiently in a future context window where the conversation history will be replaced with this summary. Your summary should be structured, concise, and actionable. Include:
 1. Task Overview
@@ -9591,7 +9591,7 @@ Wrap your summary in <summary></summary> tags.`;
   }
 });
 
-// node_modules/@anthropic-ai/sdk/lib/tools/BetaToolRunner.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/tools/BetaToolRunner.mjs
 function promiseWithResolvers() {
   let resolve;
   let reject;
@@ -9646,7 +9646,7 @@ async function generateToolResponse(params, lastMessage = params.messages.at(-1)
 }
 var _BetaToolRunner_instances, _BetaToolRunner_consumed, _BetaToolRunner_mutated, _BetaToolRunner_state, _BetaToolRunner_options, _BetaToolRunner_message, _BetaToolRunner_toolResponse, _BetaToolRunner_completion, _BetaToolRunner_iterationCount, _BetaToolRunner_checkAndCompact, _BetaToolRunner_generateToolResponse, BetaToolRunner;
 var init_BetaToolRunner = __esm({
-  "node_modules/@anthropic-ai/sdk/lib/tools/BetaToolRunner.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/tools/BetaToolRunner.mjs"() {
     init_tslib();
     init_ToolError();
     init_error();
@@ -9926,10 +9926,10 @@ var init_BetaToolRunner = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/decoders/jsonl.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/decoders/jsonl.mjs
 var JSONLDecoder;
 var init_jsonl = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/decoders/jsonl.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/decoders/jsonl.mjs"() {
     init_error();
     init_shims();
     init_line();
@@ -9966,10 +9966,10 @@ var init_jsonl = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/beta/messages/batches.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/messages/batches.mjs
 var Batches;
 var init_batches = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/beta/messages/batches.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/messages/batches.mjs"() {
     init_resource();
     init_pagination();
     init_headers();
@@ -10169,7 +10169,7 @@ var init_batches = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/beta/messages/messages.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/messages/messages.mjs
 function transformOutputFormat(params) {
   if (!params.output_format) {
     return params;
@@ -10188,7 +10188,7 @@ function transformOutputFormat(params) {
 }
 var DEPRECATED_MODELS, MODELS_TO_WARN_WITH_THINKING_ENABLED, Messages;
 var init_messages = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/beta/messages/messages.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/messages/messages.mjs"() {
     init_error2();
     init_resource();
     init_constants();
@@ -10321,10 +10321,10 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/beta/skills/versions.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/skills/versions.mjs
 var Versions;
 var init_versions = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/beta/skills/versions.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/skills/versions.mjs"() {
     init_resource();
     init_pagination();
     init_headers();
@@ -10422,10 +10422,10 @@ var init_versions = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/beta/skills/skills.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/skills/skills.mjs
 var Skills;
 var init_skills = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/beta/skills/skills.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/skills/skills.mjs"() {
     init_resource();
     init_versions();
     init_versions();
@@ -10520,10 +10520,10 @@ var init_skills = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/beta/beta.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/beta.mjs
 var Beta;
 var init_beta = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/beta/beta.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/beta.mjs"() {
     init_resource();
     init_files();
     init_files();
@@ -10549,10 +10549,10 @@ var init_beta = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/completions.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/completions.mjs
 var Completions;
 var init_completions = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/completions.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/completions.mjs"() {
     init_resource();
     init_headers();
     Completions = class extends APIResource {
@@ -10573,7 +10573,7 @@ var init_completions = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/lib/parser.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/parser.mjs
 function getOutputFormat2(params) {
   return params?.output_config?.format;
 }
@@ -10634,12 +10634,12 @@ function parseOutputFormat(params, content) {
   }
 }
 var init_parser2 = __esm({
-  "node_modules/@anthropic-ai/sdk/lib/parser.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/parser.mjs"() {
     init_error();
   }
 });
 
-// node_modules/@anthropic-ai/sdk/lib/MessageStream.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/MessageStream.mjs
 function tracksToolInput2(content) {
   return content.type === "tool_use" || content.type === "server_tool_use";
 }
@@ -10647,7 +10647,7 @@ function checkNever2(x2) {
 }
 var _MessageStream_instances, _MessageStream_currentMessageSnapshot, _MessageStream_params, _MessageStream_connectedPromise, _MessageStream_resolveConnectedPromise, _MessageStream_rejectConnectedPromise, _MessageStream_endPromise, _MessageStream_resolveEndPromise, _MessageStream_rejectEndPromise, _MessageStream_listeners, _MessageStream_ended, _MessageStream_errored, _MessageStream_aborted, _MessageStream_catchingPromiseCreated, _MessageStream_response, _MessageStream_request_id, _MessageStream_logger, _MessageStream_getFinalMessage, _MessageStream_getFinalText, _MessageStream_handleError, _MessageStream_beginRequest, _MessageStream_addStreamEvent, _MessageStream_endRequest, _MessageStream_accumulateMessage, JSON_BUF_PROPERTY2, MessageStream;
 var init_MessageStream = __esm({
-  "node_modules/@anthropic-ai/sdk/lib/MessageStream.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/MessageStream.mjs"() {
     init_tslib();
     init_errors();
     init_error2();
@@ -11216,10 +11216,10 @@ var init_MessageStream = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/messages/batches.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/messages/batches.mjs
 var Batches2;
 var init_batches2 = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/messages/batches.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/messages/batches.mjs"() {
     init_resource();
     init_pagination();
     init_headers();
@@ -11368,10 +11368,10 @@ var init_batches2 = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/messages/messages.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/messages/messages.mjs
 var Messages2, DEPRECATED_MODELS2, MODELS_TO_WARN_WITH_THINKING_ENABLED2;
 var init_messages2 = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/messages/messages.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/messages/messages.mjs"() {
     init_resource();
     init_headers();
     init_stainless_helper_header();
@@ -11494,10 +11494,10 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/models.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/models.mjs
 var Models2;
 var init_models2 = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/models.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/models.mjs"() {
     init_resource();
     init_pagination();
     init_headers();
@@ -11540,9 +11540,9 @@ var init_models2 = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/resources/index.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/index.mjs
 var init_resources = __esm({
-  "node_modules/@anthropic-ai/sdk/resources/index.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/index.mjs"() {
     init_shared();
     init_beta();
     init_completions();
@@ -11551,10 +11551,10 @@ var init_resources = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/internal/utils/env.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/env.mjs
 var readEnv;
 var init_env = __esm({
-  "node_modules/@anthropic-ai/sdk/internal/utils/env.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/env.mjs"() {
     readEnv = (env) => {
       if (typeof globalThis.process !== "undefined") {
         return globalThis.process.env?.[env]?.trim() ?? void 0;
@@ -11567,10 +11567,10 @@ var init_env = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/client.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/client.mjs
 var _BaseAnthropic_instances, _a, _BaseAnthropic_encoder, _BaseAnthropic_baseURLOverridden, HUMAN_PROMPT, AI_PROMPT, BaseAnthropic, Anthropic;
 var init_client = __esm({
-  "node_modules/@anthropic-ai/sdk/client.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/client.mjs"() {
     init_tslib();
     init_uuid();
     init_values();
@@ -12069,7 +12069,7 @@ var init_client = __esm({
   }
 });
 
-// node_modules/@anthropic-ai/sdk/index.mjs
+// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/index.mjs
 var sdk_exports = {};
 __export(sdk_exports, {
   AI_PROMPT: () => AI_PROMPT,
@@ -12095,7 +12095,7 @@ __export(sdk_exports, {
   toFile: () => toFile
 });
 var init_sdk = __esm({
-  "node_modules/@anthropic-ai/sdk/index.mjs"() {
+  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/index.mjs"() {
     init_client();
     init_uploads2();
     init_api_promise();
@@ -12105,7 +12105,7 @@ var init_sdk = __esm({
   }
 });
 
-// node_modules/zod/v3/external.js
+// ../memory-bank-fork/node_modules/zod/v3/external.js
 var external_exports = {};
 __export(external_exports, {
   BRAND: () => BRAND,
@@ -12217,7 +12217,7 @@ __export(external_exports, {
   void: () => voidType
 });
 
-// node_modules/zod/v3/helpers/util.js
+// ../memory-bank-fork/node_modules/zod/v3/helpers/util.js
 var util;
 (function(util2) {
   util2.assertEqual = (_2) => {
@@ -12351,7 +12351,7 @@ var getParsedType = (data) => {
   }
 };
 
-// node_modules/zod/v3/ZodError.js
+// ../memory-bank-fork/node_modules/zod/v3/ZodError.js
 var ZodIssueCode = util.arrayToEnum([
   "invalid_type",
   "invalid_literal",
@@ -12469,7 +12469,7 @@ ZodError.create = (issues) => {
   return error2;
 };
 
-// node_modules/zod/v3/locales/en.js
+// ../memory-bank-fork/node_modules/zod/v3/locales/en.js
 var errorMap = (issue2, _ctx) => {
   let message;
   switch (issue2.code) {
@@ -12572,7 +12572,7 @@ var errorMap = (issue2, _ctx) => {
 };
 var en_default = errorMap;
 
-// node_modules/zod/v3/errors.js
+// ../memory-bank-fork/node_modules/zod/v3/errors.js
 var overrideErrorMap = en_default;
 function setErrorMap(map) {
   overrideErrorMap = map;
@@ -12581,7 +12581,7 @@ function getErrorMap() {
   return overrideErrorMap;
 }
 
-// node_modules/zod/v3/helpers/parseUtil.js
+// ../memory-bank-fork/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
   const { data, path: path6, errorMaps, issueData } = params;
   const fullPath = [...path6, ...issueData.path || []];
@@ -12691,14 +12691,14 @@ var isDirty = (x2) => x2.status === "dirty";
 var isValid = (x2) => x2.status === "valid";
 var isAsync = (x2) => typeof Promise !== "undefined" && x2 instanceof Promise;
 
-// node_modules/zod/v3/helpers/errorUtil.js
+// ../memory-bank-fork/node_modules/zod/v3/helpers/errorUtil.js
 var errorUtil;
 (function(errorUtil2) {
   errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
   errorUtil2.toString = (message) => typeof message === "string" ? message : message?.message;
 })(errorUtil || (errorUtil = {}));
 
-// node_modules/zod/v3/types.js
+// ../memory-bank-fork/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
   constructor(parent, value, path6, key) {
     this._cachedPath = [];
@@ -16146,7 +16146,7 @@ var coerce = {
 };
 var NEVER = INVALID;
 
-// node_modules/zod/v4/core/core.js
+// ../memory-bank-fork/node_modules/zod/v4/core/core.js
 var NEVER2 = Object.freeze({
   status: "aborted"
 });
@@ -16206,7 +16206,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// node_modules/zod/v4/core/util.js
+// ../memory-bank-fork/node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -16727,7 +16727,7 @@ var Class = class {
   }
 };
 
-// node_modules/zod/v4/core/errors.js
+// ../memory-bank-fork/node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -16802,7 +16802,7 @@ function formatError(error2, _mapper) {
   return fieldErrors;
 }
 
-// node_modules/zod/v4/core/parse.js
+// ../memory-bank-fork/node_modules/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? Object.assign(_ctx, { async: false }) : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -16852,7 +16852,7 @@ var _safeParseAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeParseAsync = /* @__PURE__ */ _safeParseAsync($ZodRealError);
 
-// node_modules/zod/v4/core/regexes.js
+// ../memory-bank-fork/node_modules/zod/v4/core/regexes.js
 var cuid = /^[cC][^\s-]{8,}$/;
 var cuid2 = /^[0-9a-z]+$/;
 var ulid = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$/;
@@ -16910,7 +16910,7 @@ var _null = /null/i;
 var lowercase = /^[^A-Z]*$/;
 var uppercase = /^[^a-z]*$/;
 
-// node_modules/zod/v4/core/checks.js
+// ../memory-bank-fork/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a2;
   inst._zod ?? (inst._zod = {});
@@ -17295,7 +17295,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// node_modules/zod/v4/core/doc.js
+// ../memory-bank-fork/node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = []) {
     this.content = [];
@@ -17331,14 +17331,14 @@ var Doc = class {
   }
 };
 
-// node_modules/zod/v4/core/versions.js
+// ../memory-bank-fork/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 0,
   patch: 0
 };
 
-// node_modules/zod/v4/core/schemas.js
+// ../memory-bank-fork/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a2;
   inst ?? (inst = {});
@@ -18576,7 +18576,7 @@ function handleRefineResult(result, payload, input, inst) {
   }
 }
 
-// node_modules/zod/v4/locales/en.js
+// ../memory-bank-fork/node_modules/zod/v4/locales/en.js
 var parsedType = (data) => {
   const t = typeof data;
   switch (t) {
@@ -18694,7 +18694,7 @@ function en_default2() {
   };
 }
 
-// node_modules/zod/v4/core/registries.js
+// ../memory-bank-fork/node_modules/zod/v4/core/registries.js
 var $output = Symbol("ZodOutput");
 var $input = Symbol("ZodInput");
 var $ZodRegistry = class {
@@ -18744,7 +18744,7 @@ function registry() {
 }
 var globalRegistry = /* @__PURE__ */ registry();
 
-// node_modules/zod/v4/core/api.js
+// ../memory-bank-fork/node_modules/zod/v4/core/api.js
 function _string(Class2, params) {
   return new Class2({
     type: "string",
@@ -19183,7 +19183,7 @@ function _refine(Class2, fn, _params) {
   return schema;
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
+// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
 function isZ4Schema(s) {
   const schema = s;
   return !!schema._zod;
@@ -19246,7 +19246,7 @@ function getLiteralValue(schema) {
   return void 0;
 }
 
-// node_modules/zod/v4/classic/iso.js
+// ../memory-bank-fork/node_modules/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -19287,7 +19287,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// node_modules/zod/v4/classic/errors.js
+// ../memory-bank-fork/node_modules/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -19321,13 +19321,13 @@ var ZodRealError = $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// node_modules/zod/v4/classic/parse.js
+// ../memory-bank-fork/node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse3 = /* @__PURE__ */ _safeParse(ZodRealError);
 var safeParseAsync2 = /* @__PURE__ */ _safeParseAsync(ZodRealError);
 
-// node_modules/zod/v4/classic/schemas.js
+// ../memory-bank-fork/node_modules/zod/v4/classic/schemas.js
 var ZodType2 = /* @__PURE__ */ $constructor("ZodType", (inst, def) => {
   $ZodType.init(inst, def);
   inst.def = def;
@@ -19938,10 +19938,10 @@ function preprocess(fn, schema) {
   return pipe(transform(fn), schema);
 }
 
-// node_modules/zod/v4/classic/external.js
+// ../memory-bank-fork/node_modules/zod/v4/classic/external.js
 config(en_default2());
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
+// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
 var LATEST_PROTOCOL_VERSION = "2025-11-25";
 var SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION, "2025-06-18", "2025-03-26", "2024-11-05", "2024-10-07"];
 var RELATED_TASK_META_KEY = "io.modelcontextprotocol/related-task";
@@ -21460,18 +21460,18 @@ var UrlElicitationRequiredError = class extends McpError {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
+// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
 function isTerminal(status) {
   return status === "completed" || status === "failed" || status === "cancelled";
 }
 
-// node_modules/zod-to-json-schema/dist/esm/Options.js
+// ../memory-bank-fork/node_modules/zod-to-json-schema/dist/esm/Options.js
 var ignoreOverride = Symbol("Let zodToJsonSchema decide on which parser to use");
 
-// node_modules/zod-to-json-schema/dist/esm/parsers/string.js
+// ../memory-bank-fork/node_modules/zod-to-json-schema/dist/esm/parsers/string.js
 var ALPHA_NUMERIC = new Set("ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvxyz0123456789");
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
+// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
 function getMethodLiteral(schema) {
   const shape = getObjectShape(schema);
   const methodSchema = shape?.method;
@@ -21492,7 +21492,7 @@ function parseWithCompat(schema, data) {
   return result.data;
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
+// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
 var DEFAULT_REQUEST_TIMEOUT_MSEC = 6e4;
 var Protocol = class {
   constructor(_options) {
@@ -22446,7 +22446,7 @@ function mergeCapabilities(base, additional) {
   return result;
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
+// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
 var import_ajv = __toESM(require_ajv(), 1);
 var import_ajv_formats = __toESM(require_dist(), 1);
 function createDefaultAjvInstance() {
@@ -22514,7 +22514,7 @@ var AjvJsonSchemaValidator = class {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
+// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
 var ExperimentalServerTasks = class {
   constructor(_server) {
     this._server = _server;
@@ -22727,7 +22727,7 @@ var ExperimentalServerTasks = class {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
+// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
 function assertToolsCallTaskCapability(requests, method, entityName) {
   if (!requests) {
     throw new Error(`${entityName} does not support task creation (required for ${method})`);
@@ -22762,7 +22762,7 @@ function assertClientRequestTaskCapability(requests, method, entityName) {
   }
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.js
+// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.js
 var Server = class extends Protocol {
   /**
    * Initializes this server with the given name and version information.
@@ -23142,10 +23142,10 @@ var Server = class extends Protocol {
   }
 };
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
+// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
 var ReadBuffer = class {
   append(chunk) {
     this._buffer = this._buffer ? Buffer.concat([this._buffer, chunk]) : chunk;
@@ -23173,7 +23173,7 @@ function serializeMessage(message) {
   return JSON.stringify(message) + "\n";
 }
 
-// node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 var StdioServerTransport = class {
   constructor(_stdin = process2.stdin, _stdout = process2.stdout) {
     this._stdin = _stdin;
@@ -23281,6 +23281,10 @@ function getDbPath() {
   }
   return path.join(getIndexDir(), "db.sqlite");
 }
+function getProjectsDir() {
+  return process.env.TEST_PROJECTS_DIR || path.join(os.homedir(), ".claude", "projects");
+}
+var LLM_WORKDIR_BASENAME = "memory-bank-llm";
 
 // src/project-canon.ts
 var slugCache = /* @__PURE__ */ new Map();
@@ -23396,14 +23400,55 @@ async function generateEmbedding(text, mode = "passage") {
   return embedding;
 }
 
+// src/fact-category.ts
+var FACT_CATEGORIES = [
+  "decision",
+  "preference",
+  "pattern",
+  "knowledge",
+  "constraint"
+];
+var CATEGORY_SET = new Set(FACT_CATEGORIES);
+function normalizeFactCategory(raw) {
+  if (typeof raw === "string") {
+    const v2 = raw.trim().toLowerCase();
+    if (CATEGORY_SET.has(v2)) return v2;
+    if (v2 === "requirement" || v2 === "requirements") return "constraint";
+    if (v2.includes("|")) {
+      for (const part of v2.split("|")) {
+        const p = part.trim();
+        if (CATEGORY_SET.has(p)) return p;
+      }
+    }
+  }
+  return "knowledge";
+}
+var FACT_CATEGORY_CHECK_SQL = `category IN (${FACT_CATEGORIES.map((c) => `'${c}'`).join(",")})`;
+
+// src/types.ts
+var RELATION_TYPES = [
+  "INFLUENCES",
+  "SUPERSEDES",
+  "SUPPORTS",
+  "CONTRADICTS",
+  "DEPENDS_ON",
+  "DERIVED_FROM"
+];
+
 // src/db.ts
+var RELATION_TYPE_CHECK_SQL = `relation_type IN (${RELATION_TYPES.map((t) => `'${t}'`).join(",")})`;
 var VEC_INT8_SCALE = 127;
-function getVecDtype(db) {
+var VEC_TABLES = /* @__PURE__ */ new Set(["vec_exchanges", "vec_facts", "vec_facts_kr", "vec_categories"]);
+function getVecTableDtype(db, table) {
+  if (!VEC_TABLES.has(table)) throw new Error(`not a vec table: ${table}`);
   const row = db.prepare(
-    `SELECT sql FROM sqlite_master WHERE type='table' AND name='vec_exchanges'`
-  ).get();
+    `SELECT sql FROM sqlite_master WHERE type='table' AND name=?`
+  ).get(table);
   if (!row?.sql) return "int8";
   return /int8\s*\[/i.test(row.sql) ? "int8" : "float32";
+}
+function getVecDtype(db) {
+  return getVecTableDtype(db, "vec_exchanges");
 }
 function embeddingToVecBlob(embedding, dtype) {
   if (dtype === "int8") {
@@ -23420,6 +23465,9 @@ function vecParamSql(dtype) {
 }
 function normalizeVecDistance(distance, dtype) {
   return dtype === "int8" ? distance / VEC_INT8_SCALE : distance;
+}
+function l2DistanceToSimilarity(distance) {
+  return 1 - distance * distance / 2;
 }
 function migrateSchema(db) {
   const columns = db.prepare(`SELECT name FROM pragma_table_info('exchanges')`).all();
@@ -23449,6 +23497,125 @@ function migrateSchema(db) {
     console.error("Migration complete.");
   }
 }
+function withForeignKeysOff(db, fn) {
+  const wasOn = db.pragma("foreign_keys", { simple: true }) === 1;
+  if (wasOn) db.pragma("foreign_keys = OFF");
+  try {
+    fn();
+  } finally {
+    if (wasOn) db.pragma("foreign_keys = ON");
+  }
+}
+function defaultClause(dfltValue) {
+  if (dfltValue == null) return "";
+  const v2 = dfltValue.trim();
+  const literal2 = /^['"(]|^-?\d/.test(v2) || /^(NULL|TRUE|FALSE|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP)$/i.test(v2);
+  return ` DEFAULT ${literal2 ? v2 : `(${v2})`}`;
+}
+function migrateRelationTypeVocabulary(db) {
+  const tbl = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='ontology_relations'`).get();
+  if (!tbl?.sql) return;
+  if (RELATION_TYPES.every((t) => tbl.sql.includes(`'${t}'`))) return;
+  const fks = db.pragma(`foreign_key_list('ontology_relations')`);
+  const isShippedFk = (fk) => fk.table === "facts" && (fk.from === "source_fact_id" || fk.from === "target_fact_id");
+  if (fks.some((fk) => !isShippedFk(fk))) {
+    console.error(
+      "ontology_relations vocabulary migration skipped: custom FOREIGN KEY present \u2014 legacy CHECK stays in place."
+    );
+    return;
+  }
+  const checkCount = (tbl.sql.match(/CHECK/gi) ?? []).length;
+  if (checkCount > 1 || /UNIQUE|GENERATED/i.test(tbl.sql)) {
+    console.error(
+      "ontology_relations vocabulary migration skipped: custom constraint DDL present \u2014 legacy CHECK stays in place (new relation types are rejected on this DB)."
+    );
+    return;
+  }
+  const cols = db.prepare(`SELECT name, type, "notnull" AS nn, dflt_value, pk FROM pragma_table_info('ontology_relations')`).all();
+  const attachedDdl = db.prepare(
+    `SELECT sql FROM sqlite_master WHERE tbl_name='ontology_relations' AND type IN ('index','trigger') AND sql IS NOT NULL`
+  ).all().map((r) => r.sql);
+  const hadShippedFk = (col) => fks.some((fk) => fk.table === "facts" && fk.from === col);
+  const rebuild = db.transaction(() => {
+    const defs = cols.map((c) => {
+      const base = `${c.name} ${c.type}${c.pk ? " PRIMARY KEY" : ""}${c.nn ? " NOT NULL" : ""}${defaultClause(c.dflt_value)}`;
+      if (c.name === "relation_type") return `${base} CHECK(${RELATION_TYPE_CHECK_SQL})`;
+      if ((c.name === "source_fact_id" || c.name === "target_fact_id") && hadShippedFk(c.name)) {
+        return `${base} REFERENCES facts(id)`;
+      }
+      return base;
+    });
+    const names = cols.map((c) => c.name).join(", ");
+    db.exec(`CREATE TABLE ontology_relations_vocab_rebuild (${defs.join(", ")})`);
+    db.exec(`INSERT INTO ontology_relations_vocab_rebuild (${names}) SELECT ${names} FROM ontology_relations`);
+    db.exec(`DROP TABLE ontology_relations`);
+    db.exec(`ALTER TABLE ontology_relations_vocab_rebuild RENAME TO ontology_relations`);
+    for (const ddl of attachedDdl) db.exec(ddl);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_source ON ontology_relations(source_fact_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_target ON ontology_relations(target_fact_id)`);
+  });
+  try {
+    withForeignKeysOff(db, () => rebuild.immediate());
+  } catch (error2) {
+    console.error("ontology_relations vocabulary migration failed \u2014 keeping legacy table:", error2);
+    return;
+  }
+  console.error("Migrated ontology_relations: vocabulary extended (DEPENDS_ON, DERIVED_FROM).");
+  try {
+    const dangling = db.pragma(`foreign_key_check('ontology_relations')`);
+    if (dangling.length > 0) {
+      console.error(
+        `ontology_relations: ${dangling.length} dangling relation rows reference missing facts (pre-existing; see PRAGMA foreign_key_check).`
+      );
+    }
+  } catch {
+  }
+}
+function migrateFactsCategoryVocabulary(db) {
+  const tbl = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='facts'`).get();
+  if (!tbl?.sql) return;
+  const categoryNotNull = db.prepare(`SELECT "notnull" AS nn FROM pragma_table_info('facts') WHERE name = 'category'`).get()?.nn === 1;
+  if (/CHECK\s*\(\s*category\s+IN/i.test(tbl.sql) && FACT_CATEGORIES.every((c) => tbl.sql.includes(`'${c}'`)) && categoryNotNull) {
+    return;
+  }
+  const withoutOwnCheck = tbl.sql.replace(/CHECK\s*\(\s*category\s+IN\s*\([^)]*\)\s*\)/i, "");
+  if (/FOREIGN\s+KEY|REFERENCES|UNIQUE|CHECK|GENERATED/i.test(withoutOwnCheck)) {
+    console.error(
+      "facts.category migration skipped: custom constraint DDL on facts \u2014 vocabulary stays write-path-enforced only."
+    );
+    return;
+  }
+  const attachedDdl = db.prepare(
+    `SELECT sql FROM sqlite_master WHERE tbl_name='facts' AND type IN ('index','trigger') AND sql IS NOT NULL`
+  ).all().map((r) => r.sql);
+  const cols = db.prepare(`SELECT name, type, "notnull" AS nn, dflt_value, pk FROM pragma_table_info('facts')`).all();
+  const rebuild = db.transaction(() => {
+    const distinct = db.prepare(`SELECT DISTINCT category FROM facts`).all();
+    const update = db.prepare(`UPDATE facts SET category = ? WHERE category IS ?`);
+    for (const { category } of distinct) {
+      const normalized = normalizeFactCategory(category);
+      if (normalized !== category) update.run(normalized, category);
+    }
+    const defs = cols.map((c) => {
+      const notNull = c.name === "category" ? " NOT NULL" : c.nn ? " NOT NULL" : "";
+      const pk = c.pk ? " PRIMARY KEY" : "";
+      return `${c.name} ${c.type}${pk}${notNull}${defaultClause(c.dflt_value)}`;
+    });
+    const names = cols.map((c) => c.name).join(", ");
+    db.exec(`CREATE TABLE facts_vocab_rebuild (${defs.join(", ")}, CHECK (${FACT_CATEGORY_CHECK_SQL}))`);
+    db.exec(`INSERT INTO facts_vocab_rebuild (${names}) SELECT ${names} FROM facts`);
+    db.exec(`DROP TABLE facts`);
+    db.exec(`ALTER TABLE facts_vocab_rebuild RENAME TO facts`);
+    for (const ddl of attachedDdl) db.exec(ddl);
+  });
+  try {
+    withForeignKeysOff(db, () => rebuild.immediate());
+  } catch (error2) {
+    console.error("facts.category vocabulary migration failed \u2014 keeping legacy table:", error2);
+    return;
+  }
+  console.error("Migrated facts.category: vocabulary normalized, CHECK constraint added.");
+}
 function initDatabase() {
   const dbPath = getDbPath();
   const dbDir = path2.dirname(dbPath);
@@ -23459,6 +23626,8 @@ function initDatabase() {
   sqliteVec.load(db);
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 5000");
+  db.pragma("foreign_keys = ON");
+  db.pragma("journal_size_limit = 67108864");
   db.pragma("recursive_triggers = ON");
   db.exec(`
     CREATE TABLE IF NOT EXISTS exchanges (
@@ -23568,7 +23737,7 @@ function initDatabase() {
     CREATE TABLE IF NOT EXISTS facts (
       id TEXT PRIMARY KEY,
       fact TEXT NOT NULL,
-      category TEXT,
+      category TEXT NOT NULL CHECK (${FACT_CATEGORY_CHECK_SQL}),
       scope_type TEXT NOT NULL DEFAULT 'project',
       scope_project TEXT,
       source_exchange_ids TEXT,
@@ -23657,8 +23826,14 @@ function initDatabase() {
   if (!factColumnNames.has("ontology_attempts")) {
     db.prepare("ALTER TABLE facts ADD COLUMN ontology_attempts INTEGER NOT NULL DEFAULT 0").run();
   }
+  if (!factColumnNames.has("consolidation_attempts")) {
+    db.prepare("ALTER TABLE facts ADD COLUMN consolidation_attempts INTEGER NOT NULL DEFAULT 0").run();
+  }
   if (!factColumnNames.has("ontology_last_attempt_at")) {
     db.prepare("ALTER TABLE facts ADD COLUMN ontology_last_attempt_at TEXT").run();
+  }
+  if (!factColumnNames.has("confidence")) {
+    db.prepare("ALTER TABLE facts ADD COLUMN confidence REAL").run();
   }
   const exchangeColumns = db.prepare(
     `SELECT name FROM pragma_table_info('exchanges')`
@@ -23670,16 +23845,29 @@ function initDatabase() {
     CREATE TABLE IF NOT EXISTS ontology_relations (
       id TEXT PRIMARY KEY,
       source_fact_id TEXT NOT NULL REFERENCES facts(id),
-      relation_type TEXT NOT NULL CHECK(relation_type IN ('INFLUENCES','SUPERSEDES','SUPPORTS','CONTRADICTS')),
+      relation_type TEXT NOT NULL CHECK(${RELATION_TYPE_CHECK_SQL}),
       target_fact_id TEXT NOT NULL REFERENCES facts(id),
       reasoning TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
+  db.exec(`DROP INDEX IF EXISTS idx_ontology_relations_pair`);
+  db.exec(`
+    DELETE FROM ontology_relations
+    WHERE rowid NOT IN (
+      SELECT MIN(rowid) FROM ontology_relations
+      GROUP BY source_fact_id, relation_type, target_fact_id
+    )
+  `);
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ontology_relations_triple
+    ON ontology_relations(source_fact_id, relation_type, target_fact_id)
+  `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_source ON ontology_relations(source_fact_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_relations_target ON ontology_relations(target_fact_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_ontology ON facts(ontology_category_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_coding_agent ON facts(coding_agent)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_facts_active_created_id ON facts(is_active, created_at, id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_ontology_categories_domain ON ontology_categories(domain_id)`);
   db.exec(`
     CREATE TABLE IF NOT EXISTS extraction_log (
@@ -23689,11 +23877,17 @@ function initDatabase() {
       saved INTEGER NOT NULL DEFAULT 0
     )
   `);
+  migrateRelationTypeVocabulary(db);
+  migrateFactsCategoryVocabulary(db);
   autoHealScopeProjects(db);
   return db;
 }
 
 // src/fact-db.ts
+function vecParamFor(db, table, embedding) {
+  const dt = getVecTableDtype(db, table);
+  return { sql: vecParamSql(dt), blob: embeddingToVecBlob(embedding, dt), dt };
+}
 function getRevisions(db, factId) {
   return db.prepare(
     "SELECT * FROM fact_revisions WHERE fact_id = ? ORDER BY created_at DESC"
@@ -23701,16 +23895,18 @@ function getRevisions(db, factId) {
 }
 function searchSimilarFacts(db, embedding, project, limit = 5, threshold = 0.85) {
   const canonProject = project ? canonicalizeProject(db, project) : project;
-  const buf = Buffer.from(new Float32Array(embedding).buffer);
   const candidateFetch = Math.max(limit * 2, 50);
   const fetch2 = (table) => {
     try {
-      return db.prepare(`
+      const p = vecParamFor(db, table, embedding);
+      const rows = db.prepare(`
         SELECT id, distance FROM ${table}
-        WHERE embedding MATCH ?
+        WHERE embedding MATCH ${p.sql}
         ORDER BY distance
         LIMIT ?
-      `).all(buf, candidateFetch);
+      `).all(p.blob, candidateFetch);
+      for (const r of rows) r.distance = normalizeVecDistance(r.distance, p.dt);
+      return rows;
     } catch {
       return [];
     }
@@ -23723,7 +23919,7 @@ function searchSimilarFacts(db, embedding, project, limit = 5, threshold = 0.85)
   const merged = [...best.entries()].map(([id, distance]) => ({ id, distance })).sort((a, b2) => a.distance - b2.distance);
   const results = [];
   for (const vr of merged) {
-    const similarity = 1 - vr.distance * vr.distance / 2;
+    const similarity = l2DistanceToSimilarity(vr.distance);
     if (similarity < threshold) continue;
     const row = db.prepare(
       "SELECT * FROM facts WHERE id = ? AND is_active = 1 AND embedding_version = ?"
@@ -23737,16 +23933,18 @@ function searchSimilarFacts(db, embedding, project, limit = 5, threshold = 0.85)
   return results;
 }
 function searchAllFacts(db, embedding, limit = 10, threshold = 0.6) {
+  const pAll = vecParamFor(db, "vec_facts", embedding);
   const vecResults = db.prepare(`
     SELECT id, distance
     FROM vec_facts
-    WHERE embedding MATCH ?
+    WHERE embedding MATCH ${pAll.sql}
     ORDER BY distance
     LIMIT ?
-  `).all(Buffer.from(new Float32Array(embedding).buffer), limit * 2);
+  `).all(pAll.blob, limit * 2);
+  for (const r of vecResults) r.distance = normalizeVecDistance(r.distance, pAll.dt);
   const results = [];
   for (const vr of vecResults) {
-    const similarity = 1 - vr.distance * vr.distance / 2;
+    const similarity = l2DistanceToSimilarity(vr.distance);
     if (similarity < threshold) continue;
     const row = db.prepare("SELECT * FROM facts WHERE id = ? AND is_active = 1").get(vr.id);
     if (!row) continue;
@@ -23776,7 +23974,8 @@ function rowToFact(row) {
     consolidated_count: row["consolidated_count"],
     is_active: Boolean(row["is_active"]),
     ontology_category_id: row["ontology_category_id"] ?? null,
-    coding_agent: row["coding_agent"] ?? null
+    coding_agent: row["coding_agent"] ?? null,
+    confidence: row["confidence"] ?? null
   };
 }
 
@@ -23789,11 +23988,6 @@ function listCategories(db, domainId) {
     return db.prepare(`SELECT * FROM ontology_categories WHERE domain_id = ? ORDER BY name`).all(domainId);
   }
   return db.prepare(`SELECT * FROM ontology_categories ORDER BY name`).all();
-}
-function getFactsByCategory(db, categoryId) {
-  return db.prepare(
-    `SELECT * FROM facts WHERE ontology_category_id = ? AND is_active = 1 ORDER BY consolidated_count DESC`
-  ).all(categoryId).map(rowToFact2);
 }
 function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance = 0.2, scopeProject) {
   const visited = /* @__PURE__ */ new Set([factId]);
@@ -23819,7 +24013,7 @@ function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance = 0.2, 
         if (scopeProject && fact.scope_type === "project" && fact.scope_project !== scopeProject) continue;
         visited.add(targetId);
         nextFrontier.push(targetId);
-        const typeWeight = relation.relation_type === "SUPPORTS" || relation.relation_type === "INFLUENCES" ? 1 : 0.7;
+        const typeWeight = relation.relation_type === "CONTRADICTS" || relation.relation_type === "SUPERSEDES" ? 0.7 : 1;
         const relevance = hopRelevance * typeWeight;
         if (relevance >= minRelevance) {
           results.push({ fact, relation, relevance, hop: hop + 1 });
@@ -23840,7 +24034,7 @@ function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance = 0.2, 
         if (scopeProject && fact.scope_type === "project" && fact.scope_project !== scopeProject) continue;
         visited.add(sourceId);
         nextFrontier.push(sourceId);
-        const typeWeight = relation.relation_type === "SUPPORTS" || relation.relation_type === "INFLUENCES" ? 1 : 0.7;
+        const typeWeight = relation.relation_type === "CONTRADICTS" || relation.relation_type === "SUPERSEDES" ? 0.7 : 1;
         const relevance = hopRelevance * typeWeight;
         if (relevance >= minRelevance) {
           results.push({ fact, relation, relevance, hop: hop + 1 });
@@ -23852,23 +24046,6 @@ function getRelatedFacts(db, factId, hops = 1, decay = 0.6, minRelevance = 0.2, 
   }
   results.sort((a, b2) => b2.relevance - a.relevance);
   return results;
-}
-function getOntologyTree(db) {
-  const domains = listDomains(db);
-  const tree = [];
-  for (const domain of domains) {
-    const categories = listCategories(db, domain.id);
-    const domainEntry = {
-      domain,
-      categories: []
-    };
-    for (const category of categories) {
-      const facts = getFactsByCategory(db, category.id);
-      domainEntry.categories.push({ category, facts });
-    }
-    tree.push(domainEntry);
-  }
-  return tree;
 }
 function rowToFact2(row) {
   const embeddingRaw = row["embedding"];
@@ -24497,7 +24674,7 @@ async function formatMultiConceptResults(results, concepts) {
   return output;
 }
 
-// node_modules/marked/lib/marked.esm.js
+// ../memory-bank-fork/node_modules/marked/lib/marked.esm.js
 function L() {
   return { async: false, breaks: false, extensions: null, gfm: true, hooks: null, pedantic: false, renderer: null, silent: false, tokenizer: null, walkTokens: null };
 }
@@ -25867,18 +26044,272 @@ ${JSON.stringify(value, null, 2)}
   return output;
 }
 
+// src/ontology-view.ts
+var DEFAULT_FACT_LIMIT = 5;
+var MAX_FACT_LIMIT = 50;
+var MAX_CATEGORIES_RENDERED = 40;
+var MAX_RELATIONS_PER_FACT = 5;
+function inert(value, max = 300) {
+  if (!value) return "";
+  return value.replace(/\s+/g, " ").trim().slice(0, max);
+}
+function listCategoryFacts(db, categoryId, limit) {
+  return db.prepare(
+    `SELECT id, fact, category, consolidated_count, created_at
+       FROM facts
+       WHERE ontology_category_id = ? AND is_active = 1
+       ORDER BY consolidated_count DESC, created_at DESC
+       LIMIT ?`
+  ).all(categoryId, limit);
+}
+function countCategoryFacts(db, categoryId) {
+  return db.prepare(`SELECT COUNT(*) AS n FROM facts WHERE ontology_category_id = ? AND is_active = 1`).get(categoryId).n;
+}
+function buildOntologyView(db, opts) {
+  const domainFilter = opts.domain?.trim().toLowerCase() || void 0;
+  const categoryFilter = opts.category?.trim().toLowerCase() || void 0;
+  if (!domainFilter && !categoryFilter) return buildSummary(db);
+  const rawLimit = opts.limit ?? DEFAULT_FACT_LIMIT;
+  const limit = Math.max(1, Math.min(MAX_FACT_LIMIT, Math.floor(rawLimit)));
+  return buildDetail(db, domainFilter, categoryFilter, limit, opts.includeRelations === true);
+}
+function buildSummary(db) {
+  const activeFacts = db.prepare("SELECT COUNT(*) AS n FROM facts WHERE is_active = 1").get().n;
+  const classified = db.prepare("SELECT COUNT(*) AS n FROM facts WHERE is_active = 1 AND ontology_category_id IS NOT NULL").get().n;
+  const totalCategories = db.prepare("SELECT COUNT(*) AS n FROM ontology_categories").get().n;
+  const domains = db.prepare(
+    `SELECT d.name, d.description,
+              COUNT(DISTINCT c.id) AS categories,
+              COUNT(f.id) AS facts
+       FROM ontology_domains d
+       LEFT JOIN ontology_categories c ON c.domain_id = d.id
+       LEFT JOIN facts f ON f.ontology_category_id = c.id AND f.is_active = 1
+       GROUP BY d.id
+       ORDER BY facts DESC, d.name`
+  ).all();
+  let out = `# Ontology Summary
+
+`;
+  out += `| Metric | Count |
+|--------|-------|
+`;
+  out += `| Active facts | ${activeFacts} |
+`;
+  out += `| Classified facts | ${classified} |
+`;
+  out += `| Domains | ${domains.length} |
+`;
+  out += `| Categories | ${totalCategories} |
+
+`;
+  if (domains.length === 0) {
+    out += `_No ontology data found. Facts are classified automatically as they are extracted._
+`;
+    return out;
+  }
+  out += `## Domains (by fact count)
+
+`;
+  for (const d2 of domains) {
+    out += `- **${inert(d2.name, 80)}** \u2014 ${d2.categories} categories, ${d2.facts} facts`;
+    if (d2.description) out += ` \xB7 ${inert(d2.description, 160)}`;
+    out += "\n";
+  }
+  out += `
+_Facts are not listed in summary mode. Pass \`domain\` and/or \`category\` to list facts (\`limit\` caps facts per category, default ${DEFAULT_FACT_LIMIT})._
+`;
+  return out;
+}
+function buildDetail(db, domainFilter, categoryFilter, limit, includeRelations) {
+  const domains = listDomains(db).filter(
+    (d2) => !domainFilter || d2.name.toLowerCase().includes(domainFilter)
+  );
+  const matches = [];
+  for (const domain of domains) {
+    for (const category of listCategories(db, domain.id)) {
+      if (categoryFilter && !category.name.toLowerCase().includes(categoryFilter)) continue;
+      matches.push({
+        domainName: domain.name,
+        domainDescription: domain.description,
+        categoryId: category.id,
+        categoryName: category.name,
+        categoryDescription: category.description
+      });
+    }
+  }
+  let out = `# Ontology Tree
+
+`;
+  if (matches.length === 0) {
+    out += `_No ontology data matched the filters (domain: ${domainFilter ?? "-"}, category: ${categoryFilter ?? "-"})._
+`;
+    return out;
+  }
+  const rendered = matches.slice(0, MAX_CATEGORIES_RENDERED);
+  let currentDomain = null;
+  for (const m2 of rendered) {
+    if (m2.domainName !== currentDomain) {
+      currentDomain = m2.domainName;
+      out += `## ${inert(m2.domainName, 80)}
+`;
+      if (m2.domainDescription) out += `> ${inert(m2.domainDescription, 200)}
+`;
+      out += "\n";
+    }
+    const total = countCategoryFacts(db, m2.categoryId);
+    const facts = listCategoryFacts(db, m2.categoryId, limit);
+    out += `### ${inert(m2.categoryName, 80)}`;
+    if (m2.categoryDescription) out += ` \u2014 ${inert(m2.categoryDescription, 200)}`;
+    out += `
+(showing ${facts.length} of ${total} facts)
+
+`;
+    for (const fact of facts) {
+      out += `- **[${fact.category}]** ${inert(fact.fact)}
+`;
+      out += `  - ID: ${fact.id} | Confirmed: ${fact.consolidated_count}x | ${fact.created_at.slice(0, 10)}
+`;
+      if (includeRelations) {
+        const related = getRelatedFacts(db, fact.id, 1);
+        for (const { fact: relFact, relation } of related.slice(0, MAX_RELATIONS_PER_FACT)) {
+          out += `  - \u2194 [${relation.relation_type}] "${inert(relFact.fact, 160)}"
+`;
+        }
+        if (related.length > MAX_RELATIONS_PER_FACT) {
+          out += `  - _\u2026+${related.length - MAX_RELATIONS_PER_FACT} more relations (use explore_graph for full traversal)._
+`;
+        }
+      }
+    }
+    if (total > facts.length) {
+      out += `  _\u2026+${total - facts.length} more facts in this category (raise \`limit\` or narrow the filter)._
+`;
+    }
+    out += "\n";
+  }
+  if (matches.length > rendered.length) {
+    out += `
+_\u2026+${matches.length - rendered.length} more categories matched \u2014 narrow \`domain\`/\`category\` to see them._
+`;
+  }
+  return out;
+}
+
+// src/consistency.ts
+function countActiveActive(db, type) {
+  return db.prepare(
+    `SELECT COUNT(*) AS n
+         FROM ontology_relations r
+         JOIN facts a ON a.id = r.source_fact_id
+         JOIN facts b ON b.id = r.target_fact_id
+         WHERE r.relation_type = ? AND a.is_active = 1 AND b.is_active = 1`
+  ).get(type).n;
+}
+function getConsistencyCounts(db) {
+  const activeFacts = db.prepare("SELECT COUNT(*) AS n FROM facts WHERE is_active = 1").get().n;
+  const orphanFacts = db.prepare(
+    `SELECT COUNT(*) AS n FROM facts f
+         WHERE f.is_active = 1
+           AND NOT EXISTS (
+             SELECT 1 FROM ontology_relations r
+             WHERE r.source_fact_id = f.id OR r.target_fact_id = f.id
+           )`
+  ).get().n;
+  const totalCategories = db.prepare("SELECT COUNT(*) AS n FROM ontology_categories").get().n;
+  const singleFactCategories = db.prepare(
+    `SELECT COUNT(*) AS n FROM (
+           SELECT ontology_category_id FROM facts
+           WHERE is_active = 1 AND ontology_category_id IS NOT NULL
+           GROUP BY ontology_category_id
+           HAVING COUNT(*) = 1
+         )`
+  ).get().n;
+  return {
+    activeFacts,
+    activeContradictsPairs: countActiveActive(db, "CONTRADICTS"),
+    activeSupersedesPairs: countActiveActive(db, "SUPERSEDES"),
+    orphanFacts,
+    orphanRate: activeFacts > 0 ? orphanFacts / activeFacts : 0,
+    totalCategories,
+    singleFactCategories
+  };
+}
+function hasActiveConflicts(counts) {
+  return counts.activeContradictsPairs + counts.activeSupersedesPairs > 0;
+}
+
 // src/llm.ts
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import fs5 from "node:fs";
 import path4 from "node:path";
 import os2 from "node:os";
-var LLM_WORKDIR = path4.join(os2.tmpdir(), "memory-bank-llm");
+var LLM_WORKDIR = path4.join(os2.tmpdir(), LLM_WORKDIR_BASENAME);
 function llmWorkdir() {
   try {
     fs5.mkdirSync(LLM_WORKDIR, { recursive: true });
   } catch {
   }
+  pruneLlmTranscripts();
   return LLM_WORKDIR;
+}
+var PRUNE_MARKER = path4.join(LLM_WORKDIR, ".last-transcript-prune");
+var PRUNE_THROTTLE_MS = 60 * 60 * 1e3;
+function transcriptTtlMs() {
+  const raw = process.env.MEMORY_BANK_LLM_TRANSCRIPT_TTL_HOURS;
+  const hours = raw != null && /^\d+$/.test(raw) ? parseInt(raw, 10) : 24;
+  return Math.max(1, hours) * 60 * 60 * 1e3;
+}
+function pruneLlmTranscripts(now = Date.now()) {
+  try {
+    try {
+      const markerAge = now - fs5.statSync(PRUNE_MARKER).mtimeMs;
+      if (markerAge >= 0 && markerAge < PRUNE_THROTTLE_MS) return;
+    } catch {
+    }
+    try {
+      fs5.writeFileSync(PRUNE_MARKER, new Date(now).toISOString());
+    } catch {
+    }
+    const projectsDir = getProjectsDir();
+    const ttl = transcriptTtlMs();
+    let entries;
+    try {
+      entries = fs5.readdirSync(projectsDir);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry !== LLM_WORKDIR_BASENAME && !entry.endsWith(`-${LLM_WORKDIR_BASENAME}`)) continue;
+      const dir = path4.join(projectsDir, entry);
+      let stat;
+      try {
+        stat = fs5.lstatSync(dir);
+      } catch {
+        continue;
+      }
+      if (!stat.isDirectory()) continue;
+      let files;
+      try {
+        files = fs5.readdirSync(dir);
+      } catch {
+        continue;
+      }
+      for (const file of files) {
+        if (!file.endsWith(".jsonl") && !file.endsWith("-summary.txt")) continue;
+        const filePath = path4.join(dir, file);
+        try {
+          const fstat = fs5.lstatSync(filePath);
+          if (fstat.isFile() && now - fstat.mtimeMs > ttl) fs5.unlinkSync(filePath);
+        } catch {
+        }
+      }
+      try {
+        fs5.rmdirSync(dir);
+      } catch {
+      }
+    }
+  } catch {
+  }
 }
 async function callHaiku(systemPrompt, userMessage, maxTokens = 2048) {
   const model = process.env.MEMORY_BANK_FACT_MODEL || "haiku";
@@ -26084,7 +26515,8 @@ var SearchFactsInputSchema = external_exports.object({
 var SearchOntologyInputSchema = external_exports.object({
   domain: external_exports.string().optional().describe("Filter by domain name (case-insensitive partial match)"),
   category: external_exports.string().optional().describe("Filter by category name (case-insensitive partial match)"),
-  include_relations: external_exports.boolean().default(false).describe("Include 1-hop fact relations")
+  include_relations: external_exports.boolean().default(false).describe("Include 1-hop fact relations"),
+  limit: external_exports.number().int().min(1).max(50).optional().describe("Max facts listed per category (default 5; only applies with domain/category filters)")
 }).strict();
 var AskAvatarInputSchema = external_exports.object({
   question: external_exports.string().min(2, "Question must be at least 2 characters").max(1e4, "Question too long (max 10000 chars)").describe("Question to ask"),
@@ -26191,13 +26623,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "search_ontology",
-        description: "Browse the ontology hierarchy (Domain > Category > Facts). Use to understand how past decisions are organized, or to find all facts in a specific domain/category.",
+        description: "Browse the ontology hierarchy (Domain > Category > Facts). Unfiltered calls return a bounded summary (counts only, no fact lines); pass domain and/or category to list facts. Use to understand how past decisions are organized, or to find all facts in a specific domain/category.",
         inputSchema: {
           type: "object",
           properties: {
             domain: { type: "string", description: "Filter by domain name (partial, case-insensitive)" },
             category: { type: "string", description: "Filter by category name (partial, case-insensitive)" },
-            include_relations: { type: "boolean", default: false, description: "Include 1-hop relations for each fact" }
+            include_relations: { type: "boolean", default: false, description: "Include 1-hop relations for each fact" },
+            limit: { type: "number", minimum: 1, maximum: 50, description: "Max facts listed per category (default 5; only applies with domain/category filters)" }
           },
           additionalProperties: false
         },
@@ -26463,7 +26896,8 @@ Results: ${filtered.length}
           const factAgent = fact.coding_agent || "claude-code";
           output += `- Scope: ${fact.scope_type}${fact.scope_project ? ` (${fact.scope_project})` : ""} | Agent: ${factAgent}
 `;
-          output += `- Confirmed: ${fact.consolidated_count}x | Similarity: ${similarity}
+          const confidenceLabel = fact.confidence != null ? ` | Extraction confidence: ${fact.confidence.toFixed(2)}` : "";
+          output += `- Confirmed: ${fact.consolidated_count}x | Similarity: ${similarity}${confidenceLabel}
 `;
           if (domainName) output += `- Ontology: ${domainName}/${catName}
 `;
@@ -26506,60 +26940,17 @@ Results: ${filtered.length}
       const params = SearchOntologyInputSchema.parse(args);
       try {
         const db = initDatabase();
-        const tree = getOntologyTree(db);
-        const domainFilter = params.domain?.toLowerCase();
-        const categoryFilter = params.category?.toLowerCase();
-        const filtered = tree.filter((entry) => {
-          if (domainFilter && !entry.domain.name.toLowerCase().includes(domainFilter)) return false;
-          return true;
-        });
-        let output = `# Ontology Tree
-
-`;
-        if (filtered.length === 0) {
-          output += "_No ontology data found. Facts are classified automatically as they are extracted._\n";
-        }
-        for (const { domain, categories } of filtered) {
-          output += `## ${domain.name}
-`;
-          if (domain.description) output += `> ${domain.description}
-`;
-          output += "\n";
-          const filteredCategories = categories.filter(({ category }) => {
-            if (categoryFilter && !category.name.toLowerCase().includes(categoryFilter)) return false;
-            return true;
+        try {
+          const output = buildOntologyView(db, {
+            domain: params.domain,
+            category: params.category,
+            includeRelations: params.include_relations,
+            limit: params.limit
           });
-          if (filteredCategories.length === 0) {
-            output += "_No matching categories._\n\n";
-            continue;
-          }
-          for (const { category, facts } of filteredCategories) {
-            output += `### ${category.name}`;
-            if (category.description) output += ` \u2014 ${category.description}`;
-            output += `
-(${facts.length} facts)
-
-`;
-            for (const fact of facts) {
-              output += `- **[${fact.category}]** ${fact.fact}
-`;
-              output += `  - ID: ${fact.id} | Confirmed: ${fact.consolidated_count}x | ${fact.created_at.slice(0, 10)}
-`;
-              if (params.include_relations) {
-                const related = getRelatedFacts(db, fact.id, 1);
-                if (related.length > 0) {
-                  for (const { fact: relFact, relation } of related) {
-                    output += `  - \u2194 [${relation.relation_type}] "${relFact.fact}"
-`;
-                  }
-                }
-              }
-            }
-            output += "\n";
-          }
+          return { content: [{ type: "text", text: output }] };
+        } finally {
+          db.close();
         }
-        db.close();
-        return { content: [{ type: "text", text: output }] };
       } catch (error2) {
         return {
           content: [{ type: "text", text: handleError(error2) }],
@@ -26770,6 +27161,24 @@ _Source exchanges not available._
 `;
           output += "\n";
         }
+        const health = getConsistencyCounts(db);
+        output += `## Graph Health
+
+`;
+        output += `- Orphan facts (no relations): ${health.orphanFacts} / ${health.activeFacts} (${(health.orphanRate * 100).toFixed(1)}%)
+`;
+        output += `- Active CONTRADICTS pairs (both sides still active): ${health.activeContradictsPairs}
+`;
+        output += `- Active SUPERSEDES pairs (superseded fact still active): ${health.activeSupersedesPairs}
+`;
+        output += `- Single-fact categories: ${health.singleFactCategories} / ${health.totalCategories}
+`;
+        if (hasActiveConflicts(health)) {
+          output += `
+_Resolution queue available: run \`memory-bank consistency\` (\`--gate\` exits non-zero on violations)._
+`;
+        }
+        output += "\n";
         return { content: [{ type: "text", text: output }] };
       } catch (error2) {
         return { content: [{ type: "text", text: handleError(error2) }], isError: true };
