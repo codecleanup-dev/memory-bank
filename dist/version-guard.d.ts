@@ -18,7 +18,11 @@ export interface LockMeta {
     version: string | null;
     startedAt: number | null;
 }
-/** Numeric dotted-version compare: -1 / 0 / 1. Missing parts count as 0. */
+/** Dotted-version compare: -1 / 0 / 1. Missing parts count as 0. A prerelease
+ * suffix sorts BELOW its release (semver §11: 1.6.0-beta.1 < 1.6.0) — naive
+ * parseInt over "0-beta.1" would silently equate them and invert takeover
+ * decisions if a prerelease build ever ships. Between two prereleases a plain
+ * string compare is sufficient for our stale/newer decisions. */
 export declare function compareVersions(a: string, b: string): number;
 /**
  * Parse lock pid-file content. Accepts the v1.4.4+ JSON form

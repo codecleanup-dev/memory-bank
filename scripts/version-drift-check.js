@@ -60,18 +60,30 @@ async function main() {
   // 1) Sweep stale-version detached workers.
   let psOut = '';
   try {
-    psOut = execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+    psOut = execFileSync('ps', ['-axo', 'pid=,ppid=,command='], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
   } catch {
     return; // no ps — nothing enforceable, stay silent
   }
   const swept = [];
   for (const line of psOut.split('\n')) {
-    const m = /^\s*(\d+)\s+(.*)$/.exec(line);
+    const m = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line);
     if (!m) continue;
     const pid = parseInt(m[1], 10);
+    const ppid = parseInt(m[2], 10);
     if (!Number.isFinite(pid) || pid === process.pid) continue;
-    const stale = staleWorkerVersion(m[2], version);
+    const stale = staleWorkerVersion(m[3], version);
     if (!stale) continue;
+    // Only ORPHANED processes (reparented to init/launchd) are swept: stale
+    // detached workers were spawned detached+unref'd and their short-lived
+    // spawner hook is long gone by the time a newer session starts, so their
+    // ppid is 1. A process that merely RUNS an old worker path under a live
+    // parent (manual debugging, a shell child, a supervisor) is left alone —
+    // the sweep only ever reaps daemons nobody owns. (Cross-user kills are
+    // impossible anyway: signalling another uid's pid fails with EPERM.)
+    if (ppid !== 1) {
+      console.error(`[memory-bank drift] stale v${stale} candidate pid=${pid} skipped (attached, ppid=${ppid})`);
+      continue;
+    }
     const dead = await killAndConfirm(pid);
     swept.push({ pid, stale, dead });
     console.error(`[memory-bank drift] stale v${stale} worker pid=${pid} ${dead ? 'terminated' : 'TERMINATION FAILED'}`);

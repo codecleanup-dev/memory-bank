@@ -20,17 +20,30 @@ export interface LockMeta {
   startedAt: number | null;
 }
 
-/** Numeric dotted-version compare: -1 / 0 / 1. Missing parts count as 0. */
+/** Dotted-version compare: -1 / 0 / 1. Missing parts count as 0. A prerelease
+ * suffix sorts BELOW its release (semver §11: 1.6.0-beta.1 < 1.6.0) — naive
+ * parseInt over "0-beta.1" would silently equate them and invert takeover
+ * decisions if a prerelease build ever ships. Between two prereleases a plain
+ * string compare is sufficient for our stale/newer decisions. */
 export function compareVersions(a: string, b: string): number {
-  const pa = a.split('.').map((n) => parseInt(n, 10));
-  const pb = b.split('.').map((n) => parseInt(n, 10));
-  const len = Math.max(pa.length, pb.length);
+  const parse = (v: string): { nums: number[]; pre: string | null } => {
+    const dash = v.indexOf('-');
+    const core = dash === -1 ? v : v.slice(0, dash);
+    const pre = dash === -1 ? null : v.slice(dash + 1);
+    return { nums: core.split('.').map((n) => parseInt(n, 10)), pre };
+  };
+  const pa = parse(a);
+  const pb = parse(b);
+  const len = Math.max(pa.nums.length, pb.nums.length);
   for (let i = 0; i < len; i++) {
-    const x = Number.isFinite(pa[i]) ? pa[i] : 0;
-    const y = Number.isFinite(pb[i]) ? pb[i] : 0;
+    const x = Number.isFinite(pa.nums[i]) ? pa.nums[i] : 0;
+    const y = Number.isFinite(pb.nums[i]) ? pb.nums[i] : 0;
     if (x !== y) return x < y ? -1 : 1;
   }
-  return 0;
+  if (pa.pre === pb.pre) return 0;
+  if (pa.pre === null) return 1;
+  if (pb.pre === null) return -1;
+  return pa.pre < pb.pre ? -1 : 1;
 }
 
 /**

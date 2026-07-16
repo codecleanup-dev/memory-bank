@@ -82,6 +82,16 @@ describe('decideTakeover', () => {
   });
 });
 
+describe('compareVersions prerelease ordering', () => {
+  it('a prerelease sorts below its release (semver 11)', () => {
+    expect(compareVersions('1.6.0-beta.1', '1.6.0')).toBe(-1);
+    expect(compareVersions('1.6.0', '1.6.0-beta.1')).toBe(1);
+    expect(compareVersions('1.6.0-beta.1', '1.6.0-beta.1')).toBe(0);
+    expect(compareVersions('1.6.0-alpha', '1.6.0-beta')).toBe(-1);
+    expect(compareVersions('1.6.1-beta.1', '1.6.0')).toBe(1); // core wins first
+  });
+});
+
 describe('staleWorkerVersion', () => {
   it('matches older-version detached workers', () => {
     expect(staleWorkerVersion(`node ${CACHE}/1.3.3/dist/sync-cli.js`, '1.4.4')).toBe('1.3.3');
