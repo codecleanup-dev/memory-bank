@@ -104,4 +104,19 @@ describe('staleWorkerVersion', () => {
     expect(staleWorkerVersion('node /some/other/app/sync-cli.js', '1.4.4')).toBeNull();
     expect(staleWorkerVersion('grep memory-bank', '1.4.4')).toBeNull();
   });
+
+  it('never matches processes that only CARRY a worker path as inert argv', () => {
+    // Executable is not node — editor/grep holding the path as data.
+    expect(staleWorkerVersion(`vim ${CACHE}/1.3.3/dist/sync-cli.js`, '1.4.4')).toBeNull();
+    expect(staleWorkerVersion(`grep -r drift ${CACHE}/1.3.3/scripts/reembed-worker.js`, '1.4.4')).toBeNull();
+    // Node, but the worker path is a LATER argument, not the executed script.
+    expect(staleWorkerVersion(`node /tmp/inspect.js ${CACHE}/1.3.3/dist/sync-cli.js`, '1.4.4')).toBeNull();
+    // Executable merely ENDS with "node" (foonode) — not a node binary.
+    expect(staleWorkerVersion(`/opt/foonode ${CACHE}/1.3.3/dist/sync-cli.js`, '1.4.4')).toBeNull();
+  });
+
+  it('matches with an absolute node path and node flags', () => {
+    expect(staleWorkerVersion(`/usr/local/bin/node --max-old-space-size=4096 ${CACHE}/1.3.3/scripts/reembed-worker.js`, '1.4.4')).toBe('1.3.3');
+    expect(staleWorkerVersion(`/Users/u/.nvm/versions/node/v22.22.3/bin/node ${CACHE}/1.4.0/dist/sync-cli.js --background`, '1.4.4')).toBe('1.4.0');
+  });
 });

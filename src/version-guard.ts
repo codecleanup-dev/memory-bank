@@ -86,9 +86,16 @@ export function decideTakeover(
 /**
  * Detached memory-bank workers running from a versioned plugin cache dir.
  * Deliberately excludes mcp-server / mcp-server-wrapper (owned by live sessions).
+ *
+ * ANCHORED to "node executing this script": the first argv token must be a
+ * node binary (bare `node`/`nodejs` or a path ending in /node) and the worker
+ * path must be the first non-flag argument, terminated by whitespace/EOL. A
+ * bare substring match would also hit unrelated processes that merely carry
+ * the path as inert argv (editor, grep, a different node script taking the
+ * path as data) — and those must never be killed by the sweep.
  */
 const WORKER_RE =
-  /plugins\/cache\/memory-bank-dev\/memory-bank\/(\d+(?:\.\d+)*)\/(?:dist\/sync-cli\.js|scripts\/(?:backfill-extract-worker|backfill-ontology-worker|fact-consolidate-worker|fact-extract-worker|reembed-worker)\.js)/;
+  /^\s*(?:\S*\/)?node(?:js)?(?:\s+--\S+)*\s+\S*plugins\/cache\/memory-bank-dev\/memory-bank\/(\d+(?:\.\d+)*)\/(?:dist\/sync-cli\.js|scripts\/(?:backfill-extract-worker|backfill-ontology-worker|fact-consolidate-worker|fact-extract-worker|reembed-worker)\.js)(?:\s|$)/;
 
 /**
  * If `command` is a memory-bank detached worker from a version OLDER than
