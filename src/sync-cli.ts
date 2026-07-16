@@ -132,26 +132,24 @@ async function __killAndConfirm(pid: number): Promise<boolean> {
   return !__pidAlive(pid);
 }
 
-/** Atomically INSTALL a complete lock: stage dir + pid meta elsewhere, then
- * rename into place. rename(2) is the acquire — no observer can ever see this
- * lock without its pid meta (the old mkdir-then-write pair had a window where
- * a contender read a missing pid file and reclaimed a LIVE lock; repro:
- * pause the creator between mkdir and write). Loser's rename throws
- * (EEXIST/ENOTEMPTY) → defer. Transitional edge: POSIX rename may replace an
- * EMPTY existing dir, which only a legacy (<=1.5.0) creator inside its own
- * microsecond mkdir->write gap can present — accepted for the transition,
- * new-code locks are never observable empty. */
+/** Acquire-and-install: mkdir(2) is the atomic winner selection — it fails
+ * EEXIST for every loser and, unlike rename(2), can never REPLACE an existing
+ * (even empty) directory, so a legacy (<=1.5.0) creator paused inside its own
+ * mkdir->write gap cannot be silently dispossessed. The pid meta is written
+ * immediately after; observers that catch the microsecond meta-less gap
+ * grace-defer on young dirs instead of reclaiming (see __acquireLock), and a
+ * crash inside the gap simply ages past the grace and is reclaimed as
+ * garbage. */
 function __installLock(): boolean {
-  const stage = `${__lockDir}.acquire.${process.pid}.${Date.now()}`;
   try {
-    fs.mkdirSync(stage, { recursive: false });
-    fs.writeFileSync(path.join(stage, 'pid'), JSON.stringify({ pid: process.pid, version: __myVersion, startedAt: Date.now() }));
-    fs.renameSync(stage, __lockDir);
-    return true;
+    fs.mkdirSync(__lockDir, { recursive: false });
   } catch {
-    try { fs.rmSync(stage, { recursive: true, force: true }); } catch {}
-    return false;
+    return false; // someone else holds (or just won) the lock
   }
+  try {
+    fs.writeFileSync(__pidFile, JSON.stringify({ pid: process.pid, version: __myVersion, startedAt: Date.now() }));
+  } catch { /* meta write failed — readers will grace-defer, then treat as garbage */ }
+  return true;
 }
 
 function __reclaimLock(expectedPid: number | null): boolean {

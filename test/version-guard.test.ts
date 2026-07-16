@@ -123,6 +123,13 @@ describe('staleWorkerVersion', () => {
     expect(staleWorkerVersion('grep memory-bank', '1.4.4')).toBeNull();
   });
 
+  it('rejects cache-path look-alikes outside the real cache root', () => {
+    const real = '/Users/u/.claude/plugins/cache/memory-bank-dev/memory-bank';
+    expect(staleWorkerVersion(`node ${real}/1.0.0/scripts/reembed-worker.js`, '1.6.0', real)).toBe('1.0.0');
+    // Same SHAPE under a different root — outside the runtime-anchored cache.
+    expect(staleWorkerVersion('node /tmp/x/plugins/cache/memory-bank-dev/memory-bank/1.0.0/scripts/reembed-worker.js', '1.6.0', real)).toBeNull();
+  });
+
   it('never matches processes that only CARRY a worker path as inert argv', () => {
     // Executable is not node — editor/grep holding the path as data.
     expect(staleWorkerVersion(`vim ${CACHE}/1.3.3/dist/sync-cli.js`, '1.4.4')).toBeNull();

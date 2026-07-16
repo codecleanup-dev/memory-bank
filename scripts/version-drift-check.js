@@ -47,26 +47,26 @@ function pidAlive(pid) {
  * worker — called immediately before EVERY signal to shrink the pid-reuse
  * (TOCTOU) window: the original ps snapshot may be seconds old, and a worker
  * that exited naturally could have its pid recycled by an unrelated process. */
-function stillStaleOrphan(pid, version) {
+function stillStaleOrphan(pid, version, cacheBase) {
   try {
     const out = execFileSync('ps', ['-o', 'ppid=,command=', '-p', String(pid)], { encoding: 'utf8' });
     const m = /^\s*(\d+)\s+(.*)$/.exec(out.trim());
     if (!m) return false;
     if (parseInt(m[1], 10) !== 1) return false;
-    return staleWorkerVersion(m[2], version) !== null;
+    return staleWorkerVersion(m[2], version, cacheBase) !== null;
   } catch {
     return false; // pid gone (or ps failed) — nothing to kill
   }
 }
 
-async function killAndConfirm(pid, version) {
-  if (!stillStaleOrphan(pid, version)) return !pidAlive(pid);
+async function killAndConfirm(pid, version, cacheBase) {
+  if (!stillStaleOrphan(pid, version, cacheBase)) return !pidAlive(pid);
   try { process.kill(pid, 'SIGTERM'); } catch {}
   for (let i = 0; i < 5; i++) {
     await new Promise((r) => setTimeout(r, 300));
     if (!pidAlive(pid)) return true;
   }
-  if (!stillStaleOrphan(pid, version)) return !pidAlive(pid);
+  if (!stillStaleOrphan(pid, version, cacheBase)) return !pidAlive(pid);
   try { process.kill(pid, 'SIGKILL'); } catch {}
   await new Promise((r) => setTimeout(r, 300));
   return !pidAlive(pid);
@@ -75,6 +75,15 @@ async function killAndConfirm(pid, version) {
 async function main() {
   const version = myVersion();
   if (!version) return;
+
+  // Runtime-anchored cache root (also the kill-set boundary for the sweep):
+  // when this script runs from the versioned plugin cache, the base is its
+  // own parent directory; a dev checkout falls back to os.homedir(). Workers
+  // whose script path lies OUTSIDE this base are never killed, even if the
+  // path shape matches.
+  const cacheBase = /[\/]plugins[\/]cache[\/]memory-bank-dev[\/]memory-bank[\/][^\/]+$/.test(ROOT)
+    ? path.dirname(ROOT)
+    : path.join(os.homedir(), '.claude', 'plugins', 'cache', 'memory-bank-dev', 'memory-bank');
 
   // 1) Sweep stale-version detached workers.
   let psOut = '';
@@ -90,7 +99,7 @@ async function main() {
     const pid = parseInt(m[1], 10);
     const ppid = parseInt(m[2], 10);
     if (!Number.isFinite(pid) || pid === process.pid) continue;
-    const stale = staleWorkerVersion(m[3], version);
+    const stale = staleWorkerVersion(m[3], version, cacheBase);
     if (!stale) continue;
     // Only ORPHANED processes (reparented to init/launchd) are swept: stale
     // detached workers were spawned detached+unref'd and their short-lived
@@ -103,7 +112,7 @@ async function main() {
       console.error(`[memory-bank drift] stale v${stale} candidate pid=${pid} skipped (attached, ppid=${ppid})`);
       continue;
     }
-    const dead = await killAndConfirm(pid, version);
+    const dead = await killAndConfirm(pid, version, cacheBase);
     swept.push({ pid, stale, dead });
     console.error(`[memory-bank drift] stale v${stale} worker pid=${pid} ${dead ? 'terminated' : 'TERMINATION FAILED'}`);
   }
@@ -118,15 +127,6 @@ async function main() {
   // 2) Drift visibility: newer version present in the plugin cache than the
   //    one THIS session runs (i.e. update landed but session not restarted,
   //    or install record lags the cache).
-  // Runtime-anchored cache root: when THIS script runs from the versioned
-  // plugin cache, the cache base is simply its own parent directory — no
-  // environment variable is trusted to locate it (a poisoned HOME could point
-  // the scan at an attacker-controlled tree). A dev checkout (not under the
-  // cache) falls back to os.homedir() for drift VISIBILITY only — nothing in
-  // this branch kills processes.
-  const cacheBase = /[\/]plugins[\/]cache[\/]memory-bank-dev[\/]memory-bank[\/][^\/]+$/.test(ROOT)
-    ? path.dirname(ROOT)
-    : path.join(os.homedir(), '.claude', 'plugins', 'cache', 'memory-bank-dev', 'memory-bank');
   try {
     const versions = fs
       .readdirSync(cacheBase)

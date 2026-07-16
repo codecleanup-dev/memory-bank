@@ -46,4 +46,4 @@ export declare function isSyncCliCommand(command: string): boolean;
  * If `command` is a memory-bank detached worker from a version OLDER than
  * `myVersion`, return that stale version string; otherwise null.
  */
-export declare function staleWorkerVersion(command: string, myVersion: string): string | null;
+export declare function staleWorkerVersion(command: string, myVersion: string, cacheBase?: string | null): string | null;

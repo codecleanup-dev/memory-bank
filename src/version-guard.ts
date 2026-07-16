@@ -113,7 +113,7 @@ export function decideTakeover(
  * path as data) — and those must never be killed by the sweep.
  */
 const WORKER_RE =
-  /^\s*(?:\S*\/)?node(?:js)?(?:\s+--\S+)*\s+\S*plugins\/cache\/memory-bank-dev\/memory-bank\/(\d+(?:\.\d+)*)\/(?:dist\/sync-cli\.js|scripts\/(?:backfill-extract-worker|backfill-ontology-worker|fact-consolidate-worker|fact-extract-worker|reembed-worker)\.js)(?:\s|$)/;
+  /^\s*(?:\S*\/)?node(?:js)?(?:\s+--\S+)*\s+(\S*plugins\/cache\/memory-bank-dev\/memory-bank\/(\d+(?:\.\d+)*)\/(?:dist\/sync-cli\.js|scripts\/(?:backfill-extract-worker|backfill-ontology-worker|fact-consolidate-worker|fact-extract-worker|reembed-worker)\.js))(?:\s|$)/;
 
 
 /**
@@ -139,8 +139,19 @@ export function isSyncCliCommand(command: string): boolean {
  * If `command` is a memory-bank detached worker from a version OLDER than
  * `myVersion`, return that stale version string; otherwise null.
  */
-export function staleWorkerVersion(command: string, myVersion: string): string | null {
+export function staleWorkerVersion(
+  command: string,
+  myVersion: string,
+  cacheBase: string | null = null,
+): string | null {
   const m = WORKER_RE.exec(command);
   if (!m) return null;
-  return compareVersions(m[1], myVersion) < 0 ? m[1] : null;
+  // When the caller knows the REAL cache root (runtime-anchored from its own
+  // location), the worker's script path must live under it — a same-user
+  // process that merely imitates the cache path SHAPE elsewhere
+  // (/tmp/x/plugins/cache/...) must never enter the kill set.
+  if (cacheBase !== null && !m[1].startsWith(cacheBase.endsWith('/') ? cacheBase : cacheBase + '/')) {
+    return null;
+  }
+  return compareVersions(m[2], myVersion) < 0 ? m[2] : null;
 }
