@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/cli/node-pin.sh ${CLAUDE_PLUGIN_ROOT}/scripts/version-drift-check.js",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/cli/node-pin.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/version-drift-check.js\"",
             "async": true
           },
           {

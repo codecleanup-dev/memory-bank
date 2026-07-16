@@ -97,6 +97,25 @@ function __isSyncCliProcess(pid) {
         return false;
     }
 }
+/** Process start time (ms epoch), derived from `ps -o etime=` — elapsed time
+ * is pure digits ([[dd-]hh:]mm:ss) and locale-independent, unlike lstart
+ * (localized month/day names on non-C locales). 1s resolution is plenty for
+ * the 60s creator-vs-recycled slack below. */
+function __processStartMs(pid) {
+    try {
+        const out = execFileSync('ps', ['-o', 'etime=', '-p', String(pid)], { encoding: 'utf8' }).trim();
+        const m = /^(?:(\d+)-)?(?:(\d+):)?(\d{1,2}):(\d{2})$/.exec(out);
+        if (!m)
+            return null;
+        const days = parseInt(m[1] ?? '0', 10);
+        const hours = parseInt(m[2] ?? '0', 10);
+        const elapsedMs = (((days * 24 + hours) * 60 + parseInt(m[3], 10)) * 60 + parseInt(m[4], 10)) * 1000;
+        return Date.now() - elapsedMs;
+    }
+    catch {
+        return null;
+    }
+}
 async function __killAndConfirm(pid) {
     // Re-verify the holder's command line immediately before EVERY signal — the
     // earlier check is a separate ps read, and a holder that exits in between
@@ -195,31 +214,31 @@ async function __acquireLock() {
                     if (!__reclaimLock())
                         return false;
                 }
-                else if (runMs !== null && runMs > WEDGE_MAX_MS) {
-                    // Live but unrecognizable AND the lock is older than any real sync
-                    // can run (the same wedge bound used for recognized holders): the
-                    // only consistent explanation is a stale pid file whose pid was
-                    // RECYCLED by a long-lived unrelated process. Reclaim WITHOUT
-                    // killing — never signal an unidentified pid — because deferring
-                    // forever here would freeze indexing until a manual rm (the
-                    // original 23h-wedge incident class). Bounded trade-off: an
-                    // unrecognizable REAL sync is protected for the full wedge window,
-                    // after which it is by definition wedged and loses the lock anyway.
-                    console.error(`Sync lock holder pid=${holder.pid} unrecognized and lock exceeds wedge bound - treating as recycled-pid garbage, reclaiming without kill`);
-                    if (!__reclaimLock())
-                        return false;
-                }
                 else {
-                    // FAIL-CLOSED: a live pid we cannot POSITIVELY identify as a
-                    // memory-bank sync is neither killed nor has its lock reclaimed.
-                    // Recognition can fail on legitimate wrappers (bin shim / tsx /
-                    // quoted paths / exotic node flags) — reclaiming under a live real
-                    // sync would run two concurrent writers (the original
-                    // 76-concurrent-sync load incident class), which is strictly worse
-                    // than skipping this run. A genuinely recycled pid holds the lock
-                    // only until that process exits; manual escape is logged below.
-                    console.error(`Sync lock holder pid=${holder.pid} is alive but not recognizable as a memory-bank sync — deferring (to override manually: rm -rf ~/.claude/run-locks/memory-bank-sync.lock)`);
-                    return false;
+                    // Live but not recognizable as a sync. Discriminate CREATOR vs
+                    // RECYCLED pid by process start time: the lock's creator was
+                    // already running when the lock was born, so an occupant that
+                    // STARTED AFTER the lock existed cannot be its creator — the pid
+                    // was recycled and the lock is garbage. Reclaim WITHOUT killing
+                    // (never signal an unidentified pid); this frees a recycled-pid
+                    // hostage immediately instead of freezing indexing until a manual
+                    // rm. If the start time is compatible with lock creation (or
+                    // unavailable), the process may be a REAL sync behind a wrapper we
+                    // cannot recognize — fail closed and defer: a second concurrent
+                    // writer (the original 76-concurrent-sync load incident class) is
+                    // strictly worse than skipping runs, and killing an unidentified
+                    // pid is never acceptable.
+                    const lockBirthMs = holder.startedAt ?? (runMs !== null ? Date.now() - runMs : null);
+                    const procStartMs = __processStartMs(holder.pid);
+                    if (lockBirthMs !== null && procStartMs !== null && procStartMs > lockBirthMs + 60_000) {
+                        console.error(`Sync lock holder pid=${holder.pid} started after the lock was created - recycled pid, reclaiming without kill`);
+                        if (!__reclaimLock())
+                            return false;
+                    }
+                    else {
+                        console.error(`Sync lock holder pid=${holder.pid} is alive but not recognizable as a memory-bank sync - deferring (to override manually: rm -rf ~/.claude/run-locks/memory-bank-sync.lock)`);
+                        return false;
+                    }
                 }
             }
             else {
