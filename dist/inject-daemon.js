@@ -80,7 +80,7 @@ export function startInjectDaemon() {
             void (async () => {
                 try {
                     const req = JSON.parse(line);
-                    const context = await computeInjectContext(String(req.prompt ?? ''), String(req.cwd ?? process.cwd()), 'daemon');
+                    const context = await computeInjectContext(String(req.prompt ?? ''), String(req.cwd ?? process.cwd()), 'daemon', req.session_id ? String(req.session_id) : undefined);
                     conn.end(JSON.stringify({ ok: true, context }) + '\n');
                 }
                 catch {

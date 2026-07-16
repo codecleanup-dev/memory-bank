@@ -4,14 +4,14 @@
 
 ![Memory Bank](docs/memory-bank.gif)
 
-## What's New in v1.3.0
+## What's New in v1.4.x
 
-- ⚡ **Ontology backfill batching (20 facts per LLM call)** — the backfill worker used to spawn one headless Claude session *per fact* (~10–14s each, plus auxiliary calls and hook cascades). It now classifies in batches: measured 40 facts in 19s vs ~8min before (~25× wall-clock, 20× fewer spawns). Relation detection during backfill is off by default (`BACKFILL_RELATIONS=1` to opt in)
-- 🔇 **Headless LLM spawn isolation** — worker LLM calls run with `maxTurns: 1`, `settingSources: []`, and a dedicated tmp cwd, so they no longer fire your SessionStart/End hooks (which used to re-spawn sync/backfill workers on every call) and no longer drop transcripts into your project dirs where `claude --resume` could pick one up
-- 📒 **Classification attempt ledger** — failures are counted per fact (`ontology_attempts`); after 3 content failures the fact is parked in General/Misc and permanently leaves the backfill queue (it stays fully searchable — ontology is an overlay). Fixes the old bug where unparseable LLM output left facts NULL and re-selected (re-billed) forever. Failure taxonomy is typed: transient (runtime down — no attempt burned), content (the fact's own text — ledgered), index-repair-failed (surfaces loudly, never parks innocent facts)
-- 🛠️ **Category vec-index self-heal** — exact id set-diff reconciliation (add missing + purge stale rows, bounded per call) with candidate-starvation refusal: classification never runs blind against an incomplete index, so duplicate-taxonomy sprawl can't silently regrow. Relation edges are idempotent per (source, type, target) with a DB UNIQUE index; graph traversal deterministically prefers belief-safety edges (CONTRADICTS/SUPERSEDES) without hiding qualifying neighbours or leaking pruned paths
-- 🚱 **Per-run worker caps hardened** — detached backfill workers have finite per-run defaults + absolute ceilings + strict integer env parsing + a transient circuit breaker, so an orphaned worker can never flood the LLM proxy again
-- Earlier releases: see [CHANGELOG](CHANGELOG.md) — v1.2.2 documented Context Injection + fail-loud injection observability; v1.2.0 added the `analyze` command, transparent `.jsonl.zst` archives, and FTS5 (BM25) text search
+- 🧾 **Injection pipeline v2 — session dedup ledger (v1.4.0)** — a fact is now injected at most **once per session**. Before: 74% inject rate × 5.5–8 facts × ~140 chars ≈ **~470 tokens per prompt**, with the *same* facts re-injected across a session (~10k tokens per 30-prompt session). A bounded per-session ledger (400 ids, 7-day TTL, atomic writes, fail-open) filters already-injected facts; a repeated topic's 2nd occurrence injects **0 bytes** (`status:"deduped"`)
+- ✂️ **Token budget** — per-fact 160-char truncation + 1,000-char block budget (lowest-relevance facts dropped first), plus an elapsed-budget gate on repeated-prompt detection: its 313k-exchange vector search (p95 498ms) is synchronous and cannot be preempted mid-flight, so it is skipped entirely when injection has already spent >700ms
+- 📈 **Savings are measured, not assumed** — the inject log gains `chars` (block size) and `deduped` (facts saved) fields, so real-world token savings accumulate in observable JSONL
+- 🩹 **Dependency self-heal (v1.4.2)** — `claude plugin update` non-deterministically skips `npm install` for the new cache dir, and cc-sync ships plugin caches to other machines without `node_modules`. The dep-free injection thin client now detects `ERR_MODULE_NOT_FOUND` and spawns a one-shot detached `npm install` (atomic marker prevents loops), so a broken install heals itself on the first prompt
+- 📦 **Packaging fix (v1.4.1)** — v1.4.0 shipped a stale committed `dist/`; the release checklist now hard-checks `git status dist/` is clean before tagging
+- Earlier releases: see [CHANGELOG](CHANGELOG.md) — v1.3.x added ontology backfill batching (~25×), headless LLM spawn isolation, the classification attempt ledger, vec-index self-heal, worker flood caps, and the warm inject daemon (~2.3s → ~0.07s per prompt)
 
 ## Features
 
@@ -19,7 +19,7 @@
 - **RAG Search** -- Search results auto-enriched with related facts and ontology context
 - **Conversation Search** -- Semantic vector search + FTS5 (BM25) full-text search across all past conversations
 - **Full-History Analysis** -- `memory-bank analyze` + `analyzing-all-conversations` skill: coverage-checked report over the entire conversation *index* (projects, facts, domains, timeline, backfill gaps) — run `memory-bank sync` first so new conversations are indexed
-- **Context Injection** -- Related past decisions are automatically prepended to every prompt (UserPromptSubmit hook): baseline-margin relevance gate + 1-hop ontology expansion, with fail-loud JSONL observability logs
+- **Context Injection** -- Related past decisions are automatically prepended to every prompt (UserPromptSubmit hook): baseline-margin relevance gate + 1-hop ontology expansion + per-session dedup ledger and token budget (v1.4.0), with fail-loud JSONL observability logs
 - **Fact Extraction** -- Automatic extraction of decisions, preferences, patterns from conversations (trivial-exchange filtering, in-session dedup, confidence gating, LLM call budgeting)
 - **Fact Consolidation** -- Duplicate detection, contradiction handling, evolution tracking
 - **Graph Traversal** -- Multi-hop exploration (up to 3 hops) to trace decision chains
@@ -109,10 +109,13 @@ Every user prompt (≥20 chars) triggers the `UserPromptSubmit` hook, which vect
 
 - **Relevance gate** — a fact is injected only when its similarity to the query exceeds the query's own background baseline by a margin (absolute thresholds cannot separate relevant from irrelevant on compressed e5 scores)
 - **1-hop expansion** — top matches pull in related facts via typed ontology relations (max 8 facts total)
-- **Observability (v1.2.1)** — every run appends one JSONL line to `~/.config/superpowers/conversation-index/logs/inject-context.jsonl`:
+- **Session dedup ledger (v1.4.0)** — a fact already injected in this session is never re-injected (it is already in the conversation context); repeated topics cost 0 extra tokens. Ledger is per-session, bounded (400 ids), TTL-pruned (7 days), and fail-open
+- **Token budget (v1.4.0)** — each fact is truncated to 160 chars and the whole block capped at 1,000 chars (lowest-relevance dropped first); repeated-prompt detection is skipped when injection has already spent >700ms (the sync sqlite search cannot be preempted once started)
+- **Observability (v1.2.1, extended v1.4.0)** — every run appends one JSONL line to `~/.config/superpowers/conversation-index/logs/inject-context.jsonl`:
 
   ```json
-  {"ts":"2026-07-04T10:31:56Z","status":"injected","prompt_len":49,"candidates":5,"injected":8,"duration_ms":478}
+  {"ts":"2026-07-12T07:36:35Z","status":"injected","prompt_len":67,"candidates":5,"injected":8,"deduped":0,"chars":969,"duration_ms":528,"via":"fallback"}
+  {"ts":"2026-07-12T07:36:41Z","status":"deduped","prompt_len":67,"candidates":5,"injected":0,"deduped":8,"duration_ms":476,"via":"fallback"}
   ```
 
   Node-level crashes (missing `node_modules`, import failures) land in `logs/inject-context.err.log` instead of being discarded.

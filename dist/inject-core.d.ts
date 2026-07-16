@@ -11,4 +11,4 @@
  *
  * `via` tags the inject log so the two paths stay distinguishable.
  */
-export declare function computeInjectContext(userPrompt: string, project: string, via: 'daemon' | 'fallback'): Promise<string>;
+export declare function computeInjectContext(userPrompt: string, project: string, via: 'daemon' | 'fallback', sessionId?: string): Promise<string>;

@@ -133,6 +133,78 @@ upstream v1.3.2–v1.3.3 (own sections below)._
   edge whose fact was deduped onto an existing local fact used to be dropped
   by the FK check; post-remap self-loops and already-present edges are
   skipped instead of duplicated.
+_The sections below are upstream's own v1.4.x release notes, kept verbatim
+at the 2026-07-17 merge (fork 1.7.0). Fork-side coverage: v1.4.4 was already
+ported (hardened) in 1.6.0; inject v2 (v1.4.0) is adopted in 1.7.0._
+
+## [1.4.3] - 2026-07-12
+
+### Fixed
+- **Ineffective repeat-detection timebox replaced** (found by adversarial
+  review): the v1.4.0 `Promise.race` 250ms timebox could never preempt
+  `detectRepeat`'s synchronous better-sqlite3 vector search — the timer only
+  fires after the blocking call completes. Replaced with an elapsed-budget
+  gate: repeat detection is skipped entirely when injection has already spent
+  >700ms, which actually bounds tail latency.
+
+## [1.4.2] - 2026-07-12
+
+### Fixed
+- **Dependency self-heal**: `claude plugin update` non-deterministically skips
+  `npm install` for the new cache dir (observed: 1.4.0 got node_modules,
+  1.4.1 did not — every hook then died with `Cannot find package
+  'better-sqlite3'`), and cc-sync ships plugin caches to other machines
+  WITHOUT node_modules by design. The injection thin client (the only
+  dep-free entry point, runs on every prompt) now detects
+  ERR_MODULE_NOT_FOUND in its cold fallback and spawns a one-shot detached
+  `npm install` in the plugin root, gated by an atomic `wx` marker file so it
+  can never loop. Verified in isolation: detect → spawn → marker suppresses
+  repeats → better-sqlite3 installed.
+
+## [1.4.1] - 2026-07-12
+
+### Fixed
+- **Packaging**: v1.4.0 shipped a stale committed `dist/` (the injection-v2
+  build output was not committed with its sources), so fresh installs got the
+  new thin client but an old core without the dedup ledger. `dist/` is now
+  rebuilt and committed; release checklist gains a HARD check that
+  `git status dist/` is clean before tagging.
+
+## [1.4.0] - 2026-07-12
+
+### Added
+- **Injection pipeline v2 — session dedup ledger** (`src/inject-ledger.ts`):
+  a fact is injected at most ONCE per session. Measured waste before: 74%
+  inject rate × 5.5–8 facts × ~140 chars ≈ ~470 tokens/prompt with the SAME
+  facts re-injected across a session (~10k tokens per 30-prompt session).
+  Ledger is bounded (400 ids, oldest-evict), TTL-pruned (7 days), session-id
+  sanitized (path-traversal safe), atomic-write, and fail-open (a corrupt
+  ledger never blocks injection). E2E: 2nd call in the same session injects
+  0 bytes (`status:deduped`, ~330 tokens saved per repeated prompt).
+- **Token budget**: per-fact 160-char truncation + 1,000-char block budget
+  (lowest-relevance facts dropped first).
+- **Observability**: inject log gains `chars` (block size) and `deduped`
+  (facts saved by the ledger) so real-world savings are continuously measured.
+- **Knowledge Galaxy** (`ui/relations/`): Three.js 3D visualization of the
+  ontology — 32 domains / 4.2k categories / 24.7k facts / 27.8k typed
+  relations, with search, per-type edge toggles, relation-navigating detail
+  panel, and adaptive performance (compositor-only labels, point-size cap,
+  eco-mode DPR degrade).
+
+### Fixed
+- `session_id` is now plumbed end-to-end through the injection path
+  (hook stdin → thin client → daemon payload → core), which the dedup
+  ledger requires.
+- `detectRepeat` tail latency bounded (its 313k-exchange vector search has a
+  measured p95 of 498ms): the search is synchronous and cannot be preempted
+  once started, so it is skipped when injection has already spent >700ms
+  (v1.4.0 shipped a Promise.race "timebox" that could not actually preempt
+  the sync work — replaced in v1.4.3 with this elapsed-budget gate).
+- bench-perf `exchanges_invisible_to_vector_search` counted only
+  stale-version rows and reported 0 while ~90k missing-vector rows were
+  unsearchable; it now counts true invisibility (stale OR missing vector).
+- Vector drain completed: 87,727 invisible exchanges → 0 (all 313k
+  exchanges searchable; final baseline: vector p50 20.9ms, fts 3.4ms).
 
 ## [1.3.4] - 2026-07-11
 

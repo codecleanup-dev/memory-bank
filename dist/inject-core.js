@@ -5,6 +5,7 @@ import { generateEmbedding, initEmbeddings, queryBaseline } from './embeddings.j
 import { getRelatedFacts } from './ontology-db.js';
 import { detectRepeat, formatRepeatContext } from './repeat-detector.js';
 import { appendInjectLog } from './inject-log.js';
+import { loadLedger, appendLedger } from './inject-ledger.js';
 const TOP_K = 5;
 // Probe-baseline relevance gate (e5 scores are compressed, so absolute
 // thresholds cannot separate relevant from irrelevant). A fact is injected
@@ -14,6 +15,19 @@ const TOP_K = 5;
 // +0.04~+0.045, so the margin sits just above that noise band.
 const BASELINE_MARGIN = 0.045;
 const MAX_CONTEXT_FACTS = 8;
+// Token budget: fact 평균 140자·p90 207자 실측 — 절단 없이 8건이면 ~470 tok/프롬프트.
+// fact 당 160자 + 블록 1,000자 예산으로 상한. 잘린 내용이 필요하면 search_facts 로 조회.
+const FACT_CHAR_CAP = 160;
+const BLOCK_CHAR_BUDGET = 1000;
+// detectRepeat 는 313k exchanges 벡터검색 (p50 21ms / p95 498ms 실측) — tail 이
+// 주입 지연 p90 을 끌어올린다. better-sqlite3 는 동기라 시작한 검색을 타이머로
+// 선점할 수 없다(Promise.race 는 무효 — Codex 리뷰 지적). 대신 시작 "전" 경과
+// 예산을 확인해, 파이프라인이 이미 이만큼 썼으면 반복감지를 통째로 생략한다.
+const REPEAT_ELAPSED_BUDGET_MS = 700;
+function truncateFact(text) {
+    const t = text.replace(/\s+/g, ' ').trim();
+    return t.length > FACT_CHAR_CAP ? t.slice(0, FACT_CHAR_CAP - 1) + '…' : t;
+}
 /**
  * Compute the UserPromptSubmit context block for a prompt: top-K similar
  * facts gated by the probe baseline, expanded with 1-hop ontology relations,
@@ -27,7 +41,7 @@ const MAX_CONTEXT_FACTS = 8;
  *
  * `via` tags the inject log so the two paths stay distinguishable.
  */
-export async function computeInjectContext(userPrompt, project, via) {
+export async function computeInjectContext(userPrompt, project, via, sessionId) {
     const t0 = Date.now();
     if (!userPrompt || userPrompt.length < 20) {
         appendInjectLog({ status: 'skipped', project, prompt_len: userPrompt?.length ?? 0, via });
@@ -67,28 +81,55 @@ export async function computeInjectContext(userPrompt, project, via) {
                     }
                 }
             }
-            // Format context block
+            // 세션 dedup: 이 세션에서 이미 주입한 fact 는 대화 컨텍스트에 이미 있다 —
+            // 재주입은 순수 토큰 낭비. 원장에 없는 fact 만 주입한다.
+            const ledger = loadLedger(sessionId);
+            const fresh = expandedFacts.filter(({ fact }) => !ledger.has(fact.id));
+            const dedupedCount = expandedFacts.length - fresh.length;
+            if (fresh.length === 0) {
+                appendInjectLog({
+                    status: 'deduped', project, prompt_len: userPrompt.length,
+                    candidates: candidates.length, injected: 0, deduped: dedupedCount,
+                    duration_ms: Date.now() - t0, via,
+                });
+                return '';
+            }
+            // Format context block — fact 당 160자 절단 + 블록 1,000자 예산
+            // (하위 관련도부터 탈락: fresh 는 관련도순이므로 뒤에서 끊긴다)
             const lines = ['📌 관련 과거 결정:'];
-            for (const { fact, note } of expandedFacts) {
+            let blockChars = lines[0].length;
+            const injectedIds = [];
+            for (const { fact, note } of fresh) {
                 const dateStr = fact.created_at.slice(0, 10);
-                lines.push(`- ${note ? note + ' ' : ''}[${fact.category}] ${fact.fact} (${dateStr})`);
+                const line = `- ${note ? note + ' ' : ''}[${fact.category}] ${truncateFact(fact.fact)} (${dateStr})`;
+                if (blockChars + line.length > BLOCK_CHAR_BUDGET && injectedIds.length > 0)
+                    break;
+                lines.push(line);
+                blockChars += line.length + 1;
+                injectedIds.push(fact.id);
             }
-            // Detect repeated prompts (best-effort)
-            try {
-                const repeats = await detectRepeat(userPrompt, project, 2, 0.85, { embedding, db });
-                const repeatCtx = formatRepeatContext(repeats);
-                if (repeatCtx) {
-                    lines.push('');
-                    lines.push(repeatCtx);
+            // Detect repeated prompts (best-effort). 동기 sqlite 검색이라 시작 후엔
+            // 선점 불가 — 주입이 이미 예산을 소진했으면 시작 자체를 생략 (tail 상한).
+            if (Date.now() - t0 < REPEAT_ELAPSED_BUDGET_MS) {
+                try {
+                    const repeats = await detectRepeat(userPrompt, project, 2, 0.85, { embedding, db });
+                    const repeatCtx = formatRepeatContext(repeats);
+                    if (repeatCtx) {
+                        lines.push('');
+                        lines.push(repeatCtx);
+                    }
                 }
+                catch { /* best-effort */ }
             }
-            catch { /* best-effort */ }
+            appendLedger(sessionId, ledger, injectedIds);
+            const block = lines.join('\n') + '\n';
             appendInjectLog({
                 status: 'injected', project, prompt_len: userPrompt.length,
-                candidates: candidates.length, injected: expandedFacts.length,
+                candidates: candidates.length, injected: injectedIds.length,
+                deduped: dedupedCount, chars: block.length,
                 duration_ms: Date.now() - t0, via,
             });
-            return lines.join('\n') + '\n';
+            return block;
         }
     }
     catch (error) {
