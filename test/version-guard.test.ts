@@ -135,5 +135,7 @@ describe('isSyncCliCommand (pid-recycle kill gate)', () => {
     expect(isSyncCliCommand('node /repo/app.js /x/dist/sync-cli.js')).toBe(false); // later arg, not the script
     expect(isSyncCliCommand('node /repo/memory-bank/cli/memory-bank.js search sync-cli')).toBe(false); // wrong subcommand
     expect(isSyncCliCommand('grep -r sync-cli /repo/memory-bank')).toBe(false);
+    expect(isSyncCliCommand('node /other-app/dist/sync-cli.js')).toBe(false); // no memory-bank marker — unrelated app's own sync-cli.js
+    expect(isSyncCliCommand('node /other-app/cli/tool.js sync')).toBe(false);
   });
 });

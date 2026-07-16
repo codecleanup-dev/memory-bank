@@ -153,8 +153,21 @@ async function __acquireLock(): Promise<boolean> {
       const decision = decideTakeover(holder, __myVersion, runMs, WEDGE_MAX_MS);
       if (decision === 'defer') return false;
       if (!__isSyncCliProcess(holder.pid)) {
-        // Pid was recycled by an unrelated process — the lock is garbage.
-        if (!__reclaimLock()) return false;
+        if (!__pidAlive(holder.pid)) {
+          // Died between checks — normal dead-holder reclaim.
+          if (!__reclaimLock()) return false;
+        } else {
+          // FAIL-CLOSED: a live pid we cannot POSITIVELY identify as a
+          // memory-bank sync is neither killed nor has its lock reclaimed.
+          // Recognition can fail on legitimate wrappers (bin shim / tsx /
+          // quoted paths / exotic node flags) — reclaiming under a live real
+          // sync would run two concurrent writers (the original
+          // 76-concurrent-sync load incident class), which is strictly worse
+          // than skipping this run. A genuinely recycled pid holds the lock
+          // only until that process exits; manual escape is logged below.
+          console.error(`Sync lock holder pid=${holder.pid} is alive but not recognizable as a memory-bank sync — deferring (to override manually: rm -rf ~/.claude/run-locks/memory-bank-sync.lock)`);
+          return false;
+        }
       } else {
         console.log(`Preempting sync lock holder pid=${holder.pid} version=${holder.version ?? 'legacy'} (${decision})`);
         if (!(await __killAndConfirm(holder.pid))) {
