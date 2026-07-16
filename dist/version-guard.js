@@ -62,6 +62,7 @@ export function parseLockMeta(raw) {
                 pid,
                 version: typeof o.version === 'string' && o.version ? o.version : null,
                 startedAt: typeof o.startedAt === 'number' && Number.isFinite(o.startedAt) ? o.startedAt : null,
+                script: typeof o.script === 'string' && o.script ? o.script : null,
             };
         }
         catch {
@@ -71,7 +72,7 @@ export function parseLockMeta(raw) {
     const pid = parseInt(t, 10);
     if (!Number.isFinite(pid) || pid <= 1)
         return null;
-    return { pid, version: null, startedAt: null };
+    return { pid, version: null, startedAt: null, script: null };
 }
 /**
  * Decide whether a live lock holder should be preempted.

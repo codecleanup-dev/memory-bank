@@ -18,6 +18,14 @@ export interface LockMeta {
   pid: number;
   version: string | null;
   startedAt: number | null;
+  /** Absolute path of the creator's own entry script (process.argv[1]) —
+   * the lock's SELF-DECLARED identity. Holder recognition compares the ps
+   * command line against THIS exact token instead of a path heuristic, which
+   * is simultaneously tighter (an unrelated look-alike path never matches a
+   * lock it did not create) and looser (any invocation form — exotic node
+   * flags, wrappers — still contains its own script path). null on legacy
+   * (<=1.6.0-pre) locks → heuristic fallback. */
+  script: string | null;
 }
 
 /** Dotted-version compare: -1 / 0 / 1. Missing parts count as 0. A prerelease
@@ -57,13 +65,14 @@ export function parseLockMeta(raw: string): LockMeta | null {
   if (!t) return null;
   if (t.startsWith('{')) {
     try {
-      const o = JSON.parse(t) as { pid?: unknown; version?: unknown; startedAt?: unknown };
+      const o = JSON.parse(t) as { pid?: unknown; version?: unknown; startedAt?: unknown; script?: unknown };
       const pid = typeof o.pid === 'number' ? o.pid : parseInt(String(o.pid), 10);
       if (!Number.isFinite(pid) || pid <= 1) return null;
       return {
         pid,
         version: typeof o.version === 'string' && o.version ? o.version : null,
         startedAt: typeof o.startedAt === 'number' && Number.isFinite(o.startedAt) ? o.startedAt : null,
+        script: typeof o.script === 'string' && o.script ? o.script : null,
       };
     } catch {
       return null;
@@ -71,7 +80,7 @@ export function parseLockMeta(raw: string): LockMeta | null {
   }
   const pid = parseInt(t, 10);
   if (!Number.isFinite(pid) || pid <= 1) return null;
-  return { pid, version: null, startedAt: null };
+  return { pid, version: null, startedAt: null, script: null };
 }
 
 export type TakeoverDecision = 'takeover-stale-version' | 'takeover-wedged' | 'defer';

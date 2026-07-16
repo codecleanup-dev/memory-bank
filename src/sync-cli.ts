@@ -88,11 +88,16 @@ function __pidAlive(pid: number): boolean {
 }
 
 /** Pid-recycling guard: only treat the holder as "our" process if its command
- * line IS a running sync-cli (anchored to the node executable + script argv —
- * see isSyncCliCommand). A recycled pid must not be killed. */
-function __isSyncCliProcess(pid: number): boolean {
+ * line matches the lock's SELF-DECLARED identity — the exact entry-script
+ * path the creator recorded in its own meta (present as a whole argv token).
+ * This is tighter than any path heuristic (an unrelated process never matches
+ * a lock it did not create) AND robust to invocation form (wrappers / exotic
+ * node flags still carry their own script path). Legacy locks without a
+ * recorded script fall back to the anchored isSyncCliCommand heuristic. */
+function __isSyncCliProcess(pid: number, expectedScript: string | null): boolean {
   try {
     const cmd = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' });
+    if (expectedScript) return cmd.split(/\s+/).includes(expectedScript);
     return isSyncCliCommand(cmd);
   } catch { return false; }
 }
@@ -114,19 +119,19 @@ function __processStartMs(pid: number): number | null {
   } catch { return null; }
 }
 
-async function __killAndConfirm(pid: number): Promise<boolean> {
+async function __killAndConfirm(pid: number, expectedScript: string | null): Promise<boolean> {
   // Re-verify the holder's command line immediately before EVERY signal — the
   // earlier check is a separate ps read, and a holder that exits in between
   // could have its pid recycled by an unrelated process (TOCTOU). ps-based
   // identity can't be fully atomic with kill(2), but re-checking right before
   // each signal shrinks the window from seconds to microseconds.
-  if (!__isSyncCliProcess(pid)) return !__pidAlive(pid);
+  if (!__isSyncCliProcess(pid, expectedScript)) return !__pidAlive(pid);
   try { process.kill(pid, 'SIGTERM'); } catch {}
   for (let i = 0; i < 8; i++) {
     await new Promise((r) => setTimeout(r, 400));
     if (!__pidAlive(pid)) return true;
   }
-  if (!__isSyncCliProcess(pid)) return !__pidAlive(pid);
+  if (!__isSyncCliProcess(pid, expectedScript)) return !__pidAlive(pid);
   try { process.kill(pid, 'SIGKILL'); } catch {}
   await new Promise((r) => setTimeout(r, 500));
   return !__pidAlive(pid);
@@ -147,7 +152,7 @@ function __installLock(): boolean {
     return false; // someone else holds (or just won) the lock
   }
   try {
-    fs.writeFileSync(__pidFile, JSON.stringify({ pid: process.pid, version: __myVersion, startedAt: Date.now() }));
+    fs.writeFileSync(__pidFile, JSON.stringify({ pid: process.pid, version: __myVersion, startedAt: Date.now(), script: process.argv[1] ?? null }));
   } catch { /* meta write failed — readers will grace-defer, then treat as garbage */ }
   return true;
 }
@@ -214,7 +219,7 @@ async function __acquireLock(): Promise<boolean> {
       }
       const decision = decideTakeover(holder, __myVersion, runMs, WEDGE_MAX_MS);
       if (decision === 'defer') return false;
-      if (!__isSyncCliProcess(holder.pid)) {
+      if (!__isSyncCliProcess(holder.pid, holder.script)) {
         if (!__pidAlive(holder.pid)) {
           // Died between checks — normal dead-holder reclaim.
           if (!__reclaimLock(holder.pid)) return false;
@@ -244,7 +249,7 @@ async function __acquireLock(): Promise<boolean> {
         }
       } else {
         console.log(`Preempting sync lock holder pid=${holder.pid} version=${holder.version ?? 'legacy'} (${decision})`);
-        if (!(await __killAndConfirm(holder.pid))) {
+        if (!(await __killAndConfirm(holder.pid, holder.script))) {
           console.error(`Failed to terminate lock holder pid=${holder.pid} - skip`);
           return false;
         }

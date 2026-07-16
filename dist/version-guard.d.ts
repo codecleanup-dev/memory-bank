@@ -17,6 +17,14 @@ export interface LockMeta {
     pid: number;
     version: string | null;
     startedAt: number | null;
+    /** Absolute path of the creator's own entry script (process.argv[1]) —
+     * the lock's SELF-DECLARED identity. Holder recognition compares the ps
+     * command line against THIS exact token instead of a path heuristic, which
+     * is simultaneously tighter (an unrelated look-alike path never matches a
+     * lock it did not create) and looser (any invocation form — exotic node
+     * flags, wrappers — still contains its own script path). null on legacy
+     * (<=1.6.0-pre) locks → heuristic fallback. */
+    script: string | null;
 }
 /** Dotted-version compare: -1 / 0 / 1. Missing parts count as 0. A prerelease
  * suffix sorts BELOW its release (semver §11: 1.6.0-beta.1 < 1.6.0) — naive

@@ -25,12 +25,12 @@ describe('compareVersions', () => {
 
 describe('parseLockMeta', () => {
   it('parses the legacy bare-pid form (≤1.4.3)', () => {
-    expect(parseLockMeta('36387\n')).toEqual({ pid: 36387, version: null, startedAt: null });
+    expect(parseLockMeta('36387\n')).toEqual({ pid: 36387, version: null, startedAt: null, script: null });
   });
 
   it('parses the JSON form', () => {
     const raw = JSON.stringify({ pid: 123, version: '1.4.4', startedAt: 1770000000000 });
-    expect(parseLockMeta(raw)).toEqual({ pid: 123, version: '1.4.4', startedAt: 1770000000000 });
+    expect(parseLockMeta(raw)).toEqual({ pid: 123, version: '1.4.4', startedAt: 1770000000000, script: null });
   });
 
   it('rejects garbage, empty, and pid<=1 (never kill init)', () => {
@@ -43,7 +43,7 @@ describe('parseLockMeta', () => {
 
   it('normalizes malformed JSON fields to null', () => {
     const meta = parseLockMeta(JSON.stringify({ pid: 42, version: 7, startedAt: 'yesterday' }));
-    expect(meta).toEqual({ pid: 42, version: null, startedAt: null });
+    expect(meta).toEqual({ pid: 42, version: null, startedAt: null, script: null });
   });
 });
 
@@ -86,6 +86,16 @@ describe('decideTakeover', () => {
     expect(decideTakeover({ pid: 9, version: '1.6.0', startedAt: null }, '1.5.0', 7 * 60 * 60 * 1000, WEDGE)).toBe('defer');
     // Same-version wedged holder IS preempted (recovery path).
     expect(decideTakeover({ pid: 9, version: '1.6.0', startedAt: null }, '1.6.0', 7 * 60 * 60 * 1000, WEDGE)).toBe('takeover-wedged');
+  });
+});
+
+describe('parseLockMeta script identity', () => {
+  it('parses the self-declared entry script and defaults to null', () => {
+    const withScript = parseLockMeta(JSON.stringify({ pid: 7, version: '1.6.0', startedAt: 1, script: '/a/dist/sync-cli.js' }));
+    expect(withScript?.script).toBe('/a/dist/sync-cli.js');
+    const without = parseLockMeta(JSON.stringify({ pid: 7, version: '1.6.0', startedAt: 1 }));
+    expect(without?.script).toBeNull();
+    expect(parseLockMeta('1234')?.script).toBeNull(); // legacy bare pid
   });
 });
 
