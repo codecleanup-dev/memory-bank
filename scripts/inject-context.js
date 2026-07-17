@@ -185,8 +185,9 @@ async function main() {
     const { computeInjectContextDeferred } = await import(path.join(__dirname, '../dist/inject-core.js'));
     const r = await computeInjectContextDeferred(prompt, cwd, 'fallback', sessionId || undefined);
     if (r.block) {
-      process.stdout.write(r.block + '\n');
-      // [fork] stdout 기록(=훅으로 전달) 후에만 원장 커밋 — 데몬 경로와 동일 계약
+      // [fork] stdout drain 확인 후에만 원장 커밋 — write 콜백은 파이프가 데이터를
+      // 수용했음을 보증한다 (데몬 경로의 소켓 flush 확인과 동일 계약).
+      await new Promise((res) => process.stdout.write(r.block + '\n', res));
       r.commitLedger();
     }
   } catch (error) {
