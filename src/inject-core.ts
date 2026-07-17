@@ -44,16 +44,41 @@ function truncateFact(text: string): string {
  *
  * `via` tags the inject log so the two paths stay distinguishable.
  */
+/** 계산 결과 + 원장 커밋 클로저.
+ * [fork] 원장 기록은 "전달 확인 후"가 계약이다: 계산 완료 시점에 기록하면
+ * 클라이언트가 이미 타임아웃/접속해제한 요청의 fact 가 "주입됨"으로 남아
+ * 그 세션 내내 억제된다 — 사용자가 본 적 없는 컨텍스트를 dedup 이 지우는
+ * 역방향 결함 (적대 리뷰 발견, 2026-07-17). 호출자가 전달(소켓 flush /
+ * stdout 기록)을 확인한 뒤 commitLedger() 를 호출한다. */
+export interface InjectComputation {
+  block: string;
+  commitLedger: () => void;
+}
+
+const NOOP_COMMIT = () => {};
+
 export async function computeInjectContext(
   userPrompt: string,
   project: string,
   via: 'daemon' | 'fallback',
   sessionId?: string,
 ): Promise<string> {
+  // 하위호환 래퍼: 전달 확인 채널이 없는 호출자는 즉시 커밋 (기존 의미 유지)
+  const r = await computeInjectContextDeferred(userPrompt, project, via, sessionId);
+  r.commitLedger();
+  return r.block;
+}
+
+export async function computeInjectContextDeferred(
+  userPrompt: string,
+  project: string,
+  via: 'daemon' | 'fallback',
+  sessionId?: string,
+): Promise<InjectComputation> {
   const t0 = Date.now();
   if (!userPrompt || userPrompt.length < 20) {
     appendInjectLog({ status: 'skipped', project, prompt_len: userPrompt?.length ?? 0, via });
-    return '';
+    return { block: '', commitLedger: NOOP_COMMIT };
   }
 
   try {
@@ -78,7 +103,7 @@ export async function computeInjectContext(
           status: 'no-match', project, prompt_len: userPrompt.length,
           candidates: candidates.length, injected: 0, duration_ms: Date.now() - t0, via,
         });
-        return '';
+        return { block: '', commitLedger: NOOP_COMMIT };
       }
 
       // Expand with 1-hop relations
@@ -105,7 +130,7 @@ export async function computeInjectContext(
           candidates: candidates.length, injected: 0, deduped: dedupedCount,
           duration_ms: Date.now() - t0, via,
         });
-        return '';
+        return { block: '', commitLedger: NOOP_COMMIT };
       }
 
       // Format context block — fact 당 160자 절단 + 블록 1,000자 예산
@@ -135,7 +160,6 @@ export async function computeInjectContext(
         } catch { /* best-effort */ }
       }
 
-      appendLedger(sessionId, ledger, injectedIds);
       const block = lines.join('\n') + '\n';
       appendInjectLog({
         status: 'injected', project, prompt_len: userPrompt.length,
@@ -143,7 +167,11 @@ export async function computeInjectContext(
         deduped: dedupedCount, chars: block.length,
         duration_ms: Date.now() - t0, via,
       });
-      return block;
+      // 원장 커밋은 호출자의 전달 확인 뒤로 미룬다 (위 InjectComputation 주석 참조)
+      return {
+        block,
+        commitLedger: () => appendLedger(sessionId, ledger, injectedIds),
+      };
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -151,6 +179,6 @@ export async function computeInjectContext(
       status: 'error', project, prompt_len: userPrompt.length,
       duration_ms: Date.now() - t0, error: message.slice(0, 300), via,
     });
-    return ''; // non-fatal: never disrupt the user's prompt
+    return { block: '', commitLedger: NOOP_COMMIT }; // non-fatal: never disrupt the user's prompt
   }
 }

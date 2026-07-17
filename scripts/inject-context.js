@@ -39,19 +39,32 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  */
 function selfHealDeps(pluginRoot) {
   const marker = path.join(pluginRoot, '.deps-heal-attempted');
+  // [fork] 마커는 "성공 증거"가 아니라 "최근 시도 기록"이다. 영구 1회 게이트로
+  // 두면 일시 실패(레지스트리 장애, npm 비정상 종료)가 재시도를 영원히 막아
+  // 콜드 주입이 조용히 계속 죽는다 (적대 리뷰 발견, 2026-07-17). 24h TTL 로
+  // 만료시켜 "하루 최대 1회 시도"로 완화 — npm 폭주 방지는 유지된다.
+  const RETRY_TTL_MS = 24 * 60 * 60 * 1000;
   try {
-    fs.writeFileSync(marker, new Date().toISOString(), { flag: 'wx' }); // 원자적 1회 게이트
+    if (Date.now() - fs.statSync(marker).mtimeMs < RETRY_TTL_MS) return false; // 최근 시도됨
+    fs.rmSync(marker, { force: true }); // 만료 — 재시도 허용
+  } catch { /* 마커 없음 — 첫 시도 */ }
+  try {
+    fs.writeFileSync(marker, new Date().toISOString(), { flag: 'wx' }); // 원자적 시도 게이트
   } catch {
-    return false; // 이미 시도됨 (성공/실패 무관 — 재폭주 방지)
+    return false; // 동시 프로세스가 방금 시도 시작
   }
   try {
     const child = spawn('npm', ['install', '--no-audit', '--no-fund'], {
       cwd: pluginRoot, detached: true, stdio: 'ignore',
     });
+    // detached 라 exit code 는 못 보지만 spawn 자체 실패(ENOENT 등)는 잡힌다 —
+    // 마커를 지워 다음 콜드 경로가 TTL 대기 없이 재시도할 수 있게 한다.
+    child.on('error', () => { try { fs.rmSync(marker, { force: true }); } catch { /* best-effort */ } });
     child.unref();
-    process.stderr.write('inject-context: missing deps detected — spawned background npm install (one-shot)\n');
+    process.stderr.write('inject-context: missing deps detected — spawned background npm install (once per 24h)\n');
     return true;
   } catch (e) {
+    try { fs.rmSync(marker, { force: true }); } catch { /* best-effort */ }
     process.stderr.write(`inject-context: self-heal spawn failed: ${e && e.message}\n`);
     return false;
   }
@@ -169,9 +182,13 @@ async function main() {
 
   // COLD FALLBACK — compute locally (heavy imports load only here).
   try {
-    const { computeInjectContext } = await import(path.join(__dirname, '../dist/inject-core.js'));
-    const context = await computeInjectContext(prompt, cwd, 'fallback', sessionId || undefined);
-    if (context) process.stdout.write(context + '\n');
+    const { computeInjectContextDeferred } = await import(path.join(__dirname, '../dist/inject-core.js'));
+    const r = await computeInjectContextDeferred(prompt, cwd, 'fallback', sessionId || undefined);
+    if (r.block) {
+      process.stdout.write(r.block + '\n');
+      // [fork] stdout 기록(=훅으로 전달) 후에만 원장 커밋 — 데몬 경로와 동일 계약
+      r.commitLedger();
+    }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     process.stderr.write(`inject-context: error: ${msg}\n`);

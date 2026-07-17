@@ -80,6 +80,30 @@ describe('inject-ledger (세션 dedup 원장)', () => {
     expect(loadLedger(sid).has('f2')).toBe(true);
   });
 
+  it('[fork] lost update 방지: stale existing 으로 append 해도 동시 writer 의 id 보존', async () => {
+    const { loadLedger, appendLedger } = await ledger();
+    const sid = 'sess-race-111';
+    // 두 writer 가 같은 빈 스냅샷(L0)을 들고 시작하는 인터리빙 재현:
+    const staleL0 = loadLedger(sid); // 둘 다 이 시점 스냅샷
+    appendLedger(sid, staleL0, ['from-writer-A']);          // A 먼저 저장
+    appendLedger(sid, new Set(staleL0), ['from-writer-B']); // B 는 여전히 stale 스냅샷
+    const final = loadLedger(sid);
+    // 재로드-합집합이 없으면 B 의 쓰기가 A 의 id 를 지운다 (마지막 스냅샷 승리)
+    expect(final.has('from-writer-A')).toBe(true);
+    expect(final.has('from-writer-B')).toBe(true);
+  });
+
+  it('[fork] 고아 tmp 파일은 1시간 후 저장 시 정리', async () => {
+    const { appendLedger, ledgerDir } = await ledger();
+    appendLedger('sess-tmp-111', new Set(), ['x']); // 디렉토리 생성
+    const orphan = path.join(ledgerDir(), 'sess-dead-999.json.12345.abc.tmp');
+    fs.writeFileSync(orphan, '["zombie"]');
+    const past = Date.now() / 1000 - 2 * 3600;
+    fs.utimesSync(orphan, past, past);
+    appendLedger('sess-tmp-222', new Set(), ['y']); // save 가 prune 트리거
+    expect(fs.existsSync(orphan)).toBe(false);
+  });
+
   it('TTL: 7일 지난 원장은 다음 저장 때 정리', async () => {
     const { appendLedger, ledgerDir } = await ledger();
     appendLedger('sess-old-111', new Set(), ['x']);

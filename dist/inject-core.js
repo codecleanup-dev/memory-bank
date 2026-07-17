@@ -28,24 +28,18 @@ function truncateFact(text) {
     const t = text.replace(/\s+/g, ' ').trim();
     return t.length > FACT_CHAR_CAP ? t.slice(0, FACT_CHAR_CAP - 1) + '…' : t;
 }
-/**
- * Compute the UserPromptSubmit context block for a prompt: top-K similar
- * facts gated by the probe baseline, expanded with 1-hop ontology relations,
- * plus repeated-prompt detection. Returns '' when there is nothing to inject.
- *
- * Shared by BOTH execution paths:
- *  - the warm in-process daemon inside the MCP server (embeddings already
- *    loaded → ~150ms), and
- *  - the cold fallback in scripts/inject-context.js (fresh node process,
- *    ~2.3s dominated by model load) used when no MCP server is running.
- *
- * `via` tags the inject log so the two paths stay distinguishable.
- */
+const NOOP_COMMIT = () => { };
 export async function computeInjectContext(userPrompt, project, via, sessionId) {
+    // 하위호환 래퍼: 전달 확인 채널이 없는 호출자는 즉시 커밋 (기존 의미 유지)
+    const r = await computeInjectContextDeferred(userPrompt, project, via, sessionId);
+    r.commitLedger();
+    return r.block;
+}
+export async function computeInjectContextDeferred(userPrompt, project, via, sessionId) {
     const t0 = Date.now();
     if (!userPrompt || userPrompt.length < 20) {
         appendInjectLog({ status: 'skipped', project, prompt_len: userPrompt?.length ?? 0, via });
-        return '';
+        return { block: '', commitLedger: NOOP_COMMIT };
     }
     try {
         await initEmbeddings();
@@ -67,7 +61,7 @@ export async function computeInjectContext(userPrompt, project, via, sessionId) 
                     status: 'no-match', project, prompt_len: userPrompt.length,
                     candidates: candidates.length, injected: 0, duration_ms: Date.now() - t0, via,
                 });
-                return '';
+                return { block: '', commitLedger: NOOP_COMMIT };
             }
             // Expand with 1-hop relations
             const seenIds = new Set(results.map((r) => r.fact.id));
@@ -92,7 +86,7 @@ export async function computeInjectContext(userPrompt, project, via, sessionId) 
                     candidates: candidates.length, injected: 0, deduped: dedupedCount,
                     duration_ms: Date.now() - t0, via,
                 });
-                return '';
+                return { block: '', commitLedger: NOOP_COMMIT };
             }
             // Format context block — fact 당 160자 절단 + 블록 1,000자 예산
             // (하위 관련도부터 탈락: fresh 는 관련도순이므로 뒤에서 끊긴다)
@@ -121,7 +115,6 @@ export async function computeInjectContext(userPrompt, project, via, sessionId) 
                 }
                 catch { /* best-effort */ }
             }
-            appendLedger(sessionId, ledger, injectedIds);
             const block = lines.join('\n') + '\n';
             appendInjectLog({
                 status: 'injected', project, prompt_len: userPrompt.length,
@@ -129,7 +122,11 @@ export async function computeInjectContext(userPrompt, project, via, sessionId) 
                 deduped: dedupedCount, chars: block.length,
                 duration_ms: Date.now() - t0, via,
             });
-            return block;
+            // 원장 커밋은 호출자의 전달 확인 뒤로 미룬다 (위 InjectComputation 주석 참조)
+            return {
+                block,
+                commitLedger: () => appendLedger(sessionId, ledger, injectedIds),
+            };
         }
     }
     catch (error) {
@@ -138,6 +135,6 @@ export async function computeInjectContext(userPrompt, project, via, sessionId) 
             status: 'error', project, prompt_len: userPrompt.length,
             duration_ms: Date.now() - t0, error: message.slice(0, 300), via,
         });
-        return ''; // non-fatal: never disrupt the user's prompt
+        return { block: '', commitLedger: NOOP_COMMIT }; // non-fatal: never disrupt the user's prompt
     }
 }

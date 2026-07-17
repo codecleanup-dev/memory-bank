@@ -21,6 +21,7 @@ import { getIndexDir } from './paths.js';
 
 const MAX_IDS = 400;
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const TMP_TTL_MS = 60 * 60 * 1000;
 
 export function ledgerDir(): string {
   return path.join(getIndexDir(), 'state', 'inject-ledger');
@@ -60,29 +61,47 @@ export function appendLedger(
 ): void {
   const id = sanitizeSessionId(sessionId);
   if (!id || newIds.length === 0) return;
+  const p = ledgerPath(id);
+  // [fork] writer 고유 tmp: 데몬 동시 요청(in-flight 4)과 콜드폴백 프로세스가
+  // 같은 세션 원장을 쓸 수 있다 — 공유 tmp 이름이면 두 writer 가 서로의
+  // 스냅샷을 덮고 rename 을 경합한다 (적대 리뷰 발견, 2026-07-17).
+  // 고유 tmp 는 모든 rename 을 "완결 스냅샷의 원자 교체"로 유지한다.
+  const tmp = `${p}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
   try {
     const dir = ledgerDir();
     fs.mkdirSync(dir, { recursive: true });
-    // 삽입순 배열: 기존(로드순) + 신규. Set 은 삽입순 이터레이션이라 순서 보존.
-    const ordered = [...existing, ...newIds.filter((n) => !existing.has(n))];
-    const bounded = ordered.length > MAX_IDS ? ordered.slice(ordered.length - MAX_IDS) : ordered;
-    const p = ledgerPath(id);
-    const tmp = p + '.tmp';
+    // [fork] 쓰기 시점 재로드 + 합집합: `existing` 은 프롬프트 시작에 로드된
+    // 스냅샷이라 그대로 되쓰면 그 사이 다른 writer 가 저장한 id 를 전부
+    // 지운다 (lost update). 재로드-합집합은 유실 창을 프롬프트 연산 전체에서
+    // 이 read→rename 갭으로 줄인다. 락은 두지 않는다 — dedup 은 최적화지
+    // 정합성 요건이 아니라 fail-open/best-effort 가 계약이다.
+    const current = loadLedger(id);
+    const merged: string[] = [...current];
+    for (const x of [...existing, ...newIds]) {
+      if (!current.has(x)) { merged.push(x); current.add(x); }
+    }
+    const bounded = merged.length > MAX_IDS ? merged.slice(merged.length - MAX_IDS) : merged;
     fs.writeFileSync(tmp, JSON.stringify(bounded));
     fs.renameSync(tmp, p);
     pruneOldLedgers(dir);
-  } catch { /* best-effort */ }
+  } catch {
+    try { fs.unlinkSync(tmp); } catch { /* 이미 없음 — rename 성공 후 실패 등 */ }
+  }
 }
 
-/** 7일 넘은 원장 파일 정리 — 세션 원장은 세션과 함께 죽는 상태이지 지식이 아니다. */
+/** 7일 넘은 원장 파일 정리 — 세션 원장은 세션과 함께 죽는 상태이지 지식이 아니다.
+ * [fork] writer 고유 tmp 도입으로 크래시가 고아 tmp 를 남길 수 있어 1시간 TTL 로 함께 정리. */
 function pruneOldLedgers(dir: string): void {
   try {
     const now = Date.now();
     for (const f of fs.readdirSync(dir)) {
-      if (!f.endsWith('.json')) continue;
+      const isLedger = f.endsWith('.json');
+      const isOrphanTmp = f.endsWith('.tmp');
+      if (!isLedger && !isOrphanTmp) continue;
       const fp = path.join(dir, f);
       try {
-        if (now - fs.statSync(fp).mtimeMs > TTL_MS) fs.unlinkSync(fp);
+        const age = now - fs.statSync(fp).mtimeMs;
+        if (age > (isLedger ? TTL_MS : TMP_TTL_MS)) fs.unlinkSync(fp);
       } catch { /* race — fine */ }
     }
   } catch { /* best-effort */ }

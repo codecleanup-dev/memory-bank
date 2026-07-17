@@ -24858,6 +24858,7 @@ import fs6 from "node:fs";
 import path4 from "node:path";
 var MAX_IDS = 400;
 var TTL_MS = 7 * 24 * 60 * 60 * 1e3;
+var TMP_TTL_MS = 60 * 60 * 1e3;
 function ledgerDir() {
   return path4.join(getIndexDir(), "state", "inject-ledger");
 }
@@ -24883,27 +24884,41 @@ function loadLedger(sessionId) {
 function appendLedger(sessionId, existing, newIds) {
   const id = sanitizeSessionId(sessionId);
   if (!id || newIds.length === 0) return;
+  const p = ledgerPath(id);
+  const tmp = `${p}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
   try {
     const dir = ledgerDir();
     fs6.mkdirSync(dir, { recursive: true });
-    const ordered = [...existing, ...newIds.filter((n) => !existing.has(n))];
-    const bounded = ordered.length > MAX_IDS ? ordered.slice(ordered.length - MAX_IDS) : ordered;
-    const p = ledgerPath(id);
-    const tmp = p + ".tmp";
+    const current = loadLedger(id);
+    const merged = [...current];
+    for (const x2 of [...existing, ...newIds]) {
+      if (!current.has(x2)) {
+        merged.push(x2);
+        current.add(x2);
+      }
+    }
+    const bounded = merged.length > MAX_IDS ? merged.slice(merged.length - MAX_IDS) : merged;
     fs6.writeFileSync(tmp, JSON.stringify(bounded));
     fs6.renameSync(tmp, p);
     pruneOldLedgers(dir);
   } catch {
+    try {
+      fs6.unlinkSync(tmp);
+    } catch {
+    }
   }
 }
 function pruneOldLedgers(dir) {
   try {
     const now = Date.now();
     for (const f of fs6.readdirSync(dir)) {
-      if (!f.endsWith(".json")) continue;
+      const isLedger = f.endsWith(".json");
+      const isOrphanTmp = f.endsWith(".tmp");
+      if (!isLedger && !isOrphanTmp) continue;
       const fp = path4.join(dir, f);
       try {
-        if (now - fs6.statSync(fp).mtimeMs > TTL_MS) fs6.unlinkSync(fp);
+        const age = now - fs6.statSync(fp).mtimeMs;
+        if (age > (isLedger ? TTL_MS : TMP_TTL_MS)) fs6.unlinkSync(fp);
       } catch {
       }
     }
@@ -24922,11 +24937,13 @@ function truncateFact(text) {
   const t = text.replace(/\s+/g, " ").trim();
   return t.length > FACT_CHAR_CAP ? t.slice(0, FACT_CHAR_CAP - 1) + "\u2026" : t;
 }
-async function computeInjectContext(userPrompt, project, via, sessionId) {
+var NOOP_COMMIT = () => {
+};
+async function computeInjectContextDeferred(userPrompt, project, via, sessionId) {
   const t0 = Date.now();
   if (!userPrompt || userPrompt.length < 20) {
     appendInjectLog({ status: "skipped", project, prompt_len: userPrompt?.length ?? 0, via });
-    return "";
+    return { block: "", commitLedger: NOOP_COMMIT };
   }
   try {
     await initEmbeddings();
@@ -24949,7 +24966,7 @@ async function computeInjectContext(userPrompt, project, via, sessionId) {
           duration_ms: Date.now() - t0,
           via
         });
-        return "";
+        return { block: "", commitLedger: NOOP_COMMIT };
       }
       const seenIds = new Set(results.map((r) => r.fact.id));
       const expandedFacts = [...results.map((r) => ({ fact: r.fact, note: "" }))];
@@ -24976,7 +24993,7 @@ async function computeInjectContext(userPrompt, project, via, sessionId) {
           duration_ms: Date.now() - t0,
           via
         });
-        return "";
+        return { block: "", commitLedger: NOOP_COMMIT };
       }
       const lines = ["\u{1F4CC} \uAD00\uB828 \uACFC\uAC70 \uACB0\uC815:"];
       let blockChars = lines[0].length;
@@ -25000,7 +25017,6 @@ async function computeInjectContext(userPrompt, project, via, sessionId) {
         } catch {
         }
       }
-      appendLedger(sessionId, ledger, injectedIds);
       const block = lines.join("\n") + "\n";
       appendInjectLog({
         status: "injected",
@@ -25013,7 +25029,10 @@ async function computeInjectContext(userPrompt, project, via, sessionId) {
         duration_ms: Date.now() - t0,
         via
       });
-      return block;
+      return {
+        block,
+        commitLedger: () => appendLedger(sessionId, ledger, injectedIds)
+      };
     }
   } catch (error2) {
     const message = error2 instanceof Error ? error2.message : String(error2);
@@ -25025,7 +25044,7 @@ async function computeInjectContext(userPrompt, project, via, sessionId) {
       error: message.slice(0, 300),
       via
     });
-    return "";
+    return { block: "", commitLedger: NOOP_COMMIT };
   }
 }
 
@@ -25067,13 +25086,14 @@ function startInjectDaemon() {
       void (async () => {
         try {
           const req = JSON.parse(line);
-          const context = await computeInjectContext(
+          const { block, commitLedger } = await computeInjectContextDeferred(
             String(req.prompt ?? ""),
             String(req.cwd ?? process.cwd()),
             "daemon",
             req.session_id ? String(req.session_id) : void 0
           );
-          conn.end(JSON.stringify({ ok: true, context }) + "\n");
+          if (conn.destroyed) return;
+          conn.end(JSON.stringify({ ok: true, context: block }) + "\n", commitLedger);
         } catch {
           try {
             conn.end(JSON.stringify({ ok: false }) + "\n");
