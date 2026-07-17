@@ -32,9 +32,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/codegen/code.js
+// ../../../node_modules/ajv/dist/compile/codegen/code.js
 var require_code = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/codegen/code.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/codegen/code.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.regexpCode = exports.getEsmExportName = exports.getProperty = exports.safeStringify = exports.stringify = exports.strConcat = exports.addCodeArg = exports.str = exports._ = exports.nil = exports._Code = exports.Name = exports.IDENTIFIER = exports._CodeOrName = void 0;
@@ -186,9 +186,9 @@ var require_code = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/codegen/scope.js
+// ../../../node_modules/ajv/dist/compile/codegen/scope.js
 var require_scope = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/codegen/scope.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/codegen/scope.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ValueScope = exports.ValueScopeName = exports.Scope = exports.varKinds = exports.UsedValueState = void 0;
@@ -331,9 +331,9 @@ var require_scope = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/codegen/index.js
+// ../../../node_modules/ajv/dist/compile/codegen/index.js
 var require_codegen = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/codegen/index.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/codegen/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.or = exports.and = exports.not = exports.CodeGen = exports.operators = exports.varKinds = exports.ValueScopeName = exports.ValueScope = exports.Scope = exports.Name = exports.regexpCode = exports.stringify = exports.getProperty = exports.nil = exports.strConcat = exports.str = exports._ = void 0;
@@ -1051,9 +1051,9 @@ var require_codegen = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/util.js
+// ../../../node_modules/ajv/dist/compile/util.js
 var require_util = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/util.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/util.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.checkStrictMode = exports.getErrorPath = exports.Type = exports.useFunc = exports.setEvaluated = exports.evaluatedPropsToName = exports.mergeEvaluated = exports.eachItem = exports.unescapeJsonPointer = exports.escapeJsonPointer = exports.escapeFragment = exports.unescapeFragment = exports.schemaRefOrVal = exports.schemaHasRulesButRef = exports.schemaHasRules = exports.checkUnknownRules = exports.alwaysValidSchema = exports.toHash = void 0;
@@ -1218,9 +1218,9 @@ var require_util = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/names.js
+// ../../../node_modules/ajv/dist/compile/names.js
 var require_names = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/names.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/names.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -1257,9 +1257,9 @@ var require_names = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/errors.js
+// ../../../node_modules/ajv/dist/compile/errors.js
 var require_errors = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/errors.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/errors.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.extendErrors = exports.resetErrorsCount = exports.reportExtraError = exports.reportError = exports.keyword$DataError = exports.keywordError = void 0;
@@ -1379,9 +1379,9 @@ var require_errors = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/boolSchema.js
+// ../../../node_modules/ajv/dist/compile/validate/boolSchema.js
 var require_boolSchema = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/boolSchema.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/validate/boolSchema.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.boolOrEmptySchema = exports.topBoolOrEmptySchema = void 0;
@@ -1430,9 +1430,9 @@ var require_boolSchema = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/rules.js
+// ../../../node_modules/ajv/dist/compile/rules.js
 var require_rules = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/rules.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/rules.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getRules = exports.isJSONType = void 0;
@@ -1461,9 +1461,9 @@ var require_rules = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/applicability.js
+// ../../../node_modules/ajv/dist/compile/validate/applicability.js
 var require_applicability = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/applicability.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/validate/applicability.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.shouldUseRule = exports.shouldUseGroup = exports.schemaHasRulesForType = void 0;
@@ -1484,9 +1484,9 @@ var require_applicability = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/dataType.js
+// ../../../node_modules/ajv/dist/compile/validate/dataType.js
 var require_dataType = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/dataType.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/validate/dataType.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.reportTypeError = exports.checkDataTypes = exports.checkDataType = exports.coerceAndCheckDataType = exports.getJSONTypes = exports.getSchemaTypes = exports.DataType = void 0;
@@ -1668,9 +1668,9 @@ var require_dataType = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/defaults.js
+// ../../../node_modules/ajv/dist/compile/validate/defaults.js
 var require_defaults = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/defaults.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/validate/defaults.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.assignDefaults = void 0;
@@ -1705,9 +1705,9 @@ var require_defaults = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/code.js
+// ../../../node_modules/ajv/dist/vocabularies/code.js
 var require_code2 = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/code.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/code.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateUnion = exports.validateArray = exports.usePattern = exports.callValidateCode = exports.schemaProperties = exports.allSchemaProperties = exports.noPropertyInData = exports.propertyInData = exports.isOwnProperty = exports.hasPropFunc = exports.reportMissingProp = exports.checkMissingProp = exports.checkReportMissingProp = void 0;
@@ -1838,9 +1838,9 @@ var require_code2 = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/keyword.js
+// ../../../node_modules/ajv/dist/compile/validate/keyword.js
 var require_keyword = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/keyword.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/validate/keyword.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateKeywordUsage = exports.validSchemaType = exports.funcKeywordCode = exports.macroKeywordCode = void 0;
@@ -1956,9 +1956,9 @@ var require_keyword = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/subschema.js
+// ../../../node_modules/ajv/dist/compile/validate/subschema.js
 var require_subschema = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/subschema.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/validate/subschema.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.extendSubschemaMode = exports.extendSubschemaData = exports.getSubschema = void 0;
@@ -2039,9 +2039,9 @@ var require_subschema = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/fast-deep-equal/index.js
+// ../../../node_modules/fast-deep-equal/index.js
 var require_fast_deep_equal = __commonJS({
-  "../memory-bank-fork/node_modules/fast-deep-equal/index.js"(exports, module) {
+  "../../../node_modules/fast-deep-equal/index.js"(exports, module) {
     "use strict";
     module.exports = function equal(a, b2) {
       if (a === b2) return true;
@@ -2074,9 +2074,9 @@ var require_fast_deep_equal = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/json-schema-traverse/index.js
+// ../../../node_modules/json-schema-traverse/index.js
 var require_json_schema_traverse = __commonJS({
-  "../memory-bank-fork/node_modules/json-schema-traverse/index.js"(exports, module) {
+  "../../../node_modules/json-schema-traverse/index.js"(exports, module) {
     "use strict";
     var traverse = module.exports = function(schema, opts, cb) {
       if (typeof opts == "function") {
@@ -2162,9 +2162,9 @@ var require_json_schema_traverse = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/resolve.js
+// ../../../node_modules/ajv/dist/compile/resolve.js
 var require_resolve = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/resolve.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/resolve.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getSchemaRefs = exports.resolveUrl = exports.normalizeId = exports._getFullPath = exports.getFullPath = exports.inlineRef = void 0;
@@ -2318,9 +2318,9 @@ var require_resolve = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/validate/index.js
+// ../../../node_modules/ajv/dist/compile/validate/index.js
 var require_validate = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/validate/index.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/validate/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getData = exports.KeywordCxt = exports.validateFunctionCode = void 0;
@@ -2826,9 +2826,9 @@ var require_validate = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/runtime/validation_error.js
+// ../../../node_modules/ajv/dist/runtime/validation_error.js
 var require_validation_error = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/runtime/validation_error.js"(exports) {
+  "../../../node_modules/ajv/dist/runtime/validation_error.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var ValidationError = class extends Error {
@@ -2842,9 +2842,9 @@ var require_validation_error = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/ref_error.js
+// ../../../node_modules/ajv/dist/compile/ref_error.js
 var require_ref_error = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/ref_error.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/ref_error.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var resolve_1 = require_resolve();
@@ -2859,9 +2859,9 @@ var require_ref_error = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/compile/index.js
+// ../../../node_modules/ajv/dist/compile/index.js
 var require_compile = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/compile/index.js"(exports) {
+  "../../../node_modules/ajv/dist/compile/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.resolveSchema = exports.getCompilingSchema = exports.resolveRef = exports.compileSchema = exports.SchemaEnv = void 0;
@@ -3083,9 +3083,9 @@ var require_compile = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/refs/data.json
+// ../../../node_modules/ajv/dist/refs/data.json
 var require_data = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/refs/data.json"(exports, module) {
+  "../../../node_modules/ajv/dist/refs/data.json"(exports, module) {
     module.exports = {
       $id: "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#",
       description: "Meta-schema for $data reference (JSON AnySchema extension proposal)",
@@ -3102,9 +3102,9 @@ var require_data = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/fast-uri/lib/utils.js
+// ../../../node_modules/fast-uri/lib/utils.js
 var require_utils = __commonJS({
-  "../memory-bank-fork/node_modules/fast-uri/lib/utils.js"(exports, module) {
+  "../../../node_modules/fast-uri/lib/utils.js"(exports, module) {
     "use strict";
     var isUUID = RegExp.prototype.test.bind(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu);
     var isIPv4 = RegExp.prototype.test.bind(/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u);
@@ -3228,8 +3228,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path8) {
-      let input = path8;
+    function removeDotSegments(path9) {
+      let input = path9;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3415,9 +3415,9 @@ var require_utils = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/fast-uri/lib/schemes.js
+// ../../../node_modules/fast-uri/lib/schemes.js
 var require_schemes = __commonJS({
-  "../memory-bank-fork/node_modules/fast-uri/lib/schemes.js"(exports, module) {
+  "../../../node_modules/fast-uri/lib/schemes.js"(exports, module) {
     "use strict";
     var { isUUID } = require_utils();
     var URN_REG = /([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-.:;=@]|%[\da-f]{2})+)/iu;
@@ -3481,8 +3481,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path8, query2] = wsComponent.resourceName.split("?");
-        wsComponent.path = path8 && path8 !== "/" ? path8 : void 0;
+        const [path9, query2] = wsComponent.resourceName.split("?");
+        wsComponent.path = path9 && path9 !== "/" ? path9 : void 0;
         wsComponent.query = query2;
         wsComponent.resourceName = void 0;
       }
@@ -3625,9 +3625,9 @@ var require_schemes = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/fast-uri/index.js
+// ../../../node_modules/fast-uri/index.js
 var require_fast_uri = __commonJS({
-  "../memory-bank-fork/node_modules/fast-uri/index.js"(exports, module) {
+  "../../../node_modules/fast-uri/index.js"(exports, module) {
     "use strict";
     var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, escapePreservingEscapes, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = require_utils();
     var { SCHEMES, getSchemeHandler } = require_schemes();
@@ -3840,7 +3840,7 @@ var require_fast_uri = __commonJS({
         if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport)) {
           if (parsed.host && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && nonSimpleDomain(parsed.host)) {
             try {
-              parsed.host = URL.domainToASCII(parsed.host.toLowerCase());
+              parsed.host = new URL("http://" + parsed.host).hostname;
             } catch (e) {
               parsed.error = parsed.error || "Host's domain name can not be converted to ASCII: " + e;
             }
@@ -3911,9 +3911,9 @@ var require_fast_uri = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/runtime/uri.js
+// ../../../node_modules/ajv/dist/runtime/uri.js
 var require_uri = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/runtime/uri.js"(exports) {
+  "../../../node_modules/ajv/dist/runtime/uri.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var uri = require_fast_uri();
@@ -3922,9 +3922,9 @@ var require_uri = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/core.js
+// ../../../node_modules/ajv/dist/core.js
 var require_core = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/core.js"(exports) {
+  "../../../node_modules/ajv/dist/core.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = void 0;
@@ -4533,9 +4533,9 @@ var require_core = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/core/id.js
+// ../../../node_modules/ajv/dist/vocabularies/core/id.js
 var require_id = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/core/id.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/core/id.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var def = {
@@ -4548,9 +4548,9 @@ var require_id = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/core/ref.js
+// ../../../node_modules/ajv/dist/vocabularies/core/ref.js
 var require_ref = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/core/ref.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/core/ref.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.callRef = exports.getValidate = void 0;
@@ -4670,9 +4670,9 @@ var require_ref = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/core/index.js
+// ../../../node_modules/ajv/dist/vocabularies/core/index.js
 var require_core2 = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/core/index.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/core/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var id_1 = require_id();
@@ -4691,9 +4691,9 @@ var require_core2 = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitNumber.js
+// ../../../node_modules/ajv/dist/vocabularies/validation/limitNumber.js
 var require_limitNumber = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4723,9 +4723,9 @@ var require_limitNumber = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/multipleOf.js
+// ../../../node_modules/ajv/dist/vocabularies/validation/multipleOf.js
 var require_multipleOf = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4751,9 +4751,9 @@ var require_multipleOf = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/runtime/ucs2length.js
+// ../../../node_modules/ajv/dist/runtime/ucs2length.js
 var require_ucs2length = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
+  "../../../node_modules/ajv/dist/runtime/ucs2length.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     function ucs2length(str) {
@@ -4777,9 +4777,9 @@ var require_ucs2length = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitLength.js
+// ../../../node_modules/ajv/dist/vocabularies/validation/limitLength.js
 var require_limitLength = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4809,9 +4809,9 @@ var require_limitLength = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/pattern.js
+// ../../../node_modules/ajv/dist/vocabularies/validation/pattern.js
 var require_pattern = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -4846,9 +4846,9 @@ var require_pattern = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitProperties.js
+// ../../../node_modules/ajv/dist/vocabularies/validation/limitProperties.js
 var require_limitProperties = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4875,9 +4875,9 @@ var require_limitProperties = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/required.js
+// ../../../node_modules/ajv/dist/vocabularies/validation/required.js
 var require_required = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/required.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/validation/required.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -4957,9 +4957,9 @@ var require_required = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitItems.js
+// ../../../node_modules/ajv/dist/vocabularies/validation/limitItems.js
 var require_limitItems = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4986,9 +4986,9 @@ var require_limitItems = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/runtime/equal.js
+// ../../../node_modules/ajv/dist/runtime/equal.js
 var require_equal = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/runtime/equal.js"(exports) {
+  "../../../node_modules/ajv/dist/runtime/equal.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var equal = require_fast_deep_equal();
@@ -4997,9 +4997,9 @@ var require_equal = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/uniqueItems.js
+// ../../../node_modules/ajv/dist/vocabularies/validation/uniqueItems.js
 var require_uniqueItems = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var dataType_1 = require_dataType();
@@ -5064,9 +5064,9 @@ var require_uniqueItems = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/const.js
+// ../../../node_modules/ajv/dist/vocabularies/validation/const.js
 var require_const = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/const.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/validation/const.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5093,9 +5093,9 @@ var require_const = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/enum.js
+// ../../../node_modules/ajv/dist/vocabularies/validation/enum.js
 var require_enum = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/enum.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/validation/enum.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5142,9 +5142,9 @@ var require_enum = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/index.js
+// ../../../node_modules/ajv/dist/vocabularies/validation/index.js
 var require_validation = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/validation/index.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/validation/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var limitNumber_1 = require_limitNumber();
@@ -5180,9 +5180,9 @@ var require_validation = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/additionalItems.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/additionalItems.js
 var require_additionalItems = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateAdditionalItems = void 0;
@@ -5233,9 +5233,9 @@ var require_additionalItems = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/items.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/items.js
 var require_items = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/items.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/items.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateTuple = void 0;
@@ -5290,9 +5290,9 @@ var require_items = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/prefixItems.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/prefixItems.js
 var require_prefixItems = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var items_1 = require_items();
@@ -5307,9 +5307,9 @@ var require_prefixItems = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/items2020.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/items2020.js
 var require_items2020 = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5342,9 +5342,9 @@ var require_items2020 = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/contains.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/contains.js
 var require_contains = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5436,9 +5436,9 @@ var require_contains = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/dependencies.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/dependencies.js
 var require_dependencies = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.validateSchemaDeps = exports.validatePropertyDeps = exports.error = void 0;
@@ -5530,9 +5530,9 @@ var require_dependencies = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/propertyNames.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/propertyNames.js
 var require_propertyNames = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5573,9 +5573,9 @@ var require_propertyNames = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js
 var require_additionalProperties = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5679,9 +5679,9 @@ var require_additionalProperties = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/properties.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/properties.js
 var require_properties = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var validate_1 = require_validate();
@@ -5737,9 +5737,9 @@ var require_properties = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/patternProperties.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/patternProperties.js
 var require_patternProperties = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5811,9 +5811,9 @@ var require_patternProperties = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/not.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/not.js
 var require_not = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/not.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/not.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5842,9 +5842,9 @@ var require_not = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/anyOf.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/anyOf.js
 var require_anyOf = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5859,9 +5859,9 @@ var require_anyOf = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/oneOf.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/oneOf.js
 var require_oneOf = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5917,9 +5917,9 @@ var require_oneOf = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/allOf.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/allOf.js
 var require_allOf = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5944,9 +5944,9 @@ var require_allOf = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/if.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/if.js
 var require_if = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/if.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/if.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6013,9 +6013,9 @@ var require_if = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/thenElse.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/thenElse.js
 var require_thenElse = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var util_1 = require_util();
@@ -6031,9 +6031,9 @@ var require_thenElse = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/index.js
+// ../../../node_modules/ajv/dist/vocabularies/applicator/index.js
 var require_applicator = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/applicator/index.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/applicator/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var additionalItems_1 = require_additionalItems();
@@ -6079,9 +6079,9 @@ var require_applicator = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/format/format.js
+// ../../../node_modules/ajv/dist/vocabularies/format/format.js
 var require_format = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/format/format.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/format/format.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6169,9 +6169,9 @@ var require_format = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/format/index.js
+// ../../../node_modules/ajv/dist/vocabularies/format/index.js
 var require_format2 = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/format/index.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/format/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var format_1 = require_format();
@@ -6180,9 +6180,9 @@ var require_format2 = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/metadata.js
+// ../../../node_modules/ajv/dist/vocabularies/metadata.js
 var require_metadata = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/metadata.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/metadata.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.contentVocabulary = exports.metadataVocabulary = void 0;
@@ -6203,9 +6203,9 @@ var require_metadata = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/draft7.js
+// ../../../node_modules/ajv/dist/vocabularies/draft7.js
 var require_draft7 = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/draft7.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/draft7.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var core_1 = require_core2();
@@ -6225,9 +6225,9 @@ var require_draft7 = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/discriminator/types.js
+// ../../../node_modules/ajv/dist/vocabularies/discriminator/types.js
 var require_types = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.DiscrError = void 0;
@@ -6239,9 +6239,9 @@ var require_types = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/vocabularies/discriminator/index.js
+// ../../../node_modules/ajv/dist/vocabularies/discriminator/index.js
 var require_discriminator = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports) {
+  "../../../node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6344,9 +6344,9 @@ var require_discriminator = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/refs/json-schema-draft-07.json
+// ../../../node_modules/ajv/dist/refs/json-schema-draft-07.json
 var require_json_schema_draft_07 = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/refs/json-schema-draft-07.json"(exports, module) {
+  "../../../node_modules/ajv/dist/refs/json-schema-draft-07.json"(exports, module) {
     module.exports = {
       $schema: "http://json-schema.org/draft-07/schema#",
       $id: "http://json-schema.org/draft-07/schema#",
@@ -6501,9 +6501,9 @@ var require_json_schema_draft_07 = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv/dist/ajv.js
+// ../../../node_modules/ajv/dist/ajv.js
 var require_ajv = __commonJS({
-  "../memory-bank-fork/node_modules/ajv/dist/ajv.js"(exports, module) {
+  "../../../node_modules/ajv/dist/ajv.js"(exports, module) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.MissingRefError = exports.ValidationError = exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = exports.Ajv = void 0;
@@ -6571,9 +6571,9 @@ var require_ajv = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv-formats/dist/formats.js
+// ../../../node_modules/ajv-formats/dist/formats.js
 var require_formats = __commonJS({
-  "../memory-bank-fork/node_modules/ajv-formats/dist/formats.js"(exports) {
+  "../../../node_modules/ajv-formats/dist/formats.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatNames = exports.fastFormats = exports.fullFormats = void 0;
@@ -6774,9 +6774,9 @@ var require_formats = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv-formats/dist/limit.js
+// ../../../node_modules/ajv-formats/dist/limit.js
 var require_limit = __commonJS({
-  "../memory-bank-fork/node_modules/ajv-formats/dist/limit.js"(exports) {
+  "../../../node_modules/ajv-formats/dist/limit.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.formatLimitDefinition = void 0;
@@ -6846,9 +6846,9 @@ var require_limit = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/ajv-formats/dist/index.js
+// ../../../node_modules/ajv-formats/dist/index.js
 var require_dist = __commonJS({
-  "../memory-bank-fork/node_modules/ajv-formats/dist/index.js"(exports, module) {
+  "../../../node_modules/ajv-formats/dist/index.js"(exports, module) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     var formats_1 = require_formats();
@@ -6875,12 +6875,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs9, exportName) {
+    function addFormats(ajv, list, fs10, exportName) {
       var _a2;
       var _b;
       (_a2 = (_b = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs9[f]);
+        ajv.addFormat(f, fs10[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -6888,7 +6888,7 @@ var require_dist = __commonJS({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/tslib.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/tslib.mjs
 function __classPrivateFieldSet(receiver, state, value, kind, f) {
   if (kind === "m")
     throw new TypeError("Private method is not writable");
@@ -6906,14 +6906,14 @@ function __classPrivateFieldGet(receiver, state, kind, f) {
   return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 }
 var init_tslib = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/tslib.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/tslib.mjs"() {
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/uuid.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/utils/uuid.mjs
 var uuid4;
 var init_uuid = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/uuid.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/utils/uuid.mjs"() {
     uuid4 = function() {
       const { crypto } = globalThis;
       if (crypto?.randomUUID) {
@@ -6927,7 +6927,7 @@ var init_uuid = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/errors.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/errors.mjs
 function isAbortError(err) {
   return typeof err === "object" && err !== null && // Spec-compliant fetch implementations
   ("name" in err && err.name === "AbortError" || // Expo fetch
@@ -6935,7 +6935,7 @@ function isAbortError(err) {
 }
 var castToError;
 var init_errors = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/errors.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/errors.mjs"() {
     castToError = (err) => {
       if (err instanceof Error)
         return err;
@@ -6963,10 +6963,10 @@ var init_errors = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/error.mjs
+// ../../../node_modules/@anthropic-ai/sdk/core/error.mjs
 var AnthropicError, APIError, APIUserAbortError, APIConnectionError, APIConnectionTimeoutError, BadRequestError, AuthenticationError, PermissionDeniedError, NotFoundError, ConflictError, UnprocessableEntityError, RateLimitError, InternalServerError;
 var init_error = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/error.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/core/error.mjs"() {
     init_errors();
     AnthropicError = class extends Error {
     };
@@ -7059,7 +7059,7 @@ var init_error = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/values.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/utils/values.mjs
 function maybeObj(x2) {
   if (typeof x2 !== "object") {
     return {};
@@ -7078,7 +7078,7 @@ function hasOwn(obj, key) {
 }
 var startsWithSchemeRegexp, isAbsoluteURL, isArray, isReadonlyArray, validatePositiveInteger, safeJSON;
 var init_values = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/values.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/utils/values.mjs"() {
     init_error();
     startsWithSchemeRegexp = /^[a-z][a-z0-9+.-]*:/i;
     isAbsoluteURL = (url) => {
@@ -7105,23 +7105,23 @@ var init_values = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/sleep.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/utils/sleep.mjs
 var sleep;
 var init_sleep = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/sleep.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/utils/sleep.mjs"() {
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/version.mjs
+// ../../../node_modules/@anthropic-ai/sdk/version.mjs
 var VERSION;
 var init_version = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/version.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/version.mjs"() {
     VERSION = "0.78.0";
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/detect-platform.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/detect-platform.mjs
 function getDetectedPlatform() {
   if (typeof Deno !== "undefined" && Deno.build != null) {
     return "deno";
@@ -7159,7 +7159,7 @@ function getBrowserInfo() {
 }
 var isRunningInBrowser, getPlatformProperties, normalizeArch, normalizePlatform, _platformHeaders, getPlatformHeaders;
 var init_detect_platform = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/detect-platform.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/detect-platform.mjs"() {
     init_version();
     isRunningInBrowser = () => {
       return (
@@ -7260,7 +7260,7 @@ var init_detect_platform = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/shims.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/shims.mjs
 function getDefaultFetch() {
   if (typeof fetch !== "undefined") {
     return fetch;
@@ -7332,14 +7332,14 @@ async function CancelReadableStream(stream) {
   await cancelPromise;
 }
 var init_shims = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/shims.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/shims.mjs"() {
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/request-options.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/request-options.mjs
 var FallbackEncoder;
 var init_request_options = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/request-options.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/request-options.mjs"() {
     FallbackEncoder = ({ headers, body }) => {
       return {
         bodyHeaders: {
@@ -7351,7 +7351,7 @@ var init_request_options = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/bytes.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/utils/bytes.mjs
 function concatBytes(buffers) {
   let length = 0;
   for (const buffer of buffers) {
@@ -7375,11 +7375,11 @@ function decodeUTF8(bytes) {
 }
 var encodeUTF8_, decodeUTF8_;
 var init_bytes = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/bytes.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/utils/bytes.mjs"() {
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/decoders/line.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/decoders/line.mjs
 function findNewlineIndex(buffer, startIndex) {
   const newline = 10;
   const carriage = 13;
@@ -7411,7 +7411,7 @@ function findDoubleNewlineIndex(buffer) {
 }
 var _LineDecoder_buffer, _LineDecoder_carriageReturnIndex, LineDecoder;
 var init_line = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/decoders/line.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/decoders/line.mjs"() {
     init_tslib();
     init_bytes();
     LineDecoder = class {
@@ -7461,7 +7461,7 @@ var init_line = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/log.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/utils/log.mjs
 function noop() {
 }
 function makeLogFn(fnLevel, logger, logLevel) {
@@ -7492,7 +7492,7 @@ function loggerFor(client) {
 }
 var levelNumbers, parseLogLevel, noopLogger, cachedLoggers, formatRequestDetails;
 var init_log = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/log.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/utils/log.mjs"() {
     init_values();
     levelNumbers = {
       off: 0,
@@ -7540,7 +7540,7 @@ var init_log = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/streaming.mjs
+// ../../../node_modules/@anthropic-ai/sdk/core/streaming.mjs
 async function* _iterSSEMessages(response, controller) {
   if (!response.body) {
     controller.abort();
@@ -7595,7 +7595,7 @@ function partition(str, delimiter) {
 }
 var _Stream_client, Stream, SSEDecoder;
 var init_streaming = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/streaming.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/core/streaming.mjs"() {
     init_tslib();
     init_error();
     init_shims();
@@ -7803,7 +7803,7 @@ var init_streaming = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/parse.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/parse.mjs
 async function defaultParseResponse(client, props) {
   const { response, requestLogID, retryOfRequestLogID, startTime } = props;
   const body = await (async () => {
@@ -7853,16 +7853,16 @@ function addRequestID(value, response) {
   });
 }
 var init_parse = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/parse.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/parse.mjs"() {
     init_streaming();
     init_log();
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/api-promise.mjs
+// ../../../node_modules/@anthropic-ai/sdk/core/api-promise.mjs
 var _APIPromise_client, APIPromise;
 var init_api_promise = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/api-promise.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/core/api-promise.mjs"() {
     init_tslib();
     init_parse();
     APIPromise = class _APIPromise extends Promise {
@@ -7928,10 +7928,10 @@ var init_api_promise = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/pagination.mjs
+// ../../../node_modules/@anthropic-ai/sdk/core/pagination.mjs
 var _AbstractPage_client, AbstractPage, PagePromise, Page, PageCursor;
 var init_pagination = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/pagination.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/core/pagination.mjs"() {
     init_tslib();
     init_error();
     init_parse();
@@ -8069,7 +8069,7 @@ var init_pagination = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/uploads.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/uploads.mjs
 function makeFile(fileBits, fileName, options) {
   checkFileSupport();
   return new File(fileBits, fileName ?? "unknown_file", options);
@@ -8100,7 +8100,7 @@ function supportsFormData(fetchObject) {
 }
 var checkFileSupport, isAsyncIterable, multipartFormRequestOptions, supportsFormDataMap, createForm, isNamedBlob, addFormValue;
 var init_uploads = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/uploads.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/uploads.mjs"() {
     init_shims();
     checkFileSupport = () => {
       if (typeof File === "undefined") {
@@ -8153,7 +8153,7 @@ var init_uploads = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/to-file.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/to-file.mjs
 async function toFile(value, name, options) {
   checkFileSupport();
   value = await value;
@@ -8207,7 +8207,7 @@ function propsForError(value) {
 }
 var isBlobLike, isFileLike, isResponseLike;
 var init_to_file = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/to-file.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/to-file.mjs"() {
     init_uploads();
     init_uploads();
     isBlobLike = (value) => value != null && typeof value === "object" && typeof value.size === "number" && typeof value.type === "string" && typeof value.text === "function" && typeof value.slice === "function" && typeof value.arrayBuffer === "function";
@@ -8216,23 +8216,23 @@ var init_to_file = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/uploads.mjs
+// ../../../node_modules/@anthropic-ai/sdk/core/uploads.mjs
 var init_uploads2 = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/uploads.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/core/uploads.mjs"() {
     init_to_file();
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/shared.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/shared.mjs
 var init_shared = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/shared.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/shared.mjs"() {
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/resource.mjs
+// ../../../node_modules/@anthropic-ai/sdk/core/resource.mjs
 var APIResource;
 var init_resource = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/core/resource.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/core/resource.mjs"() {
     APIResource = class {
       constructor(client) {
         this._client = client;
@@ -8241,7 +8241,7 @@ var init_resource = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/headers.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/headers.mjs
 function* iterateHeaders(headers) {
   if (!headers)
     return;
@@ -8282,7 +8282,7 @@ function* iterateHeaders(headers) {
 }
 var brand_privateNullableHeaders, buildHeaders;
 var init_headers = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/headers.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/headers.mjs"() {
     init_values();
     brand_privateNullableHeaders = Symbol.for("brand.privateNullableHeaders");
     buildHeaders = (newHeaders) => {
@@ -8310,7 +8310,7 @@ var init_headers = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/stainless-helper-header.mjs
+// ../../../node_modules/@anthropic-ai/sdk/lib/stainless-helper-header.mjs
 function wasCreatedByStainlessHelper(value) {
   return typeof value === "object" && value !== null && SDK_HELPER_SYMBOL in value;
 }
@@ -8353,26 +8353,26 @@ function stainlessHelperHeaderFromFile(file) {
 }
 var SDK_HELPER_SYMBOL;
 var init_stainless_helper_header = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/stainless-helper-header.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/lib/stainless-helper-header.mjs"() {
     SDK_HELPER_SYMBOL = Symbol("anthropic.sdk.stainlessHelper");
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/path.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/utils/path.mjs
 function encodeURIPath(str) {
   return str.replace(/[^A-Za-z0-9\-._~!$&'()*+,;=:@]+/g, encodeURIComponent);
 }
-var EMPTY, createPathTagFunction, path5;
+var EMPTY, createPathTagFunction, path6;
 var init_path = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/path.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/utils/path.mjs"() {
     init_error();
     EMPTY = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.create(null));
-    createPathTagFunction = (pathEncoder = encodeURIPath) => function path8(statics, ...params) {
+    createPathTagFunction = (pathEncoder = encodeURIPath) => function path9(statics, ...params) {
       if (statics.length === 1)
         return statics[0];
       let postPath = false;
       const invalidSegments = [];
-      const path9 = statics.reduce((previousValue, currentValue, index) => {
+      const path10 = statics.reduce((previousValue, currentValue, index) => {
         if (/[?#]/.test(currentValue)) {
           postPath = true;
         }
@@ -8389,7 +8389,7 @@ var init_path = __esm({
         }
         return previousValue + currentValue + (index === params.length ? "" : encoded);
       }, "");
-      const pathOnly = path9.split(/[?#]/, 1)[0];
+      const pathOnly = path10.split(/[?#]/, 1)[0];
       const invalidSegmentPattern = /(?<=^|\/)(?:\.|%2e){1,2}(?=\/|$)/gi;
       let match;
       while ((match = invalidSegmentPattern.exec(pathOnly)) !== null) {
@@ -8410,19 +8410,19 @@ var init_path = __esm({
         }, "");
         throw new AnthropicError(`Path parameters result in path with invalid segments:
 ${invalidSegments.map((e) => e.error).join("\n")}
-${path9}
+${path10}
 ${underline}`);
       }
-      return path9;
+      return path10;
     };
-    path5 = /* @__PURE__ */ createPathTagFunction(encodeURIPath);
+    path6 = /* @__PURE__ */ createPathTagFunction(encodeURIPath);
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/files.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/beta/files.mjs
 var Files;
 var init_files = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/files.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/beta/files.mjs"() {
     init_resource();
     init_pagination();
     init_headers();
@@ -8464,7 +8464,7 @@ var init_files = __esm({
        */
       delete(fileID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.delete(path5`/v1/files/${fileID}`, {
+        return this._client.delete(path6`/v1/files/${fileID}`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "files-api-2025-04-14"].toString() },
@@ -8487,7 +8487,7 @@ var init_files = __esm({
        */
       download(fileID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.get(path5`/v1/files/${fileID}/content`, {
+        return this._client.get(path6`/v1/files/${fileID}/content`, {
           ...options,
           headers: buildHeaders([
             {
@@ -8510,7 +8510,7 @@ var init_files = __esm({
        */
       retrieveMetadata(fileID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.get(path5`/v1/files/${fileID}`, {
+        return this._client.get(path6`/v1/files/${fileID}`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "files-api-2025-04-14"].toString() },
@@ -8544,10 +8544,10 @@ var init_files = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/models.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/beta/models.mjs
 var Models;
 var init_models = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/models.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/beta/models.mjs"() {
     init_resource();
     init_pagination();
     init_headers();
@@ -8568,7 +8568,7 @@ var init_models = __esm({
        */
       retrieve(modelID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.get(path5`/v1/models/${modelID}?beta=true`, {
+        return this._client.get(path6`/v1/models/${modelID}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { ...betas?.toString() != null ? { "anthropic-beta": betas?.toString() } : void 0 },
@@ -8605,17 +8605,17 @@ var init_models = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/error.mjs
+// ../../../node_modules/@anthropic-ai/sdk/error.mjs
 var init_error2 = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/error.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/error.mjs"() {
     init_error();
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/constants.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/constants.mjs
 var MODEL_NONSTREAMING_TOKENS;
 var init_constants = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/constants.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/constants.mjs"() {
     MODEL_NONSTREAMING_TOKENS = {
       "claude-opus-4-20250514": 8192,
       "claude-opus-4-0": 8192,
@@ -8629,7 +8629,7 @@ var init_constants = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/beta-parser.mjs
+// ../../../node_modules/@anthropic-ai/sdk/lib/beta-parser.mjs
 function getOutputFormat(params) {
   return params?.output_format ?? params?.output_config?.format;
 }
@@ -8702,15 +8702,15 @@ function parseBetaOutputFormat(params, content) {
   }
 }
 var init_beta_parser = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/beta-parser.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/lib/beta-parser.mjs"() {
     init_error();
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/_vendor/partial-json-parser/parser.mjs
+// ../../../node_modules/@anthropic-ai/sdk/_vendor/partial-json-parser/parser.mjs
 var tokenize, strip, unstrip, generate, partialParse;
 var init_parser = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/_vendor/partial-json-parser/parser.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/_vendor/partial-json-parser/parser.mjs"() {
     tokenize = (input) => {
       let current = 0;
       let tokens = [];
@@ -8932,14 +8932,14 @@ var init_parser = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/streaming.mjs
+// ../../../node_modules/@anthropic-ai/sdk/streaming.mjs
 var init_streaming2 = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/streaming.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/streaming.mjs"() {
     init_streaming();
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/BetaMessageStream.mjs
+// ../../../node_modules/@anthropic-ai/sdk/lib/BetaMessageStream.mjs
 function tracksToolInput(content) {
   return content.type === "tool_use" || content.type === "server_tool_use" || content.type === "mcp_tool_use";
 }
@@ -8947,7 +8947,7 @@ function checkNever(x2) {
 }
 var _BetaMessageStream_instances, _BetaMessageStream_currentMessageSnapshot, _BetaMessageStream_params, _BetaMessageStream_connectedPromise, _BetaMessageStream_resolveConnectedPromise, _BetaMessageStream_rejectConnectedPromise, _BetaMessageStream_endPromise, _BetaMessageStream_resolveEndPromise, _BetaMessageStream_rejectEndPromise, _BetaMessageStream_listeners, _BetaMessageStream_ended, _BetaMessageStream_errored, _BetaMessageStream_aborted, _BetaMessageStream_catchingPromiseCreated, _BetaMessageStream_response, _BetaMessageStream_request_id, _BetaMessageStream_logger, _BetaMessageStream_getFinalMessage, _BetaMessageStream_getFinalText, _BetaMessageStream_handleError, _BetaMessageStream_beginRequest, _BetaMessageStream_addStreamEvent, _BetaMessageStream_endRequest, _BetaMessageStream_accumulateMessage, JSON_BUF_PROPERTY, BetaMessageStream;
 var init_BetaMessageStream = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/BetaMessageStream.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/lib/BetaMessageStream.mjs"() {
     init_tslib();
     init_parser();
     init_error2();
@@ -9541,10 +9541,10 @@ var init_BetaMessageStream = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/tools/ToolError.mjs
+// ../../../node_modules/@anthropic-ai/sdk/lib/tools/ToolError.mjs
 var ToolError;
 var init_ToolError = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/tools/ToolError.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/lib/tools/ToolError.mjs"() {
     ToolError = class extends Error {
       constructor(content) {
         const message = typeof content === "string" ? content : content.map((block) => {
@@ -9560,10 +9560,10 @@ var init_ToolError = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/tools/CompactionControl.mjs
+// ../../../node_modules/@anthropic-ai/sdk/lib/tools/CompactionControl.mjs
 var DEFAULT_TOKEN_THRESHOLD, DEFAULT_SUMMARY_PROMPT;
 var init_CompactionControl = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/tools/CompactionControl.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/lib/tools/CompactionControl.mjs"() {
     DEFAULT_TOKEN_THRESHOLD = 1e5;
     DEFAULT_SUMMARY_PROMPT = `You have been working on the task described above but have not yet completed it. Write a continuation summary that will allow you (or another instance of yourself) to resume work efficiently in a future context window where the conversation history will be replaced with this summary. Your summary should be structured, concise, and actionable. Include:
 1. Task Overview
@@ -9591,7 +9591,7 @@ Wrap your summary in <summary></summary> tags.`;
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/tools/BetaToolRunner.mjs
+// ../../../node_modules/@anthropic-ai/sdk/lib/tools/BetaToolRunner.mjs
 function promiseWithResolvers() {
   let resolve;
   let reject;
@@ -9646,7 +9646,7 @@ async function generateToolResponse(params, lastMessage = params.messages.at(-1)
 }
 var _BetaToolRunner_instances, _BetaToolRunner_consumed, _BetaToolRunner_mutated, _BetaToolRunner_state, _BetaToolRunner_options, _BetaToolRunner_message, _BetaToolRunner_toolResponse, _BetaToolRunner_completion, _BetaToolRunner_iterationCount, _BetaToolRunner_checkAndCompact, _BetaToolRunner_generateToolResponse, BetaToolRunner;
 var init_BetaToolRunner = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/tools/BetaToolRunner.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/lib/tools/BetaToolRunner.mjs"() {
     init_tslib();
     init_ToolError();
     init_error();
@@ -9926,10 +9926,10 @@ var init_BetaToolRunner = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/decoders/jsonl.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/decoders/jsonl.mjs
 var JSONLDecoder;
 var init_jsonl = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/decoders/jsonl.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/decoders/jsonl.mjs"() {
     init_error();
     init_shims();
     init_line();
@@ -9966,10 +9966,10 @@ var init_jsonl = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/messages/batches.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/beta/messages/batches.mjs
 var Batches;
 var init_batches = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/messages/batches.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/beta/messages/batches.mjs"() {
     init_resource();
     init_pagination();
     init_headers();
@@ -10035,7 +10035,7 @@ var init_batches = __esm({
        */
       retrieve(messageBatchID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.get(path5`/v1/messages/batches/${messageBatchID}?beta=true`, {
+        return this._client.get(path6`/v1/messages/batches/${messageBatchID}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "message-batches-2024-09-24"].toString() },
@@ -10088,7 +10088,7 @@ var init_batches = __esm({
        */
       delete(messageBatchID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.delete(path5`/v1/messages/batches/${messageBatchID}?beta=true`, {
+        return this._client.delete(path6`/v1/messages/batches/${messageBatchID}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "message-batches-2024-09-24"].toString() },
@@ -10120,7 +10120,7 @@ var init_batches = __esm({
        */
       cancel(messageBatchID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.post(path5`/v1/messages/batches/${messageBatchID}/cancel?beta=true`, {
+        return this._client.post(path6`/v1/messages/batches/${messageBatchID}/cancel?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "message-batches-2024-09-24"].toString() },
@@ -10169,7 +10169,7 @@ var init_batches = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/messages/messages.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/beta/messages/messages.mjs
 function transformOutputFormat(params) {
   if (!params.output_format) {
     return params;
@@ -10188,7 +10188,7 @@ function transformOutputFormat(params) {
 }
 var DEPRECATED_MODELS, MODELS_TO_WARN_WITH_THINKING_ENABLED, Messages;
 var init_messages = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/messages/messages.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/beta/messages/messages.mjs"() {
     init_error2();
     init_resource();
     init_constants();
@@ -10321,10 +10321,10 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/skills/versions.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/beta/skills/versions.mjs
 var Versions;
 var init_versions = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/skills/versions.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/beta/skills/versions.mjs"() {
     init_resource();
     init_pagination();
     init_headers();
@@ -10343,7 +10343,7 @@ var init_versions = __esm({
        */
       create(skillID, params = {}, options) {
         const { betas, ...body } = params ?? {};
-        return this._client.post(path5`/v1/skills/${skillID}/versions?beta=true`, multipartFormRequestOptions({
+        return this._client.post(path6`/v1/skills/${skillID}/versions?beta=true`, multipartFormRequestOptions({
           body,
           ...options,
           headers: buildHeaders([
@@ -10365,7 +10365,7 @@ var init_versions = __esm({
        */
       retrieve(version2, params, options) {
         const { skill_id, betas } = params;
-        return this._client.get(path5`/v1/skills/${skill_id}/versions/${version2}?beta=true`, {
+        return this._client.get(path6`/v1/skills/${skill_id}/versions/${version2}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() },
@@ -10388,7 +10388,7 @@ var init_versions = __esm({
        */
       list(skillID, params = {}, options) {
         const { betas, ...query2 } = params ?? {};
-        return this._client.getAPIList(path5`/v1/skills/${skillID}/versions?beta=true`, PageCursor, {
+        return this._client.getAPIList(path6`/v1/skills/${skillID}/versions?beta=true`, PageCursor, {
           query: query2,
           ...options,
           headers: buildHeaders([
@@ -10410,7 +10410,7 @@ var init_versions = __esm({
        */
       delete(version2, params, options) {
         const { skill_id, betas } = params;
-        return this._client.delete(path5`/v1/skills/${skill_id}/versions/${version2}?beta=true`, {
+        return this._client.delete(path6`/v1/skills/${skill_id}/versions/${version2}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() },
@@ -10422,10 +10422,10 @@ var init_versions = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/skills/skills.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/beta/skills/skills.mjs
 var Skills;
 var init_skills = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/skills/skills.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/beta/skills/skills.mjs"() {
     init_resource();
     init_versions();
     init_versions();
@@ -10467,7 +10467,7 @@ var init_skills = __esm({
        */
       retrieve(skillID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.get(path5`/v1/skills/${skillID}?beta=true`, {
+        return this._client.get(path6`/v1/skills/${skillID}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() },
@@ -10507,7 +10507,7 @@ var init_skills = __esm({
        */
       delete(skillID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.delete(path5`/v1/skills/${skillID}?beta=true`, {
+        return this._client.delete(path6`/v1/skills/${skillID}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() },
@@ -10520,10 +10520,10 @@ var init_skills = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/beta.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/beta/beta.mjs
 var Beta;
 var init_beta = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/beta/beta.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/beta/beta.mjs"() {
     init_resource();
     init_files();
     init_files();
@@ -10549,10 +10549,10 @@ var init_beta = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/completions.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/completions.mjs
 var Completions;
 var init_completions = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/completions.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/completions.mjs"() {
     init_resource();
     init_headers();
     Completions = class extends APIResource {
@@ -10573,7 +10573,7 @@ var init_completions = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/parser.mjs
+// ../../../node_modules/@anthropic-ai/sdk/lib/parser.mjs
 function getOutputFormat2(params) {
   return params?.output_config?.format;
 }
@@ -10634,12 +10634,12 @@ function parseOutputFormat(params, content) {
   }
 }
 var init_parser2 = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/parser.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/lib/parser.mjs"() {
     init_error();
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/MessageStream.mjs
+// ../../../node_modules/@anthropic-ai/sdk/lib/MessageStream.mjs
 function tracksToolInput2(content) {
   return content.type === "tool_use" || content.type === "server_tool_use";
 }
@@ -10647,7 +10647,7 @@ function checkNever2(x2) {
 }
 var _MessageStream_instances, _MessageStream_currentMessageSnapshot, _MessageStream_params, _MessageStream_connectedPromise, _MessageStream_resolveConnectedPromise, _MessageStream_rejectConnectedPromise, _MessageStream_endPromise, _MessageStream_resolveEndPromise, _MessageStream_rejectEndPromise, _MessageStream_listeners, _MessageStream_ended, _MessageStream_errored, _MessageStream_aborted, _MessageStream_catchingPromiseCreated, _MessageStream_response, _MessageStream_request_id, _MessageStream_logger, _MessageStream_getFinalMessage, _MessageStream_getFinalText, _MessageStream_handleError, _MessageStream_beginRequest, _MessageStream_addStreamEvent, _MessageStream_endRequest, _MessageStream_accumulateMessage, JSON_BUF_PROPERTY2, MessageStream;
 var init_MessageStream = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/lib/MessageStream.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/lib/MessageStream.mjs"() {
     init_tslib();
     init_errors();
     init_error2();
@@ -11216,10 +11216,10 @@ var init_MessageStream = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/messages/batches.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/messages/batches.mjs
 var Batches2;
 var init_batches2 = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/messages/batches.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/messages/batches.mjs"() {
     init_resource();
     init_pagination();
     init_headers();
@@ -11274,7 +11274,7 @@ var init_batches2 = __esm({
        * ```
        */
       retrieve(messageBatchID, options) {
-        return this._client.get(path5`/v1/messages/batches/${messageBatchID}`, options);
+        return this._client.get(path6`/v1/messages/batches/${messageBatchID}`, options);
       }
       /**
        * List all Message Batches within a Workspace. Most recently created batches are
@@ -11310,7 +11310,7 @@ var init_batches2 = __esm({
        * ```
        */
       delete(messageBatchID, options) {
-        return this._client.delete(path5`/v1/messages/batches/${messageBatchID}`, options);
+        return this._client.delete(path6`/v1/messages/batches/${messageBatchID}`, options);
       }
       /**
        * Batches may be canceled any time before processing ends. Once cancellation is
@@ -11334,7 +11334,7 @@ var init_batches2 = __esm({
        * ```
        */
       cancel(messageBatchID, options) {
-        return this._client.post(path5`/v1/messages/batches/${messageBatchID}/cancel`, options);
+        return this._client.post(path6`/v1/messages/batches/${messageBatchID}/cancel`, options);
       }
       /**
        * Streams the results of a Message Batch as a `.jsonl` file.
@@ -11368,10 +11368,10 @@ var init_batches2 = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/messages/messages.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/messages/messages.mjs
 var Messages2, DEPRECATED_MODELS2, MODELS_TO_WARN_WITH_THINKING_ENABLED2;
 var init_messages2 = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/messages/messages.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/messages/messages.mjs"() {
     init_resource();
     init_headers();
     init_stainless_helper_header();
@@ -11494,10 +11494,10 @@ Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resour
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/models.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/models.mjs
 var Models2;
 var init_models2 = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/models.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/models.mjs"() {
     init_resource();
     init_pagination();
     init_headers();
@@ -11511,7 +11511,7 @@ var init_models2 = __esm({
        */
       retrieve(modelID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.get(path5`/v1/models/${modelID}`, {
+        return this._client.get(path6`/v1/models/${modelID}`, {
           ...options,
           headers: buildHeaders([
             { ...betas?.toString() != null ? { "anthropic-beta": betas?.toString() } : void 0 },
@@ -11540,9 +11540,9 @@ var init_models2 = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/index.mjs
+// ../../../node_modules/@anthropic-ai/sdk/resources/index.mjs
 var init_resources = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/resources/index.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/resources/index.mjs"() {
     init_shared();
     init_beta();
     init_completions();
@@ -11551,10 +11551,10 @@ var init_resources = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/env.mjs
+// ../../../node_modules/@anthropic-ai/sdk/internal/utils/env.mjs
 var readEnv;
 var init_env = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/internal/utils/env.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/internal/utils/env.mjs"() {
     readEnv = (env) => {
       if (typeof globalThis.process !== "undefined") {
         return globalThis.process.env?.[env]?.trim() ?? void 0;
@@ -11567,10 +11567,10 @@ var init_env = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/client.mjs
+// ../../../node_modules/@anthropic-ai/sdk/client.mjs
 var _BaseAnthropic_instances, _a, _BaseAnthropic_encoder, _BaseAnthropic_baseURLOverridden, HUMAN_PROMPT, AI_PROMPT, BaseAnthropic, Anthropic;
 var init_client = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/client.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/client.mjs"() {
     init_tslib();
     init_uuid();
     init_values();
@@ -11715,9 +11715,9 @@ var init_client = __esm({
       makeStatusError(status, error2, message, headers) {
         return APIError.generate(status, error2, message, headers);
       }
-      buildURL(path8, query2, defaultBaseURL) {
+      buildURL(path9, query2, defaultBaseURL) {
         const baseURL = !__classPrivateFieldGet(this, _BaseAnthropic_instances, "m", _BaseAnthropic_baseURLOverridden).call(this) && defaultBaseURL || this.baseURL;
-        const url = isAbsoluteURL(path8) ? new URL(path8) : new URL(baseURL + (baseURL.endsWith("/") && path8.startsWith("/") ? path8.slice(1) : path8));
+        const url = isAbsoluteURL(path9) ? new URL(path9) : new URL(baseURL + (baseURL.endsWith("/") && path9.startsWith("/") ? path9.slice(1) : path9));
         const defaultQuery = this.defaultQuery();
         if (!isEmptyObj(defaultQuery)) {
           query2 = { ...defaultQuery, ...query2 };
@@ -11748,24 +11748,24 @@ var init_client = __esm({
        */
       async prepareRequest(request, { url, options }) {
       }
-      get(path8, opts) {
-        return this.methodRequest("get", path8, opts);
+      get(path9, opts) {
+        return this.methodRequest("get", path9, opts);
       }
-      post(path8, opts) {
-        return this.methodRequest("post", path8, opts);
+      post(path9, opts) {
+        return this.methodRequest("post", path9, opts);
       }
-      patch(path8, opts) {
-        return this.methodRequest("patch", path8, opts);
+      patch(path9, opts) {
+        return this.methodRequest("patch", path9, opts);
       }
-      put(path8, opts) {
-        return this.methodRequest("put", path8, opts);
+      put(path9, opts) {
+        return this.methodRequest("put", path9, opts);
       }
-      delete(path8, opts) {
-        return this.methodRequest("delete", path8, opts);
+      delete(path9, opts) {
+        return this.methodRequest("delete", path9, opts);
       }
-      methodRequest(method, path8, opts) {
+      methodRequest(method, path9, opts) {
         return this.request(Promise.resolve(opts).then((opts2) => {
-          return { method, path: path8, ...opts2 };
+          return { method, path: path9, ...opts2 };
         }));
       }
       request(options, remainingRetries = null) {
@@ -11869,8 +11869,8 @@ var init_client = __esm({
         }));
         return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
       }
-      getAPIList(path8, Page2, opts) {
-        return this.requestAPIList(Page2, opts && "then" in opts ? opts.then((opts2) => ({ method: "get", path: path8, ...opts2 })) : { method: "get", path: path8, ...opts });
+      getAPIList(path9, Page2, opts) {
+        return this.requestAPIList(Page2, opts && "then" in opts ? opts.then((opts2) => ({ method: "get", path: path9, ...opts2 })) : { method: "get", path: path9, ...opts });
       }
       requestAPIList(Page2, options) {
         const request = this.makeRequest(options, null, void 0);
@@ -11958,8 +11958,8 @@ var init_client = __esm({
       }
       async buildRequest(inputOptions, { retryCount = 0 } = {}) {
         const options = { ...inputOptions };
-        const { method, path: path8, query: query2, defaultBaseURL } = options;
-        const url = this.buildURL(path8, query2, defaultBaseURL);
+        const { method, path: path9, query: query2, defaultBaseURL } = options;
+        const url = this.buildURL(path9, query2, defaultBaseURL);
         if ("timeout" in options)
           validatePositiveInteger("timeout", options.timeout);
         options.timeout = options.timeout ?? this.timeout;
@@ -12069,7 +12069,7 @@ var init_client = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/@anthropic-ai/sdk/index.mjs
+// ../../../node_modules/@anthropic-ai/sdk/index.mjs
 var sdk_exports = {};
 __export(sdk_exports, {
   AI_PROMPT: () => AI_PROMPT,
@@ -12095,7 +12095,7 @@ __export(sdk_exports, {
   toFile: () => toFile
 });
 var init_sdk = __esm({
-  "../memory-bank-fork/node_modules/@anthropic-ai/sdk/index.mjs"() {
+  "../../../node_modules/@anthropic-ai/sdk/index.mjs"() {
     init_client();
     init_uploads2();
     init_api_promise();
@@ -12105,7 +12105,7 @@ var init_sdk = __esm({
   }
 });
 
-// ../memory-bank-fork/node_modules/zod/v3/external.js
+// ../../../node_modules/zod/v3/external.js
 var external_exports = {};
 __export(external_exports, {
   BRAND: () => BRAND,
@@ -12217,7 +12217,7 @@ __export(external_exports, {
   void: () => voidType
 });
 
-// ../memory-bank-fork/node_modules/zod/v3/helpers/util.js
+// ../../../node_modules/zod/v3/helpers/util.js
 var util;
 (function(util2) {
   util2.assertEqual = (_2) => {
@@ -12351,7 +12351,7 @@ var getParsedType = (data) => {
   }
 };
 
-// ../memory-bank-fork/node_modules/zod/v3/ZodError.js
+// ../../../node_modules/zod/v3/ZodError.js
 var ZodIssueCode = util.arrayToEnum([
   "invalid_type",
   "invalid_literal",
@@ -12469,7 +12469,7 @@ ZodError.create = (issues) => {
   return error2;
 };
 
-// ../memory-bank-fork/node_modules/zod/v3/locales/en.js
+// ../../../node_modules/zod/v3/locales/en.js
 var errorMap = (issue2, _ctx) => {
   let message;
   switch (issue2.code) {
@@ -12572,7 +12572,7 @@ var errorMap = (issue2, _ctx) => {
 };
 var en_default = errorMap;
 
-// ../memory-bank-fork/node_modules/zod/v3/errors.js
+// ../../../node_modules/zod/v3/errors.js
 var overrideErrorMap = en_default;
 function setErrorMap(map) {
   overrideErrorMap = map;
@@ -12581,10 +12581,10 @@ function getErrorMap() {
   return overrideErrorMap;
 }
 
-// ../memory-bank-fork/node_modules/zod/v3/helpers/parseUtil.js
+// ../../../node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path8, errorMaps, issueData } = params;
-  const fullPath = [...path8, ...issueData.path || []];
+  const { data, path: path9, errorMaps, issueData } = params;
+  const fullPath = [...path9, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -12691,20 +12691,20 @@ var isDirty = (x2) => x2.status === "dirty";
 var isValid = (x2) => x2.status === "valid";
 var isAsync = (x2) => typeof Promise !== "undefined" && x2 instanceof Promise;
 
-// ../memory-bank-fork/node_modules/zod/v3/helpers/errorUtil.js
+// ../../../node_modules/zod/v3/helpers/errorUtil.js
 var errorUtil;
 (function(errorUtil2) {
   errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
   errorUtil2.toString = (message) => typeof message === "string" ? message : message?.message;
 })(errorUtil || (errorUtil = {}));
 
-// ../memory-bank-fork/node_modules/zod/v3/types.js
+// ../../../node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path8, key) {
+  constructor(parent, value, path9, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path8;
+    this._path = path9;
     this._key = key;
   }
   get path() {
@@ -16146,7 +16146,7 @@ var coerce = {
 };
 var NEVER = INVALID;
 
-// ../memory-bank-fork/node_modules/zod/v4/core/core.js
+// ../../../node_modules/zod/v4/core/core.js
 var NEVER2 = Object.freeze({
   status: "aborted"
 });
@@ -16206,7 +16206,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// ../memory-bank-fork/node_modules/zod/v4/core/util.js
+// ../../../node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -16342,10 +16342,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path8) {
-  if (!path8)
+function getElementAtPath(obj, path9) {
+  if (!path9)
     return obj;
-  return path8.reduce((acc, key) => acc?.[key], obj);
+  return path9.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -16665,11 +16665,11 @@ function aborted(x2, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path8, issues) {
+function prefixIssues(path9, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path8);
+    iss.path.unshift(path9);
     return iss;
   });
 }
@@ -16727,7 +16727,7 @@ var Class = class {
   }
 };
 
-// ../memory-bank-fork/node_modules/zod/v4/core/errors.js
+// ../../../node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -16802,7 +16802,7 @@ function formatError(error2, _mapper) {
   return fieldErrors;
 }
 
-// ../memory-bank-fork/node_modules/zod/v4/core/parse.js
+// ../../../node_modules/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? Object.assign(_ctx, { async: false }) : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -16852,7 +16852,7 @@ var _safeParseAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeParseAsync = /* @__PURE__ */ _safeParseAsync($ZodRealError);
 
-// ../memory-bank-fork/node_modules/zod/v4/core/regexes.js
+// ../../../node_modules/zod/v4/core/regexes.js
 var cuid = /^[cC][^\s-]{8,}$/;
 var cuid2 = /^[0-9a-z]+$/;
 var ulid = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$/;
@@ -16910,7 +16910,7 @@ var _null = /null/i;
 var lowercase = /^[^A-Z]*$/;
 var uppercase = /^[^a-z]*$/;
 
-// ../memory-bank-fork/node_modules/zod/v4/core/checks.js
+// ../../../node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a2;
   inst._zod ?? (inst._zod = {});
@@ -17295,7 +17295,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// ../memory-bank-fork/node_modules/zod/v4/core/doc.js
+// ../../../node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = []) {
     this.content = [];
@@ -17331,14 +17331,14 @@ var Doc = class {
   }
 };
 
-// ../memory-bank-fork/node_modules/zod/v4/core/versions.js
+// ../../../node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 0,
   patch: 0
 };
 
-// ../memory-bank-fork/node_modules/zod/v4/core/schemas.js
+// ../../../node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a2;
   inst ?? (inst = {});
@@ -18576,7 +18576,7 @@ function handleRefineResult(result, payload, input, inst) {
   }
 }
 
-// ../memory-bank-fork/node_modules/zod/v4/locales/en.js
+// ../../../node_modules/zod/v4/locales/en.js
 var parsedType = (data) => {
   const t = typeof data;
   switch (t) {
@@ -18694,7 +18694,7 @@ function en_default2() {
   };
 }
 
-// ../memory-bank-fork/node_modules/zod/v4/core/registries.js
+// ../../../node_modules/zod/v4/core/registries.js
 var $output = Symbol("ZodOutput");
 var $input = Symbol("ZodInput");
 var $ZodRegistry = class {
@@ -18744,7 +18744,7 @@ function registry() {
 }
 var globalRegistry = /* @__PURE__ */ registry();
 
-// ../memory-bank-fork/node_modules/zod/v4/core/api.js
+// ../../../node_modules/zod/v4/core/api.js
 function _string(Class2, params) {
   return new Class2({
     type: "string",
@@ -19183,7 +19183,7 @@ function _refine(Class2, fn, _params) {
   return schema;
 }
 
-// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
+// ../../../node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
 function isZ4Schema(s) {
   const schema = s;
   return !!schema._zod;
@@ -19246,7 +19246,7 @@ function getLiteralValue(schema) {
   return void 0;
 }
 
-// ../memory-bank-fork/node_modules/zod/v4/classic/iso.js
+// ../../../node_modules/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -19287,7 +19287,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// ../memory-bank-fork/node_modules/zod/v4/classic/errors.js
+// ../../../node_modules/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -19321,13 +19321,13 @@ var ZodRealError = $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// ../memory-bank-fork/node_modules/zod/v4/classic/parse.js
+// ../../../node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse3 = /* @__PURE__ */ _safeParse(ZodRealError);
 var safeParseAsync2 = /* @__PURE__ */ _safeParseAsync(ZodRealError);
 
-// ../memory-bank-fork/node_modules/zod/v4/classic/schemas.js
+// ../../../node_modules/zod/v4/classic/schemas.js
 var ZodType2 = /* @__PURE__ */ $constructor("ZodType", (inst, def) => {
   $ZodType.init(inst, def);
   inst.def = def;
@@ -19938,10 +19938,10 @@ function preprocess(fn, schema) {
   return pipe(transform(fn), schema);
 }
 
-// ../memory-bank-fork/node_modules/zod/v4/classic/external.js
+// ../../../node_modules/zod/v4/classic/external.js
 config(en_default2());
 
-// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
+// ../../../node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
 var LATEST_PROTOCOL_VERSION = "2025-11-25";
 var SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION, "2025-06-18", "2025-03-26", "2024-11-05", "2024-10-07"];
 var RELATED_TASK_META_KEY = "io.modelcontextprotocol/related-task";
@@ -21460,18 +21460,18 @@ var UrlElicitationRequiredError = class extends McpError {
   }
 };
 
-// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
+// ../../../node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
 function isTerminal(status) {
   return status === "completed" || status === "failed" || status === "cancelled";
 }
 
-// ../memory-bank-fork/node_modules/zod-to-json-schema/dist/esm/Options.js
+// ../../../node_modules/zod-to-json-schema/dist/esm/Options.js
 var ignoreOverride = Symbol("Let zodToJsonSchema decide on which parser to use");
 
-// ../memory-bank-fork/node_modules/zod-to-json-schema/dist/esm/parsers/string.js
+// ../../../node_modules/zod-to-json-schema/dist/esm/parsers/string.js
 var ALPHA_NUMERIC = new Set("ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvxyz0123456789");
 
-// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
+// ../../../node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
 function getMethodLiteral(schema) {
   const shape = getObjectShape(schema);
   const methodSchema = shape?.method;
@@ -21492,7 +21492,7 @@ function parseWithCompat(schema, data) {
   return result.data;
 }
 
-// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
+// ../../../node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
 var DEFAULT_REQUEST_TIMEOUT_MSEC = 6e4;
 var Protocol = class {
   constructor(_options) {
@@ -22446,7 +22446,7 @@ function mergeCapabilities(base, additional) {
   return result;
 }
 
-// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
+// ../../../node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
 var import_ajv = __toESM(require_ajv(), 1);
 var import_ajv_formats = __toESM(require_dist(), 1);
 function createDefaultAjvInstance() {
@@ -22514,7 +22514,7 @@ var AjvJsonSchemaValidator = class {
   }
 };
 
-// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
+// ../../../node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
 var ExperimentalServerTasks = class {
   constructor(_server) {
     this._server = _server;
@@ -22727,7 +22727,7 @@ var ExperimentalServerTasks = class {
   }
 };
 
-// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
+// ../../../node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
 function assertToolsCallTaskCapability(requests, method, entityName) {
   if (!requests) {
     throw new Error(`${entityName} does not support task creation (required for ${method})`);
@@ -22762,7 +22762,7 @@ function assertClientRequestTaskCapability(requests, method, entityName) {
   }
 }
 
-// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.js
+// ../../../node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.js
 var Server = class extends Protocol {
   /**
    * Initializes this server with the given name and version information.
@@ -23142,10 +23142,10 @@ var Server = class extends Protocol {
   }
 };
 
-// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+// ../../../node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
 
-// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
+// ../../../node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
 var ReadBuffer = class {
   append(chunk) {
     this._buffer = this._buffer ? Buffer.concat([this._buffer, chunk]) : chunk;
@@ -23173,7 +23173,7 @@ function serializeMessage(message) {
   return JSON.stringify(message) + "\n";
 }
 
-// ../memory-bank-fork/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+// ../../../node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 var StdioServerTransport = class {
   constructor(_stdin = process2.stdin, _stdout = process2.stdout) {
     this._stdin = _stdin;
@@ -23236,8 +23236,8 @@ var StdioServerTransport = class {
 
 // src/inject-daemon.ts
 import net from "node:net";
-import fs6 from "node:fs";
-import path4 from "node:path";
+import fs7 from "node:fs";
+import path5 from "node:path";
 
 // src/paths.ts
 import os from "os";
@@ -24853,15 +24853,97 @@ function appendInjectLog(entry) {
   }
 }
 
+// src/inject-ledger.ts
+import fs6 from "node:fs";
+import path4 from "node:path";
+var MAX_IDS = 400;
+var TTL_MS = 7 * 24 * 60 * 60 * 1e3;
+var TMP_TTL_MS = 60 * 60 * 1e3;
+function ledgerDir() {
+  return path4.join(getIndexDir(), "state", "inject-ledger");
+}
+function sanitizeSessionId(sessionId) {
+  if (!sessionId) return null;
+  const clean = String(sessionId).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
+  return clean.length >= 4 ? clean : null;
+}
+function ledgerPath(cleanId) {
+  return path4.join(ledgerDir(), cleanId + ".json");
+}
+function loadLedger(sessionId) {
+  const id = sanitizeSessionId(sessionId);
+  if (!id) return /* @__PURE__ */ new Set();
+  try {
+    const raw = fs6.readFileSync(ledgerPath(id), "utf8");
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) return new Set(arr.filter((x2) => typeof x2 === "string"));
+  } catch {
+  }
+  return /* @__PURE__ */ new Set();
+}
+function appendLedger(sessionId, existing, newIds) {
+  const id = sanitizeSessionId(sessionId);
+  if (!id || newIds.length === 0) return;
+  const p = ledgerPath(id);
+  const tmp = `${p}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+  try {
+    const dir = ledgerDir();
+    fs6.mkdirSync(dir, { recursive: true });
+    const current = loadLedger(id);
+    const merged = [...current];
+    for (const x2 of [...existing, ...newIds]) {
+      if (!current.has(x2)) {
+        merged.push(x2);
+        current.add(x2);
+      }
+    }
+    const bounded = merged.length > MAX_IDS ? merged.slice(merged.length - MAX_IDS) : merged;
+    fs6.writeFileSync(tmp, JSON.stringify(bounded));
+    fs6.renameSync(tmp, p);
+    pruneOldLedgers(dir);
+  } catch {
+    try {
+      fs6.unlinkSync(tmp);
+    } catch {
+    }
+  }
+}
+function pruneOldLedgers(dir) {
+  try {
+    const now = Date.now();
+    for (const f of fs6.readdirSync(dir)) {
+      const isLedger = f.endsWith(".json");
+      const isOrphanTmp = f.endsWith(".tmp");
+      if (!isLedger && !isOrphanTmp) continue;
+      const fp = path4.join(dir, f);
+      try {
+        const age = now - fs6.statSync(fp).mtimeMs;
+        if (age > (isLedger ? TTL_MS : TMP_TTL_MS)) fs6.unlinkSync(fp);
+      } catch {
+      }
+    }
+  } catch {
+  }
+}
+
 // src/inject-core.ts
 var TOP_K = 5;
 var BASELINE_MARGIN = 0.045;
 var MAX_CONTEXT_FACTS = 8;
-async function computeInjectContext(userPrompt, project, via) {
+var FACT_CHAR_CAP = 160;
+var BLOCK_CHAR_BUDGET = 1e3;
+var REPEAT_ELAPSED_BUDGET_MS = 700;
+function truncateFact(text) {
+  const t = text.replace(/\s+/g, " ").trim();
+  return t.length > FACT_CHAR_CAP ? t.slice(0, FACT_CHAR_CAP - 1) + "\u2026" : t;
+}
+var NOOP_COMMIT = () => {
+};
+async function computeInjectContextDeferred(userPrompt, project, via, sessionId) {
   const t0 = Date.now();
   if (!userPrompt || userPrompt.length < 20) {
     appendInjectLog({ status: "skipped", project, prompt_len: userPrompt?.length ?? 0, via });
-    return "";
+    return { block: "", commitLedger: NOOP_COMMIT };
   }
   try {
     await initEmbeddings();
@@ -24884,7 +24966,7 @@ async function computeInjectContext(userPrompt, project, via) {
           duration_ms: Date.now() - t0,
           via
         });
-        return "";
+        return { block: "", commitLedger: NOOP_COMMIT };
       }
       const seenIds = new Set(results.map((r) => r.fact.id));
       const expandedFacts = [...results.map((r) => ({ fact: r.fact, note: "" }))];
@@ -24897,30 +24979,60 @@ async function computeInjectContext(userPrompt, project, via) {
           }
         }
       }
+      const ledger = loadLedger(sessionId);
+      const fresh = expandedFacts.filter(({ fact }) => !ledger.has(fact.id));
+      const dedupedCount = expandedFacts.length - fresh.length;
+      if (fresh.length === 0) {
+        appendInjectLog({
+          status: "deduped",
+          project,
+          prompt_len: userPrompt.length,
+          candidates: candidates.length,
+          injected: 0,
+          deduped: dedupedCount,
+          duration_ms: Date.now() - t0,
+          via
+        });
+        return { block: "", commitLedger: NOOP_COMMIT };
+      }
       const lines = ["\u{1F4CC} \uAD00\uB828 \uACFC\uAC70 \uACB0\uC815:"];
-      for (const { fact, note } of expandedFacts) {
+      let blockChars = lines[0].length;
+      const injectedIds = [];
+      for (const { fact, note } of fresh) {
         const dateStr = fact.created_at.slice(0, 10);
-        lines.push(`- ${note ? note + " " : ""}[${fact.category}] ${fact.fact} (${dateStr})`);
+        const line = `- ${note ? note + " " : ""}[${fact.category}] ${truncateFact(fact.fact)} (${dateStr})`;
+        if (blockChars + line.length > BLOCK_CHAR_BUDGET && injectedIds.length > 0) break;
+        lines.push(line);
+        blockChars += line.length + 1;
+        injectedIds.push(fact.id);
       }
-      try {
-        const repeats = await detectRepeat(userPrompt, project, 2, 0.85, { embedding, db });
-        const repeatCtx = formatRepeatContext(repeats);
-        if (repeatCtx) {
-          lines.push("");
-          lines.push(repeatCtx);
+      if (Date.now() - t0 < REPEAT_ELAPSED_BUDGET_MS) {
+        try {
+          const repeats = await detectRepeat(userPrompt, project, 2, 0.85, { embedding, db });
+          const repeatCtx = formatRepeatContext(repeats);
+          if (repeatCtx) {
+            lines.push("");
+            lines.push(repeatCtx);
+          }
+        } catch {
         }
-      } catch {
       }
+      const block = lines.join("\n") + "\n";
       appendInjectLog({
         status: "injected",
         project,
         prompt_len: userPrompt.length,
         candidates: candidates.length,
-        injected: expandedFacts.length,
+        injected: injectedIds.length,
+        deduped: dedupedCount,
+        chars: block.length,
         duration_ms: Date.now() - t0,
         via
       });
-      return lines.join("\n") + "\n";
+      return {
+        block,
+        commitLedger: () => appendLedger(sessionId, ledger, injectedIds)
+      };
     }
   } catch (error2) {
     const message = error2 instanceof Error ? error2.message : String(error2);
@@ -24932,13 +25044,13 @@ async function computeInjectContext(userPrompt, project, via) {
       error: message.slice(0, 300),
       via
     });
-    return "";
+    return { block: "", commitLedger: NOOP_COMMIT };
   }
 }
 
 // src/inject-daemon.ts
 function injectSocketPath() {
-  return path4.join(getIndexDir(), "inject-daemon.sock");
+  return path5.join(getIndexDir(), "inject-daemon.sock");
 }
 function startInjectDaemon() {
   const sockPath = injectSocketPath();
@@ -24974,12 +25086,14 @@ function startInjectDaemon() {
       void (async () => {
         try {
           const req = JSON.parse(line);
-          const context = await computeInjectContext(
+          const { block, commitLedger } = await computeInjectContextDeferred(
             String(req.prompt ?? ""),
             String(req.cwd ?? process.cwd()),
-            "daemon"
+            "daemon",
+            req.session_id ? String(req.session_id) : void 0
           );
-          conn.end(JSON.stringify({ ok: true, context }) + "\n");
+          if (conn.destroyed) return;
+          conn.end(JSON.stringify({ ok: true, context: block }) + "\n", commitLedger);
         } catch {
           try {
             conn.end(JSON.stringify({ ok: false }) + "\n");
@@ -24999,7 +25113,7 @@ function startInjectDaemon() {
     probe.on("connect", () => probe.destroy());
     probe.on("error", () => {
       try {
-        fs6.unlinkSync(sockPath);
+        fs7.unlinkSync(sockPath);
         server2.listen(sockPath, onListen);
       } catch {
       }
@@ -25007,13 +25121,13 @@ function startInjectDaemon() {
   });
   const onListen = () => {
     try {
-      fs6.chmodSync(sockPath, 384);
-      const st = fs6.statSync(sockPath);
+      fs7.chmodSync(sockPath, 384);
+      const st = fs7.statSync(sockPath);
       if ((st.mode & 511) !== 384 || st.uid !== selfUid) throw new Error("socket perms");
     } catch {
       try {
         server2.close();
-        fs6.unlinkSync(sockPath);
+        fs7.unlinkSync(sockPath);
       } catch {
       }
       return;
@@ -25023,8 +25137,8 @@ function startInjectDaemon() {
   };
   try {
     const dir = getIndexDir();
-    fs6.chmodSync(dir, 448);
-    const dst = fs6.statSync(dir);
+    fs7.chmodSync(dir, 448);
+    const dst = fs7.statSync(dir);
     if ((dst.mode & 511) !== 448 || dst.uid !== selfUid) return;
     server2.listen(sockPath, onListen);
     server2.unref();
@@ -25032,7 +25146,7 @@ function startInjectDaemon() {
   }
 }
 
-// ../memory-bank-fork/node_modules/marked/lib/marked.esm.js
+// ../../../node_modules/marked/lib/marked.esm.js
 function L() {
   return { async: false, breaks: false, extensions: null, gfm: true, hooks: null, pedantic: false, renderer: null, silent: false, tokenizer: null, walkTokens: null };
 }
@@ -26598,19 +26712,19 @@ function hasActiveConflicts(counts) {
 
 // src/llm.ts
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import fs7 from "node:fs";
-import path6 from "node:path";
+import fs8 from "node:fs";
+import path7 from "node:path";
 import os2 from "node:os";
-var LLM_WORKDIR = path6.join(os2.tmpdir(), LLM_WORKDIR_BASENAME);
+var LLM_WORKDIR = path7.join(os2.tmpdir(), LLM_WORKDIR_BASENAME);
 function llmWorkdir() {
   try {
-    fs7.mkdirSync(LLM_WORKDIR, { recursive: true });
+    fs8.mkdirSync(LLM_WORKDIR, { recursive: true });
   } catch {
   }
   pruneLlmTranscripts();
   return LLM_WORKDIR;
 }
-var PRUNE_MARKER = path6.join(LLM_WORKDIR, ".last-transcript-prune");
+var PRUNE_MARKER = path7.join(LLM_WORKDIR, ".last-transcript-prune");
 var PRUNE_THROTTLE_MS = 60 * 60 * 1e3;
 function transcriptTtlMs() {
   const raw = process.env.MEMORY_BANK_LLM_TRANSCRIPT_TTL_HOURS;
@@ -26620,49 +26734,49 @@ function transcriptTtlMs() {
 function pruneLlmTranscripts(now = Date.now()) {
   try {
     try {
-      const markerAge = now - fs7.statSync(PRUNE_MARKER).mtimeMs;
+      const markerAge = now - fs8.statSync(PRUNE_MARKER).mtimeMs;
       if (markerAge >= 0 && markerAge < PRUNE_THROTTLE_MS) return;
     } catch {
     }
     try {
-      fs7.writeFileSync(PRUNE_MARKER, new Date(now).toISOString());
+      fs8.writeFileSync(PRUNE_MARKER, new Date(now).toISOString());
     } catch {
     }
     const projectsDir = getProjectsDir();
     const ttl = transcriptTtlMs();
     let entries;
     try {
-      entries = fs7.readdirSync(projectsDir);
+      entries = fs8.readdirSync(projectsDir);
     } catch {
       return;
     }
     for (const entry of entries) {
       if (entry !== LLM_WORKDIR_BASENAME && !entry.endsWith(`-${LLM_WORKDIR_BASENAME}`)) continue;
-      const dir = path6.join(projectsDir, entry);
+      const dir = path7.join(projectsDir, entry);
       let stat;
       try {
-        stat = fs7.lstatSync(dir);
+        stat = fs8.lstatSync(dir);
       } catch {
         continue;
       }
       if (!stat.isDirectory()) continue;
       let files;
       try {
-        files = fs7.readdirSync(dir);
+        files = fs8.readdirSync(dir);
       } catch {
         continue;
       }
       for (const file of files) {
         if (!file.endsWith(".jsonl") && !file.endsWith("-summary.txt")) continue;
-        const filePath = path6.join(dir, file);
+        const filePath = path7.join(dir, file);
         try {
-          const fstat = fs7.lstatSync(filePath);
-          if (fstat.isFile() && now - fstat.mtimeMs > ttl) fs7.unlinkSync(filePath);
+          const fstat = fs8.lstatSync(filePath);
+          if (fstat.isFile() && now - fstat.mtimeMs > ttl) fs8.unlinkSync(filePath);
         } catch {
         }
       }
       try {
-        fs7.rmdirSync(dir);
+        fs8.rmdirSync(dir);
       } catch {
       }
     }
@@ -26834,8 +26948,8 @@ async function askAvatar(db, question, project) {
 }
 
 // src/mcp-server.ts
-import path7 from "path";
-import fs8 from "fs";
+import path8 from "path";
+import fs9 from "fs";
 import os3 from "os";
 var SearchModeEnum = external_exports.enum(["vector", "text", "both"]);
 var ResponseFormatEnum = external_exports.enum(["markdown", "json"]);
@@ -27174,7 +27288,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
     if (name === "read") {
       const params = ShowConversationInputSchema.parse(args);
-      const resolvedPath = path7.resolve(params.path);
+      const resolvedPath = path8.resolve(params.path);
       if (!resolvedPath.endsWith(".jsonl") && !resolvedPath.endsWith(".jsonl.zst")) {
         throw new Error(`Invalid file type: only .jsonl files are supported`);
       }
@@ -27182,19 +27296,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!resolvedFile) {
         throw new Error(`File not found: ${resolvedPath}`);
       }
-      const realFile = fs8.realpathSync(resolvedFile);
+      const realFile = fs9.realpathSync(resolvedFile);
       const allowedRoots = [
         getArchiveDir(),
-        path7.join(os3.homedir(), ".claude", "projects")
+        path8.join(os3.homedir(), ".claude", "projects")
       ].map((root) => {
         try {
-          return fs8.realpathSync(root);
+          return fs9.realpathSync(root);
         } catch {
-          return path7.resolve(root);
+          return path8.resolve(root);
         }
       });
       const isAllowed = allowedRoots.some(
-        (root) => realFile === root || realFile.startsWith(root + path7.sep)
+        (root) => realFile === root || realFile.startsWith(root + path8.sep)
       );
       if (!isAllowed) {
         throw new Error("Access denied: path is outside the conversation archive");

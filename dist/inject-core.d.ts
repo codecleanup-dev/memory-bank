@@ -11,4 +11,15 @@
  *
  * `via` tags the inject log so the two paths stay distinguishable.
  */
-export declare function computeInjectContext(userPrompt: string, project: string, via: 'daemon' | 'fallback'): Promise<string>;
+/** 계산 결과 + 원장 커밋 클로저.
+ * [fork] 원장 기록은 "전달 확인 후"가 계약이다: 계산 완료 시점에 기록하면
+ * 클라이언트가 이미 타임아웃/접속해제한 요청의 fact 가 "주입됨"으로 남아
+ * 그 세션 내내 억제된다 — 사용자가 본 적 없는 컨텍스트를 dedup 이 지우는
+ * 역방향 결함 (적대 리뷰 발견, 2026-07-17). 호출자가 전달(소켓 flush /
+ * stdout 기록)을 확인한 뒤 commitLedger() 를 호출한다. */
+export interface InjectComputation {
+    block: string;
+    commitLedger: () => void;
+}
+export declare function computeInjectContext(userPrompt: string, project: string, via: 'daemon' | 'fallback', sessionId?: string): Promise<string>;
+export declare function computeInjectContextDeferred(userPrompt: string, project: string, via: 'daemon' | 'fallback', sessionId?: string): Promise<InjectComputation>;

@@ -2,7 +2,7 @@ import net from 'node:net';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getIndexDir } from './paths.js';
-import { computeInjectContext } from './inject-core.js';
+import { computeInjectContextDeferred } from './inject-core.js';
 import { initEmbeddings } from './embeddings.js';
 /**
  * Warm inject daemon — a unix-socket sidecar inside the long-lived MCP server.
@@ -80,8 +80,14 @@ export function startInjectDaemon() {
             void (async () => {
                 try {
                     const req = JSON.parse(line);
-                    const context = await computeInjectContext(String(req.prompt ?? ''), String(req.cwd ?? process.cwd()), 'daemon');
-                    conn.end(JSON.stringify({ ok: true, context }) + '\n');
+                    const { block, commitLedger } = await computeInjectContextDeferred(String(req.prompt ?? ''), String(req.cwd ?? process.cwd()), 'daemon', req.session_id ? String(req.session_id) : undefined);
+                    // [fork] 원장 커밋은 응답이 클라이언트로 flush 된 뒤에만: 클라이언트가
+                    // 이미 타임아웃/해제한 요청의 fact 를 "주입됨"으로 남기면 그 세션에서
+                    // 실제로 전달된 적 없는 컨텍스트가 계속 억제된다. destroyed 소켓이면
+                    // 커밋 생략 — flush 직후 클라이언트가 포기하는 잔여 창(ms)만 남는다.
+                    if (conn.destroyed)
+                        return;
+                    conn.end(JSON.stringify({ ok: true, context: block }) + '\n', commitLedger);
                 }
                 catch {
                     try {
