@@ -105,3 +105,29 @@ read 실측 (로그: `memory-bank-sync-loop-20260725T052408Z`).
 
 개선안: transient IO 재시도에 지수 backoff (예: 1s/4s/16s) — load-spike 지속시간은 즉시
 재시도 3회의 시간창보다 길다. 측정: 동일 클래스 재발 시 backoff 유무별 트랜잭션 완주율.
+
+- **재발 2회째 (2026-07-25 08:12Z, load 66~73 창)**: 동일 클래스(errno -11 ×5파일, exit 75,
+  fail-safe 정상) — backoff 근거 강화. 구현 소유는 **keystone-hub**
+  (`layers/00-universal/scripts/memory-bank-shared-sync.sh` 정본)로 확인되어 fork가 아닌
+  keystone-hub 사이클에서 처리한다.
+
+## F5. judge 순서 효과 — 비가환 측정의 대응물 (표별 배치 셔플 후보)
+
+배경: LLM 판정은 배치 내 순서·구성에 의존할 수 있다(질문 순서 효과 — quantum cognition
+분야가 사람 판단에서 정식화한 현상). 현 위원회 3표는 **같은 배치 순서로 3번** 판정하므로,
+순서-계통 편향은 3표가 공유되어 다수결로 걸러지지 않는다. R1↔R2에서 관측한 churn의 일부가
+확률 노이즈가 아니라 계통적 순서 효과일 가설.
+
+### 파일럿 실험 (measured-improvement-only — 구현 전 측정)
+
+동일 첫 200 facts, 단일표 4조건 × 10배치 (총 40콜):
+- S1/S2 = canonical 순서 반복 → `J(S1,S2)` = 고정 순서에서의 확률 재현율(기준선)
+- O1/O2 = 결정론 셔플(mulberry32, seed 41/97) → 교차순서 Jaccard 평균
+
+판정: `orderEffectDelta = J(S1,S2) − mean(J(S,O))` 가 파일럿 임계 **0.10** 초과 시
+순서 효과 실재로 보고 **표별 배치 셔플**(위원회 각 표마다 순서 순열 + fact_index 역매핑)을
+구현한다. 미달 시 음성 결과로 기록하고 코드 변경 없음.
+
+### 실측 결과
+
+(파일럿 실행 후 기록)
