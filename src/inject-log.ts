@@ -31,6 +31,10 @@ export interface InjectLogEntry {
   error?: string;
   /** Which execution path served this injection: warm MCP-server daemon or cold fallback. */
   via?: 'daemon' | 'fallback';
+  /** E2 telemetry: per-injected-fact surprise (2dp; null = unmeasured row). */
+  surprise?: Array<number | null>;
+  /** E2: set only when the surprise ranking weight is active (>0). */
+  surprise_w?: number;
 }
 
 export function getInjectLogPath(): string {

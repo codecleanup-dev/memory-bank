@@ -46,6 +46,7 @@ COMMANDS:
   consistency Report knowledge-graph conflicts (active CONTRADICTS/SUPERSEDES pairs, orphans)
   taxonomy-align  Detect/merge near-duplicate ontology categories (report-first; --apply to merge)
   principles  Operating-principles registry + fact↔principle conflict queue (list/add/import/check/resolve)
+  surprise-backfill  Measure corpus-relative novelty (E2) for facts predating the surprise column
 
 Run 'memory-bank <command> --help' for command-specific help.
 
@@ -102,6 +103,10 @@ async function main() {
 
       case 'principles':
         await runScript(join(distDir, 'principles-cli.js'), args);
+        break;
+
+      case 'surprise-backfill':
+        await runScript(join(distDir, 'surprise-backfill-cli.js'), args);
         break;
 
       case '--help':
