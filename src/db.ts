@@ -821,6 +821,16 @@ export function initDatabase(): Database.Database {
       value TEXT NOT NULL
     )
   `);
+  // F1: facts whose TEXT changed after being judged. A verdict is bound to
+  // the text it measured — the next principle-check run re-judges queued
+  // facts FIRST and reconciles their stale llm-method conflicts
+  // (docs/2026-07-25-principle-contradicts-followups.md F1).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_recheck_queue (
+      fact_id TEXT PRIMARY KEY,
+      enqueued_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
 
   // Vocabulary migrations (one-time rebuilds on legacy DBs; fresh DBs already
   // carry both CHECKs from CREATE TABLE above). Run after the ALTER block so
