@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] - 2026-07-25
+
+### Changed (F5 — judge 순서 효과 대응, 파일럿 양성 후 적용)
+- **위원회 표별 배치 셔플**: 파일럿 실측(동일 200 facts, 단일표 4런)에서 동일순서 재현율
+  J=0.400 vs 교차순서 평균 0.218 — orderEffectDelta 0.182 > 임계 0.10으로 **계통적 순서
+  효과 실재** 판명. `committeeJudge`가 2표부터 독립 배치 순열로 판정하고 `fact_index`를
+  호출자 순서로 역매핑 — 순서-계통 편향이 표간 분산으로 바뀌어 다수결이 흡수한다.
+  (배경: 질문 순서 효과 — 판정이 배치 순서에 의존하는 현상의 직접 측정·대응)
+
+### Ops
+- stale fact 1건 정식 revise (Node 핀 방향 역전 기록 — revision 기록 + 재판정 큐 자동 등록,
+  F1 경로 라이브 첫 사용)
+
 ## [1.10.0] - 2026-07-25
 
 ### Added (F1 — revision 측정시점 바인딩, followups F1 종결)

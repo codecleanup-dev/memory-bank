@@ -63,8 +63,16 @@ export declare const llmJudge: PrincipleJudge;
  * All-vote failure (throw) propagates; a single vote's unparseable output
  * counts as an empty vote, and if EVERY vote is unparseable the committee
  * returns null (no-op + cursor advance, same contract as a single judge).
+ *
+ * F5: votes after the first see an INDEPENDENT batch order (vote 1 keeps the
+ * caller's order). LLM judgments are order-dependent (question-order effects);
+ * with a shared order that bias is systematic across votes and survives the
+ * majority filter — per-vote permutation turns it into vote-to-vote variance
+ * the filter can suppress. Findings are remapped back to the caller's
+ * indices, so downstream validation/tally semantics are unchanged.
+ * (Pilot measurement: docs/2026-07-25-principle-contradicts-followups.md F5)
  */
-export declare function committeeJudge(base: PrincipleJudge, votes: number): PrincipleJudge;
+export declare function committeeJudge(base: PrincipleJudge, votes: number, rng?: () => number): PrincipleJudge;
 export interface PrincipleCheckResult {
     activePrinciples: number;
     factsChecked: number;
