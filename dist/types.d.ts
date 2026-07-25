@@ -57,6 +57,7 @@ export interface Fact {
     ontology_category_id?: string | null;
     coding_agent?: string | null;
     confidence?: number | null;
+    surprise?: number | null;
 }
 export interface FactRevision {
     id: string;

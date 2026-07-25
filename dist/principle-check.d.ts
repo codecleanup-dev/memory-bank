@@ -31,13 +31,40 @@ export interface JudgeFinding {
 }
 /** Returns findings, or null when the output was unparseable (no-op + advance). */
 export type PrincipleJudge = (facts: FactForCheck[], principles: Principle[]) => Promise<JudgeFinding[] | null>;
-export declare const PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD = 0.7;
+export declare const PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD = 0.8;
+/**
+ * Default committee size for the LLM judge (see committeeJudge). 3 balances
+ * the measured churn suppression against LLM cost; --votes 1 restores the
+ * single-call behavior for cheap exploratory scans.
+ */
+export declare const DEFAULT_JUDGE_VOTES = 3;
 export declare function buildJudgePrompt(facts: FactForCheck[], principles: Principle[]): {
     system: string;
     user: string;
 };
+/**
+ * Error-text detection: the agent SDK surfaces some failures (rate limits,
+ * API errors) as a plain-text RESULT instead of throwing. Without this guard
+ * such a response parses to null → "unparseable, no-op + cursor advance",
+ * silently skipping facts during an outage (observed live 2026-07-25:
+ * "API Error: Rate limit reached"). Outages must throw so the run stops
+ * WITHOUT advancing — same contract as a thrown judge failure.
+ */
+export declare function isLlmErrorText(raw: string): boolean;
 /** Default judge: Haiku via the repo's shared LLM wrapper. */
 export declare const llmJudge: PrincipleJudge;
+/**
+ * Committee vote: run the judge `votes` times per batch and keep only
+ * (fact, principle) pairs that a MAJORITY of votes report, with the median
+ * confidence. Measured motivation (2026-07-25, two 200-fact re-judgings):
+ * single-vote findings churn run-to-run in the 0.80–0.85 band while
+ * keep-worthy findings recur — majority filtering removes the
+ * non-reproducible marginals that no prompt wording could pin down.
+ * All-vote failure (throw) propagates; a single vote's unparseable output
+ * counts as an empty vote, and if EVERY vote is unparseable the committee
+ * returns null (no-op + cursor advance, same contract as a single judge).
+ */
+export declare function committeeJudge(base: PrincipleJudge, votes: number): PrincipleJudge;
 export interface PrincipleCheckResult {
     activePrinciples: number;
     factsChecked: number;
@@ -64,6 +91,10 @@ export interface PrincipleCheckOptions {
     /** Force a full rescan (cursor reset) even when the principle set is unchanged. */
     recheck?: boolean;
     judge?: PrincipleJudge;
+    /** Per-run confidence cutoff override (0 < t ≤ 1); defaults to PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD. */
+    confidenceThreshold?: number;
+    /** Committee size (1–5, default DEFAULT_JUDGE_VOTES): majority-vote across repeated judge calls. */
+    votes?: number;
 }
 export declare function runPrincipleCheck(db: Database.Database, opts?: PrincipleCheckOptions): Promise<PrincipleCheckResult>;
 /**

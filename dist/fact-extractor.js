@@ -1,5 +1,5 @@
 import { callHaiku, parseJsonResponse } from './llm.js';
-import { insertFact } from './fact-db.js';
+import { computeSurprise, insertFact } from './fact-db.js';
 import { generateEmbedding, initEmbeddings } from './embeddings.js';
 import { classifyAndLinkFact, detectCoExtractionRelations } from './ontology-classifier.js';
 export const EXTRACTION_SYSTEM_PROMPT = `You are an expert at extracting long-term facts from conversations.
@@ -189,6 +189,9 @@ export async function saveExtractedFacts(db, facts, project, sourceExchangeIds, 
     for (const fact of facts) {
         const embedding = await generateEmbedding(fact.fact);
         const embeddingKr = fact.fact_kr ? await generateEmbedding(fact.fact_kr) : null;
+        // E2: measure novelty BEFORE insert — the new fact is not yet in the vec
+        // tables, so the probe cannot self-match (ranking signal only, no gating).
+        const surprise = computeSurprise(db, embedding, embeddingKr);
         const id = insertFact(db, {
             fact: fact.fact,
             category: fact.category,
@@ -200,6 +203,7 @@ export async function saveExtractedFacts(db, facts, project, sourceExchangeIds, 
             fact_kr: fact.fact_kr ?? null,
             embedding_kr: embeddingKr,
             confidence: fact.confidence,
+            surprise,
         });
         savedIds.push(id);
         // Ontology classification + relation detection (must await to prevent DB close race)

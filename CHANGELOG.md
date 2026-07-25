@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-07-25
+
+### Changed (F2 — judge 정밀도, 동일 200 facts 이중 실측 게이트 PASS)
+- **NOT-contradiction 가드 5종**: 스코프 열거 밖 비위반 / 가역 작업 ≠ irreversible /
+  관찰-비판 fact 예외(practice-in-force는 위반) / "언급 부재 ≠ 위반" / 아키텍처 스타일 비위반.
+  실측: 기존 FP 클래스 5종이 독립 이중 측정(A: n=2, B: 3라운드)에서 공히 0 재출현.
+- **threshold 0.7→0.8** (캘리브레이션: FP 밴드 0.75–0.85, 정당 0.95) + `check --threshold T`
+- **위원회 3표 다수결·중앙값 confidence** (기본, `--votes K`): 단발 judge의 0.80–0.85 밴드
+  런간 churn 실측 대응 — 주입 judge는 `votes` 명시 시에만 위원회.
+- **outage 오분류 수정**: SDK가 rate limit을 텍스트 결과로 반환 시 "unparseable→커서 전진"으로
+  facts를 조용히 스킵하던 구멍 — 파싱 실패+에러 배너일 때만 throw(미전진). 라이브 실사고에서 발견.
+
+### Added (E2 — surprise 주입 랭킹 필드, 스펙: docs/2026-07-25-e2-surprise-ranking-spec.md)
+- `facts.surprise` (0..1, NULL=미측정): 결정론 novelty `1 − max cosine 유사도`, insert 시
+  pre-insert KNN으로 계산(자기매칭 구조적 불가). **주입 랭킹 신호 전용** — 저장 필터·검색 랭킹 불개입.
+- `memory-bank surprise-backfill [--limit N]`: NULL 술어=자연 커서, embedding 없는 행은 NULL 유지.
+- 주입 telemetry(injected fact별 surprise) + `MEMORY_BANK_INJECT_SURPRISE_WEIGHT`(기본 0 —
+  측정 게이트 G1–G3 통과 후에만 상향 논의).
+
+### Docs
+- followups: F2 이중 실측(A/B) + 조정 노트, F3(잔여 judge FP 모드 2종), F4(sync transient IO backoff)
+
 ## [1.8.0] - 2026-07-25
 
 ### Added
