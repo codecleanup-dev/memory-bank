@@ -144,3 +144,14 @@ Automatic classification of facts into domain/category hierarchy:
 - Fixtures in `test/fixtures/*.jsonl`
 - Each test creates/destroys its own temp directory
 - 30s timeout per test (embedding model loading)
+
+## Auto-Issue Settings
+
+<!-- keystone-auto-issue 루프 설정 (parse_setting: `^- key:` 첫 매치) -->
+- repo: codecleanup-dev/memory-bank
+- label: auto-dev
+- pr_base: main
+
+큐 규약: `auto-dev` 라벨이 있어야 머신 루프가 픽업한다. 게이트/선행조건 미충족 이슈는
+`parked`로 등록만 하고, 승격은 라벨을 `auto-dev`로 교체하는 것으로 한다. 각 이슈 본문의
+"수용 기준(게이트)"는 워커가 PR 전에 충족해야 하는 조건이다 (dist 재빌드·릴리스는 항상 별도).
