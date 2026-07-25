@@ -308,13 +308,42 @@ function snippet(text: string, max: number = 110): string {
   return oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
 }
 
-/** Markdown section for the consistency report. Empty string when there is nothing to show. */
+/** Coverage summary shape (defined in principle-check.ts; duplicated here to avoid an import cycle). */
+export interface PrincipleCoverageInfo {
+  state: 'no-principles' | 'unscanned' | 'principles-changed' | 'partial' | 'complete';
+  uncheckedFacts: number;
+}
+
+function coverageNote(coverage: PrincipleCoverageInfo): string {
+  switch (coverage.state) {
+    case 'unscanned':
+      return `_Principle scan has not run yet (${coverage.uncheckedFacts} active facts unmeasured) — "no conflicts" is NOT "verified consistent". Run \`memory-bank principles check\`._`;
+    case 'principles-changed':
+      return `_Principle set changed since the last scan (${coverage.uncheckedFacts} active facts need re-measuring) — existing verdicts are against an old set. Run \`memory-bank principles check\`._`;
+    case 'partial':
+      return `_Principle scan incomplete: ${coverage.uncheckedFacts} active facts unmeasured — run \`memory-bank principles check\` to continue._`;
+    default:
+      return '';
+  }
+}
+
+/**
+ * Markdown section for the consistency report. Empty when there is nothing to
+ * show AND nothing unmeasured — an incomplete scan is surfaced even with zero
+ * conflicts, so "no conflicts" cannot masquerade as "measured and clean".
+ */
 export function formatPrincipleConflictSection(
   total: number,
   conflicts: ActivePrincipleConflict[],
+  coverage?: PrincipleCoverageInfo,
 ): string {
-  if (total === 0) return '';
+  const note = coverage ? coverageNote(coverage) : '';
+  if (total === 0) {
+    if (!note) return '';
+    return `## Active principle conflicts (0)\n\n${note}\n\n`;
+  }
   let out = `## Active principle conflicts (${total})\n\n`;
+  if (note) out += `${note}\n\n`;
   out +=
     '_A stored fact contradicts a registered operating principle — decide whether the fact is stale ' +
     '(deprecate/revise it), the principle is outdated (deactivate it and update the canon), or the pair ' +

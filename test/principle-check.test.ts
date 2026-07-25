@@ -8,6 +8,7 @@ import { suppressConsole } from './test-utils.js';
 import { addPrinciple, countActivePrincipleConflicts } from '../src/principles.js';
 import {
   buildJudgePrompt,
+  getPrincipleCheckCoverage,
   runPrincipleCheck,
   PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD,
   type FactForCheck,
@@ -208,6 +209,25 @@ describe('Principle check batch', () => {
     expect(second.factsChecked).toBe(2);
     expect(second.done).toBe(true);
     expect(seenSecond).toEqual(['f4', 'f5']);
+  });
+
+  it('reports scan coverage honestly — unmeasured is not clean', async () => {
+    expect(getPrincipleCheckCoverage(db).state).toBe('no-principles');
+
+    addPrinciple(db, { slug: 'p1', statement: 's1' });
+    seedFiveFacts(db);
+    expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'unscanned', uncheckedFacts: 5 });
+
+    await runPrincipleCheck(db, { judge: recordingJudge([]) });
+    expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'complete', uncheckedFacts: 0 });
+
+    // A fact recorded after the scan is unmeasured until the next run.
+    insertTestFact(db, 'f6', 'a new fact after the scan', '2026-01-06 00:00:00');
+    expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'partial', uncheckedFacts: 1 });
+
+    // Changing the principle set voids all existing coverage.
+    addPrinciple(db, { slug: 'p2', statement: 's2' });
+    expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'principles-changed', uncheckedFacts: 6 });
   });
 
   it('builds a prompt with principles, delimited untrusted facts, and a JSON contract', () => {
