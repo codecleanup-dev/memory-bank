@@ -30,6 +30,7 @@ interface InsertFactParams {
   embedding_kr?: number[] | null;
   confidence?: number | null;  // extraction confidence 0..1 (clamped on insert)
   surprise?: number | null;    // E2 corpus-relative novelty 0..1 (clamped on insert)
+  model_surprise?: number | null; // E2 v2 model-relative novelty 0..1 (clamped on insert)
 }
 
 interface UpdateFactParams {
@@ -63,10 +64,14 @@ export function insertFact(db: Database.Database, params: InsertFactParams): str
     typeof params.surprise === 'number' && Number.isFinite(params.surprise)
       ? Math.min(1, Math.max(0, params.surprise))
       : null;
+  const modelSurprise =
+    typeof params.model_surprise === 'number' && Number.isFinite(params.model_surprise)
+      ? Math.min(1, Math.max(0, params.model_surprise))
+      : null;
 
   db.prepare(`
-    INSERT INTO facts (id, fact, category, scope_type, scope_project, source_exchange_ids, embedding, created_at, updated_at, consolidated_count, is_active, coding_agent, fact_kr, embedding_version, confidence, surprise)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?)
+    INSERT INTO facts (id, fact, category, scope_type, scope_project, source_exchange_ids, embedding, created_at, updated_at, consolidated_count, is_active, coding_agent, fact_kr, embedding_version, confidence, surprise, model_surprise)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     params.fact,
@@ -85,6 +90,7 @@ export function insertFact(db: Database.Database, params: InsertFactParams): str
     EMBEDDING_VERSION,
     confidence,
     surprise,
+    modelSurprise,
   );
 
   // Insert into vector index (atomic DELETE+INSERT via transaction)
@@ -670,6 +676,7 @@ function rowToFact(row: Record<string, unknown>): Fact {
     ontology_category_id: (row['ontology_category_id'] as string | null) ?? null,
     coding_agent: (row['coding_agent'] as string | null) ?? null,
     surprise: (row['surprise'] as number | null) ?? null,
+    model_surprise: (row['model_surprise'] as number | null) ?? null,
     confidence: (row['confidence'] as number | null) ?? null,
   };
 }

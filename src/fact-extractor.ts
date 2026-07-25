@@ -28,7 +28,8 @@ export const EXTRACTION_SYSTEM_PROMPT = `You are an expert at extracting long-te
     "fact_kr": "사용자는 상태 관리에 Riverpod을 사용한다",
     "category": "decision",
     "scope_type": "project",
-    "confidence": 0.9
+    "confidence": 0.9,
+    "model_surprise": 0.8
   }
 ]
 
@@ -46,7 +47,13 @@ export const EXTRACTION_SYSTEM_PROMPT = `You are an expert at extracting long-te
 ## confidence criteria
 - 0.9+: explicit decision/declaration
 - 0.7-0.9: inferred from behavior
-- Below 0.7: do not extract`;
+- Below 0.7: do not extract
+
+## model_surprise criteria (0..1, rate independently of confidence)
+How unexpected is this fact to a GENERIC assistant with no knowledge of this user/project?
+- 0.0-0.2: any assistant would already assume it (framework defaults, common practice)
+- 0.3-0.6: mildly specific (typical project-level choices)
+- 0.7-1.0: user/project-specific, surprising, or CORRECTS a default assumption`;
 
 const BATCH_SIZE = 5; // configurable-ok
 const MAX_FACTS_PER_SESSION = 20; // configurable-ok
@@ -234,6 +241,7 @@ export async function saveExtractedFacts(
       embedding_kr: embeddingKr,
       confidence: fact.confidence,
       surprise,
+      model_surprise: fact.model_surprise ?? null,
     });
 
     savedIds.push(id);

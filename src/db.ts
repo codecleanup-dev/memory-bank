@@ -714,6 +714,14 @@ export function initDatabase(): Database.Database {
   if (!factColumnNames.has('surprise')) {
     db.prepare('ALTER TABLE facts ADD COLUMN surprise REAL').run();
   }
+  // E2 v2 model_surprise (0..1): MODEL-relative novelty rated by the
+  // extraction LLM at extract time — the corpus-relative `surprise` failed
+  // its G2 gate as a proxy for this, so v2 measures it directly. NULL on
+  // pre-existing rows (no LLM backfill). Ranking signal only, pending its
+  // own G2 re-test (docs/2026-07-25-e2-surprise-ranking-spec.md).
+  if (!factColumnNames.has('model_surprise')) {
+    db.prepare('ALTER TABLE facts ADD COLUMN model_surprise REAL').run();
+  }
   const exchangeColumns = db.prepare(
     `SELECT name FROM pragma_table_info('exchanges')`
   ).all() as Array<{ name: string }>;
