@@ -43,6 +43,24 @@ surprise(fact) = 1 − max cosine 유사도(fact 임베딩, 기존 활성 facts�
   \> knowledge 계열 평균 — "교정이 곧 예측 오차"라면 참이어야 한다. 상위/하위 20건 수동 검토 병행.
 - **G3 주입 델타**: w=0 vs w>0에서 주입 셋 변화율과 토큰 예산 내 고유값 비율 (관측 로그 기반).
 
+## 게이트 실측 (2026-07-25, v1.9.0 backfill 완주 후 — live DB 16,621 facts)
+
+- **backfill**: 16,621/16,621 측정 완료 (4런 × 5,000), 347건은 embedding 부재로 정직한 NULL 유지.
+- **G1 — 조건부 통과**: 분포 min 0.000 / p25 0.044 / median 0.066 / p75 0.084 / **max 0.145**.
+  퇴화 아님(사분위 스프레드 ~2×)이나 **절대 스케일이 [0, 0.145]로 압축** — e5 계열의 알려진
+  유사도 압축(inject-core의 probe-baseline 주석과 동일 현상). ⇒ 가중치를 켤 경우 raw 값이 아니라
+  **백분위 정규화** 값을 써야 한다 (raw w×surprise는 미미한 넛지에 불과).
+- **G2 — FAIL**: user-specific(constraint+preference) 평균 **0.0635** vs generic(knowledge)
+  평균 **0.0638** — 사실상 동률 (카테고리별: pattern 0.0706 > constraint 0.0660 > knowledge
+  0.0638 > preference 0.0611 > decision 0.0600). **해석: 코퍼스-상대 novelty는 PP의
+  "모델-상대 novelty"의 대리가 아니다.** 사용자 선호는 코퍼스 안에서 서로 뭉쳐(자기 유사)
+  낮게 측정되고, 일반 지식은 주제가 다양해 높게 측정된다 — 측정이 이식 가설을 기각했다.
+- **판정**: measured-improvement-only에 따라 **가중치 기본 0 유지 확정** (G2 미통과 상태에서
+  랭킹 개입 금지). 필드·telemetry·backfill은 존치 — (a) 관측 데이터 축적, (b) v2 정의
+  (모델-prior 기반: 추출 시 LLM에게 "일반론 vs 사용자 특이" 평점)의 비교 기준선.
+- 부수 관찰: `avg(surprise | consolidated_count>1)`이 전 카테고리에서 더 낮음 (0.031~0.045)
+  — 확인 누적 fact일수록 코퍼스 밀집대에 있다는 정합 신호 (측정 자체는 건강함).
+
 ## Non-goals
 
 - 모델-prior 기반 surprise(LLM에게 "일반론인가" 묻기) — v2 후보. v1은 코퍼스-상대 결정론 정의.
