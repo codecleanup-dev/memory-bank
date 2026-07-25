@@ -2,10 +2,17 @@
 
 > repo 이슈가 비활성화라 docs로 추적. 출처: 2026-07-25 인지 축 합의(베이즈·인지과학·그래프 중심,
 > QM은 구조 채석장만) 후속 — 산란 이론·Friston(AIF/FEP/PP) 글의 3단 심사(de-jargon → 정식 홈 →
-> 고유 잔여물)에서 살아남은 유일 신규 구조. 해당 글 전체 수율 ~1.5/10 (FEP 제안은 기구현
+> 고유 잔여물)에서 살아남은 신규 구조. 해당 글 전체 수율 ~1.5/10 (FEP 제안은 기구현
 > consistency+resolve 큐의 리네이밍으로 기각). 관련: `docs/2026-07-25-principle-contradicts-followups.md`
+>
+> **정합 노트 (같은 날 2차 검토와 대조)**: 같은 글을 독립 심사한 2차 검토는 이 계열을
+> **spreading activation explain-log**(고전 홈 — 산란 아님)로 명명하고 **저순위**로 판정했다.
+> 실측 데이터를 이미 보유한 후보가 선순위다: **judge Beta-캘리브레이션**(F2, FP 5/7 실측)과
+> **surprise 점수 — 주입 랭킹 필드**(PP+Shannon 합본, 저장 게이트 아님). E1은 그 뒤의
+> 인프라 실험이며, 아래 측정 게이트를 통과할 때만 채택한다 (두 검토가 공히 기각한 것:
+> FEP/AIF 어휘 수입, Grover 리네이밍, "오차만 저장" 하드 필터, free-energy 단일 스칼라 게이트).
 
-## E1. 읽기측 강화 신호 부재 — retrieval trace
+## E1. 읽기측 강화 신호 부재 — retrieval trace (고전 홈: spreading activation explain-log)
 
 강화 신호가 현재 **쓰기측뿐**이다: `consolidated_count`는 응고 시점에 증가하지만, **질의가 어떤
 fact를 활성화했고 그중 무엇이 답에 실제 사용됐는지**는 어디에도 기록되지 않는다.
@@ -50,7 +57,10 @@ tracing에 해당하는 표준 관행이다. "인지적 산란" 같은 물리 �
 
 ## 후순위 후보 (미착수 — 별도 스펙 전 착수 금지)
 
-- **E2. novelty 입장 게이트** (Shannon 잔여물): fact 추출 시 `novelty ≈ 1 − max 유사도` 임계
-  미달이면 신규 저장 대신 기존 fact 강화로 라우팅. 현행 dedup·consolidation과 중복 범위 실측 후 판단.
+- **E2. surprise 점수 — 주입 랭킹 필드** (PP+Shannon 합본): `surprise ≈ 1 − max 유사도`를
+  **주입/랭킹 신호로만** 사용한다. **저장 차단 하드 필터 금지** — 반복은 노이즈가 아니라 확인
+  신호이므로 임계 미달 시 discard가 아니라 기존 fact 강화(consolidation)로 라우팅한다
+  (2차 검토 안티패턴 합의: "오차만 저장" 필터 금지, consolidation이 이미 절반 구현).
 - **E3. expected/actual 델타** (AIF·FEP·PP 가족 전체의 정직한 잔여물): decision fact에
   `expected_outcome` 기록 → 사후 `actual` 대조 → 불일치 시 correction/CONTRADICTS 생성.
+  correction-driven-memory가 이 패턴의 기존 실증이므로, 신규 스키마 전에 그 경로 재사용을 먼저 검토.
