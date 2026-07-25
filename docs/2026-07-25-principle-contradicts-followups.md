@@ -32,3 +32,28 @@
 - 프롬프트 명시 추가: (a) 원칙에 열거된 스코프 밖은 위반 아님 (b) 읽기 전용/가역 작업은 irreversible 아님 (c) 문제를 관찰/비판하는 fact는 위반 실행 기록이 아님 (d) 아키텍처 스타일 선택은 propose-approve-execute 붕괴가 아님
 - threshold 0.7→0.8 검토 (이번 실측 0.75~0.80 구간 전부 FP)
 - **효과 측정**: 동일 200 facts를 `--recheck --dry-run` 재판정 → before/after FP율 비교 (measured-improvement-only 준수). 큐의 기존 7건 해소 사유 분포도 캘리브레이션 데이터.
+
+### F2 적용 실측 (2026-07-25, feature/260725-f2-judge-precision — 게이트 PASS)
+
+동일 첫 200 facts를 `--recheck --dry-run`으로 3라운드 재판정 (사전 선언 게이트: 정당 신호 2 유지 + 기존 FP 쌍 재출현 ≤1):
+
+| 라운드 | 구성 | 기존 FP 재출현 | 정당 신호 | 관찰 |
+|---|---|---|---|---|
+| baseline | threshold 0.7, 단발 judge | — (7건: 정당2/FP5, FP율 71%) | 2/2 | FP 전부 0.75–0.85, 정당 전부 0.95 |
+| R1 | 가드 4종 + threshold 0.8 | **0/5** | 1/2 | 관찰-비판 가드가 practice-in-force fact까지 제거, 신규 marginal 5 |
+| R2 | 가드 정밀화 5종 (practice-in-force 예외 + "언급 부재≠위반") | **0/5** | fact 단위 2/2 (자매 원칙 재라우팅) | 단발 judge의 0.80–0.85 밴드가 런마다 다른 borderline 생성 — 프롬프트만으론 고정 불가 |
+| R3 | + **위원회 3표 다수결·중앙값** | **0/5** | **2/2 (exact-pair 복귀)** | 8건 중 5건 ≥0.9로 상향, 내 라벨 기준 FP ~2/8(25%) |
+
+- 확정 배선: NOT-contradiction 가드 5종 + threshold 0.8(실측 밴드 캘리브레이션) + 위원회 기본 3표(`--votes`, 주입 judge는 명시 시에만) + `--threshold`
+- 부수 수정(실사고 발): SDK가 rate limit을 **텍스트 결과**로 반환 → "unparseable→커서 전진"으로 오분류되어 outage 중 facts를 조용히 스킵하던 구멍 — 파싱 실패+에러 배너일 때만 throw(미전진)로 교정 (2026-07-25 14:32 KST rate limit 실측)
+- 잔여 FP 클래스: "재설계/제거 결정에 승인 언급 없음=위반" (~2/8) — 큐 해소 사유 축적 후 재캘리브레이션 (Beta prior 후보)
+
+## F3. portable sync transient IO 재시도에 backoff 부재
+
+2026-07-25 05:32Z (load avg 49–64 폭주 창): `portable_sync`가 facts-ontology 5개 파일 read에서
+errno -11 transient 실패 → **즉시 재시도 3연속 전멸** → 파일 스킵 → 트랜잭션 안전 중단
+(exit 75, staged 미승격 — fail-safe 정상 작동, 데이터 무손상). 부하 정상화 후 동일 파일 정상
+read 실측 (로그: `memory-bank-sync-loop-20260725T052408Z`).
+
+개선안: transient IO 재시도에 지수 backoff (예: 1s/4s/16s) — load-spike 지속시간은 즉시
+재시도 3회의 시간창보다 길다. 측정: 동일 클래스 재발 시 backoff 유무별 트랜잭션 완주율.
