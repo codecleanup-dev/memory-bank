@@ -15,6 +15,7 @@ import {
 import { updateFact } from '../src/fact-db.js';
 import {
   buildJudgePrompt,
+  committeeJudge,
   getPrincipleCheckCoverage,
   runPrincipleCheck,
   PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD,
@@ -421,10 +422,22 @@ describe('Principle check batch', () => {
     addPrinciple(db, { slug: 'p1', statement: 's1' });
     seedFiveFacts(db);
     let call = 0;
-    const churningJudge: PrincipleJudge = async () => {
+    // Content-keyed judge (F5: votes 2+ see a shuffled order, so a fake judge
+    // must locate facts by id, not by fixed position — like a real LLM would).
+    const churningJudge: PrincipleJudge = async (facts) => {
       call += 1;
-      const stable: JudgeFinding = { fact_index: 0, principle_slug: 'p1', verdict: 'contradicts', confidence: 0.8 + call * 0.05 };
-      const marginal: JudgeFinding = { fact_index: 1, principle_slug: 'p1', verdict: 'contradicts', confidence: 0.85 };
+      const stable: JudgeFinding = {
+        fact_index: facts.findIndex((f) => f.id === 'f1'),
+        principle_slug: 'p1',
+        verdict: 'contradicts',
+        confidence: 0.8 + call * 0.05,
+      };
+      const marginal: JudgeFinding = {
+        fact_index: facts.findIndex((f) => f.id === 'f2'),
+        principle_slug: 'p1',
+        verdict: 'contradicts',
+        confidence: 0.85,
+      };
       // stable appears in every vote; marginal only in the first — majority(2/3) must drop it
       return call === 1 ? [stable, marginal] : [stable];
     };
@@ -434,6 +447,48 @@ describe('Principle check batch', () => {
     expect(result.dryRunFindings).toHaveLength(1);
     expect(result.dryRunFindings[0].factId).toBe('f1');
     expect(result.dryRunFindings[0].confidence).toBe(0.9); // median of 0.85/0.90/0.95
+  });
+
+  it('F5: committee votes after the first see an independent order, remapped back to caller indices', async () => {
+    const facts: FactForCheck[] = ['a', 'b', 'c', 'd', 'e'].map((id, i) => ({
+      id,
+      fact: `fact ${id}`,
+      category: 'decision',
+      scope_type: 'global',
+      scope_project: null,
+      created_at: `2026-01-0${i + 1} 00:00:00`,
+    }));
+    const principles = [{ slug: 'p1', statement: 's1', id: 'pid1' }] as never;
+
+    const firstSeen: string[] = [];
+    // Judge flags fact 'c' wherever it currently sits — remap must aggregate
+    // all three votes onto the SAME caller index despite different orders.
+    const contentJudge: PrincipleJudge = async (batch) => {
+      firstSeen.push(batch[0].id);
+      return [
+        {
+          fact_index: batch.findIndex((f) => f.id === 'c'),
+          principle_slug: 'p1',
+          verdict: 'contradicts',
+          confidence: 0.9,
+        },
+      ];
+    };
+
+    // Deterministic rng → deterministic permutations for votes 2 and 3.
+    let s = 12345;
+    const rng = () => {
+      s = (s * 1103515245 + 12345) % 2147483648;
+      return s / 2147483648;
+    };
+    const committee = committeeJudge(contentJudge, 3, rng);
+    const agreed = await committee(facts, principles);
+
+    expect(firstSeen[0]).toBe('a'); // vote 1 keeps the caller's order
+    expect(new Set(firstSeen).size).toBeGreaterThan(1); // later votes were reordered
+    expect(agreed).toHaveLength(1); // 3/3 votes aggregated onto one pair
+    expect(agreed?.[0].fact_index).toBe(2); // caller index of 'c'
+    expect(agreed?.[0].confidence).toBe(0.9);
   });
 
   it('committee: all-unparseable votes stay a no-op, and one throwing vote stops the run', async () => {
