@@ -128,15 +128,48 @@ export const llmJudge: PrincipleJudge = async (facts, principles) => {
  * All-vote failure (throw) propagates; a single vote's unparseable output
  * counts as an empty vote, and if EVERY vote is unparseable the committee
  * returns null (no-op + cursor advance, same contract as a single judge).
+ *
+ * F5: votes after the first see an INDEPENDENT batch order (vote 1 keeps the
+ * caller's order). LLM judgments are order-dependent (question-order effects);
+ * with a shared order that bias is systematic across votes and survives the
+ * majority filter — per-vote permutation turns it into vote-to-vote variance
+ * the filter can suppress. Findings are remapped back to the caller's
+ * indices, so downstream validation/tally semantics are unchanged.
+ * (Pilot measurement: docs/2026-07-25-principle-contradicts-followups.md F5)
  */
-export function committeeJudge(base: PrincipleJudge, votes: number): PrincipleJudge {
+export function committeeJudge(
+  base: PrincipleJudge,
+  votes: number,
+  rng: () => number = Math.random,
+): PrincipleJudge {
   const voteCount = Math.max(1, Math.min(5, Math.floor(votes)));
   if (voteCount === 1) return base;
   const majority = Math.floor(voteCount / 2) + 1;
   return async (facts, principles) => {
     const perVote: Array<JudgeFinding[] | null> = [];
     for (let v = 0; v < voteCount; v++) {
-      perVote.push(await base(facts, principles));
+      const perm = facts.map((_, i) => i);
+      if (v > 0) {
+        for (let i = perm.length - 1; i > 0; i--) {
+          const j = Math.floor(rng() * (i + 1));
+          [perm[i], perm[j]] = [perm[j], perm[i]];
+        }
+      }
+      const vote = await base(perm.map((idx) => facts[idx]), principles);
+      if (!Array.isArray(vote)) {
+        perVote.push(vote);
+        continue;
+      }
+      // Remap each finding's fact_index from the permuted order back to the
+      // caller's order; out-of-range indexes pass through and are dropped by
+      // downstream validation as before.
+      perVote.push(
+        vote.map((f) =>
+          Number.isInteger(f.fact_index) && f.fact_index >= 0 && f.fact_index < perm.length
+            ? { ...f, fact_index: perm[f.fact_index] }
+            : f,
+        ),
+      );
     }
     if (perVote.every((v) => v === null)) return null;
 
