@@ -271,6 +271,55 @@ describe('Principle check batch', () => {
     expect(user).toContain('Architecture or workflow style');
   });
 
+  it('committee keeps only majority pairs with the median confidence', async () => {
+    addPrinciple(db, { slug: 'p1', statement: 's1' });
+    seedFiveFacts(db);
+    let call = 0;
+    const churningJudge: PrincipleJudge = async () => {
+      call += 1;
+      const stable: JudgeFinding = { fact_index: 0, principle_slug: 'p1', verdict: 'contradicts', confidence: 0.8 + call * 0.05 };
+      const marginal: JudgeFinding = { fact_index: 1, principle_slug: 'p1', verdict: 'contradicts', confidence: 0.85 };
+      // stable appears in every vote; marginal only in the first — majority(2/3) must drop it
+      return call === 1 ? [stable, marginal] : [stable];
+    };
+    const result = await runPrincipleCheck(db, { dryRun: true, batchSize: 5, maxFacts: 5, judge: churningJudge, votes: 3 });
+    expect(call).toBe(3);
+    expect(result.findings).toBe(1);
+    expect(result.dryRunFindings).toHaveLength(1);
+    expect(result.dryRunFindings[0].factId).toBe('f1');
+    expect(result.dryRunFindings[0].confidence).toBe(0.9); // median of 0.85/0.90/0.95
+  });
+
+  it('committee: all-unparseable votes stay a no-op, and one throwing vote stops the run', async () => {
+    addPrinciple(db, { slug: 'p1', statement: 's1' });
+    seedFiveFacts(db);
+
+    const allNull: PrincipleJudge = async () => null;
+    const nullRun = await runPrincipleCheck(db, { judge: allNull, votes: 3 });
+    expect(nullRun.factsChecked).toBe(5);
+    expect(nullRun.findings).toBe(0);
+
+    let calls = 0;
+    const secondVoteThrows: PrincipleJudge = async () => {
+      calls += 1;
+      if (calls === 2) throw new Error('vote outage');
+      return [];
+    };
+    const failed = await runPrincipleCheck(db, { recheck: true, judge: secondVoteThrows, votes: 3 });
+    expect(failed.error).toContain('vote outage');
+    expect(failed.factsChecked).toBe(0);
+  });
+
+  it('classifies error-text LLM responses as outages, not unparseable no-ops', async () => {
+    const { isLlmErrorText } = await import('../src/principle-check.js');
+    expect(isLlmErrorText('API Error: Rate limit reached')).toBe(true);
+    expect(isLlmErrorText('  API Error: 529 overloaded_error')).toBe(true);
+    expect(isLlmErrorText('Rate limit reached for requests')).toBe(true);
+    expect(isLlmErrorText('[]')).toBe(false);
+    expect(isLlmErrorText('[{"fact_index":0}]')).toBe(false);
+    expect(isLlmErrorText('The rate of change is limited by design')).toBe(false); // mid-text, not an error banner
+  });
+
   it('builds a prompt with principles, delimited untrusted facts, and a JSON contract', () => {
     const principles = [
       { slug: 'p1', statement: 'rule one' },
