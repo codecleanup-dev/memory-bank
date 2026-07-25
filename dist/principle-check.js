@@ -158,6 +158,8 @@ export async function runPrincipleCheck(db, opts = {}) {
         inserted: 0,
         done: false,
         error: null,
+        recheckedFacts: 0,
+        reconciledCleared: 0,
         dryRunFindings: [],
     };
     const principles = getActivePrinciples(db);
@@ -172,6 +174,111 @@ export async function runPrincipleCheck(db, opts = {}) {
         ? { created_at: '', id: '', principles_hash: hash }
         : stored;
     const idBySlug = new Map(principles.map((p) => [p.slug, p.id]));
+    // === F1: drain the revision recheck queue BEFORE the forward scan ===
+    // A verdict is bound to the text it measured — revised facts are re-judged
+    // first and their stale llm-method conflicts reconciled. Queue rows consume
+    // the same facts budget as the forward scan.
+    if (!dryRun) {
+        // Inactive/deleted facts leave the queue silently: every active-active
+        // view already hides their conflicts.
+        db.prepare('DELETE FROM principle_recheck_queue WHERE fact_id NOT IN (SELECT id FROM facts WHERE is_active = 1)').run();
+    }
+    const selectQueued = db.prepare(`SELECT f.id, f.fact, f.category, f.scope_type, f.scope_project, f.created_at
+     FROM principle_recheck_queue q JOIN facts f ON f.id = q.fact_id
+     WHERE f.is_active = 1 AND (f.created_at > ? OR (f.created_at = ? AND f.id > ?))
+     ORDER BY f.created_at, f.id
+     LIMIT ?`);
+    const dequeue = db.prepare('DELETE FROM principle_recheck_queue WHERE fact_id = ?');
+    const activeLlmConflictsFor = db.prepare(`SELECT id, principle_id FROM principle_conflicts
+     WHERE fact_id = ? AND is_active = 1 AND method = 'llm'`);
+    const clearConflict = db.prepare(`UPDATE principle_conflicts SET is_active = 0, resolved_at = datetime('now') WHERE id = ?`);
+    const activePrincipleIds = new Set(principles.map((p) => p.id));
+    let qCursor = { created_at: '', id: '' };
+    while (result.factsChecked < maxFacts) {
+        const queued = selectQueued.all(qCursor.created_at, qCursor.created_at, qCursor.id, Math.min(batchSize, maxFacts - result.factsChecked));
+        if (queued.length === 0)
+            break;
+        let queuedFindings;
+        try {
+            queuedFindings = await judge(queued, principles);
+        }
+        catch (e) {
+            // Transient failure: stop with the queue intact — the next run retries.
+            result.error = e instanceof Error ? e.message : String(e);
+            return result;
+        }
+        result.batches += 1;
+        result.factsChecked += queued.length;
+        result.recheckedFacts += queued.length;
+        if (Array.isArray(queuedFindings)) {
+            const foundByFact = new Map();
+            for (const f of queuedFindings) {
+                if (!Number.isInteger(f.fact_index) ||
+                    f.fact_index < 0 ||
+                    f.fact_index >= queued.length ||
+                    typeof f.principle_slug !== 'string' ||
+                    !idBySlug.has(f.principle_slug) ||
+                    f.verdict !== 'contradicts' ||
+                    typeof f.confidence !== 'number' ||
+                    f.confidence < confidenceThreshold ||
+                    f.confidence > 1) {
+                    continue;
+                }
+                result.findings += 1;
+                const factId = queued[f.fact_index].id;
+                const principleId = idBySlug.get(f.principle_slug);
+                const reasoning = typeof f.reasoning === 'string' ? f.reasoning : null;
+                if (dryRun) {
+                    result.dryRunFindings.push({
+                        factId,
+                        principleSlug: f.principle_slug,
+                        confidence: f.confidence,
+                        reasoning,
+                    });
+                }
+                else {
+                    const outcome = recordPrincipleConflict(db, {
+                        principleId,
+                        factId,
+                        reasoning,
+                        method: 'llm',
+                        confidence: f.confidence,
+                    });
+                    if (outcome === 'inserted')
+                        result.inserted += 1;
+                }
+                const set = foundByFact.get(factId) ?? new Set();
+                set.add(principleId);
+                foundByFact.set(factId, set);
+            }
+            // Reconcile ONLY with a parsed verdict as basis: active llm-method
+            // pairs the re-judgement did not re-find are system-cleared
+            // (is_active=0, resolution stays NULL — distinguishable from the four
+            // human resolutions, which are never touched here). manual/import
+            // pairs are human-owned and never reconciled.
+            if (!dryRun) {
+                for (const fact of queued) {
+                    const found = foundByFact.get(fact.id) ?? new Set();
+                    const rows = activeLlmConflictsFor.all(fact.id);
+                    for (const row of rows) {
+                        if (activePrincipleIds.has(row.principle_id) && !found.has(row.principle_id)) {
+                            clearConflict.run(row.id);
+                            result.reconciledCleared += 1;
+                        }
+                    }
+                }
+            }
+        }
+        // queuedFindings === null → unparseable: dequeue as a no-op (poison
+        // escape) but reconcile NOTHING — old verdicts stand until a real
+        // verdict re-judges them.
+        if (!dryRun) {
+            for (const fact of queued)
+                dequeue.run(fact.id);
+        }
+        const last = queued[queued.length - 1];
+        qCursor = { created_at: last.created_at, id: last.id };
+    }
     // Serves WHERE + ORDER BY from idx_facts_active_created_id (keyset pagination).
     const selectBatch = db.prepare(`SELECT id, fact, category, scope_type, scope_project, created_at
      FROM facts
@@ -247,20 +354,24 @@ export async function runPrincipleCheck(db, opts = {}) {
 }
 export function getPrincipleCheckCoverage(db) {
     const totalActive = db.prepare('SELECT COUNT(*) AS n FROM facts WHERE is_active = 1').get().n;
+    const recheckQueued = db
+        .prepare(`SELECT COUNT(*) AS n FROM principle_recheck_queue q
+         JOIN facts f ON f.id = q.fact_id WHERE f.is_active = 1`)
+        .get().n;
     if (getActivePrinciples(db).length === 0) {
-        return { state: 'no-principles', uncheckedFacts: totalActive };
+        return { state: 'no-principles', uncheckedFacts: totalActive, recheckQueued };
     }
     const cursor = readCursor(db);
     if (!cursor)
-        return { state: 'unscanned', uncheckedFacts: totalActive };
+        return { state: 'unscanned', uncheckedFacts: totalActive, recheckQueued };
     if (cursor.principles_hash !== activePrinciplesHash(db)) {
-        return { state: 'principles-changed', uncheckedFacts: totalActive };
+        return { state: 'principles-changed', uncheckedFacts: totalActive, recheckQueued };
     }
     const unchecked = db
         .prepare(`SELECT COUNT(*) AS n FROM facts
          WHERE is_active = 1 AND (created_at > ? OR (created_at = ? AND id > ?))`)
         .get(cursor.created_at, cursor.created_at, cursor.id).n;
     return unchecked === 0
-        ? { state: 'complete', uncheckedFacts: 0 }
-        : { state: 'partial', uncheckedFacts: unchecked };
+        ? { state: 'complete', uncheckedFacts: 0, recheckQueued }
+        : { state: 'partial', uncheckedFacts: unchecked, recheckQueued };
 }

@@ -12,6 +12,7 @@ interface InsertFactParams {
     embedding_kr?: number[] | null;
     confidence?: number | null;
     surprise?: number | null;
+    model_surprise?: number | null;
 }
 interface UpdateFactParams {
     fact?: string;
