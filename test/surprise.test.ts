@@ -89,6 +89,29 @@ describe('E2 surprise', () => {
     expect(byText.get('fact b')).toBe(1);
   });
 
+  it('E2 v2: model_surprise column exists, clamps, and round-trips (NULL when absent/invalid)', () => {
+    const cols = db.prepare(`SELECT name FROM pragma_table_info('facts')`).all() as Array<{ name: string }>;
+    expect(cols.some((c) => c.name === 'model_surprise')).toBe(true);
+
+    insertFact(db, {
+      fact: 'rated fact', category: 'preference', scope_type: 'global', scope_project: null,
+      source_exchange_ids: [], embedding: oneHot(2), model_surprise: 0.83,
+    });
+    insertFact(db, {
+      fact: 'over-rated fact', category: 'preference', scope_type: 'global', scope_project: null,
+      source_exchange_ids: [], embedding: oneHot(3), model_surprise: 2.5, // clamp → 1
+    });
+    insertFact(db, {
+      fact: 'unrated fact', category: 'knowledge', scope_type: 'global', scope_project: null,
+      source_exchange_ids: [], embedding: oneHot(4),
+    });
+    const byText = new Map(getActiveFacts(db).map((f) => [f.fact, f.model_surprise]));
+    expect(byText.get('rated fact')).toBe(0.83);
+    expect(byText.get('over-rated fact')).toBe(1);
+    expect(byText.get('unrated fact')).toBeNull();
+  });
+
+
   it('backfill measures NULL rows via self-excluding KNN and reports the distribution', () => {
     const a = insertWithVec(db, 'dup one', 0);
     const b = insertWithVec(db, 'dup two', 0);

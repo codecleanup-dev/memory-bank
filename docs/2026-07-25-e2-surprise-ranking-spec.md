@@ -61,7 +61,34 @@ surprise(fact) = 1 − max cosine 유사도(fact 임베딩, 기존 활성 facts�
 - 부수 관찰: `avg(surprise | consolidated_count>1)`이 전 카테고리에서 더 낮음 (0.031~0.045)
   — 확인 누적 fact일수록 코퍼스 밀집대에 있다는 정합 신호 (측정 자체는 건강함).
 
+## v2 — model_surprise (G2 기각의 직접 대응, 2026-07-25 착수)
+
+G2가 기각한 것은 필드가 아니라 **정의**였다: 코퍼스-상대 novelty는 "모델이 이미 아는 것과의
+편차"(PP의 본래 주장)를 근사하지 못한다. v2는 그 양을 **직접** 측정한다:
+
+- `facts.model_surprise REAL` (0..1, NULL=미측정): **추출 LLM이 추출 시점에 평점** —
+  "일반 어시스턴트가 이 사용자/프로젝트를 몰라도 이미 가정할 내용인가(0) vs
+  사용자·프로젝트 특이/기본 가정을 교정하는 내용인가(1)". 추출 호출에 필드 하나를
+  얹는 것이라 한계비용 ~0 (별도 LLM 호출 없음).
+- 기존 행은 NULL 유지 (LLM backfill은 비용상 하지 않음 — 신규 fact부터 자연 축적).
+- confidence와 독립 평점 (프롬프트에 명시).
+- v1 `surprise`(코퍼스-상대)는 존치 — v2와의 상관/대조 분석 기준선.
+
+### v2 측정 게이트 (30일 축적 후, 기본 랭킹 개입 전 필수)
+
+```sql
+-- G2 재검정: 정의가 가설과 정합하므로 이번엔 통과가 기대치
+SELECT AVG(CASE WHEN category IN ('constraint','preference') THEN model_surprise END) AS user_specific,
+       AVG(CASE WHEN category = 'knowledge' THEN model_surprise END) AS generic,
+       COUNT(model_surprise) AS n
+FROM facts WHERE is_active = 1 AND model_surprise IS NOT NULL;
+-- 통과: user_specific > generic (표본 n ≥ 300 권장) + 상하위 20건 face validity
+```
+
+통과 시에만 주입 랭킹 가중치(별도 flag) 논의. v1 실측이 남긴 교훈 유지: raw 값 스케일을
+확인하고 필요하면 백분위 정규화.
+
 ## Non-goals
 
-- 모델-prior 기반 surprise(LLM에게 "일반론인가" 묻기) — v2 후보. v1은 코퍼스-상대 결정론 정의.
-- 저장/추출 게이트 개입, 검색 랭킹 개입, surprise 재계산 데몬.
+- ~~모델-prior 기반 surprise — v2 후보~~ → 2026-07-25 v2로 착수 (위 섹션).
+- 저장/추출 게이트 개입, 검색 랭킹 개입, surprise 재계산 데몬, 기존 행 LLM backfill.

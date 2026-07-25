@@ -81,6 +81,12 @@ export interface Fact {
   // insert/backfill time; NULL = unmeasured. Injection-ranking signal only —
   // docs/2026-07-25-e2-surprise-ranking-spec.md.
   surprise?: number | null;
+  // E2 v2: MODEL-relative novelty rated by the extraction LLM at extract time
+  // (0 = any generic assistant would assume it, 1 = user/project-specific or
+  // corrects a default assumption). The corpus-relative `surprise` failed the
+  // G2 gate as a proxy for this — v2 measures it directly. NULL on rows that
+  // predate the field. Ranking signal only, pending its own G2 re-test.
+  model_surprise?: number | null;
 }
 
 export interface FactRevision {
@@ -104,6 +110,8 @@ export interface ExtractedFact {
   category: FactCategory;
   scope_type: FactScopeType;
   confidence: number;
+  /** E2 v2: model-relative novelty rated by the extraction LLM (0..1, optional). */
+  model_surprise?: number;
 }
 
 export interface ConsolidationResult {
