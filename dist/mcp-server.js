@@ -23866,6 +23866,9 @@ function initDatabase() {
   if (!factColumnNames.has("confidence")) {
     db.prepare("ALTER TABLE facts ADD COLUMN confidence REAL").run();
   }
+  if (!factColumnNames.has("surprise")) {
+    db.prepare("ALTER TABLE facts ADD COLUMN surprise REAL").run();
+  }
   const exchangeColumns = db.prepare(
     `SELECT name FROM pragma_table_info('exchanges')`
   ).all();
@@ -24043,6 +24046,7 @@ function rowToFact(row) {
     is_active: Boolean(row["is_active"]),
     ontology_category_id: row["ontology_category_id"] ?? null,
     coding_agent: row["coding_agent"] ?? null,
+    surprise: row["surprise"] ?? null,
     confidence: row["confidence"] ?? null
   };
 }
@@ -24974,6 +24978,10 @@ function truncateFact(text) {
   const t = text.replace(/\s+/g, " ").trim();
   return t.length > FACT_CHAR_CAP ? t.slice(0, FACT_CHAR_CAP - 1) + "\u2026" : t;
 }
+function surpriseWeight(env = process.env) {
+  const raw = parseFloat(env.MEMORY_BANK_INJECT_SURPRISE_WEIGHT ?? "");
+  return Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0;
+}
 var NOOP_COMMIT = () => {
 };
 async function computeInjectContextDeferred(userPrompt, project, via, sessionId) {
@@ -25005,6 +25013,14 @@ async function computeInjectContextDeferred(userPrompt, project, via, sessionId)
         });
         return { block: "", commitLedger: NOOP_COMMIT };
       }
+      const w2 = surpriseWeight();
+      if (w2 > 0) {
+        results.sort((a, b2) => {
+          const sa = l2DistanceToSimilarity(a.distance) + w2 * (a.fact.surprise ?? 0);
+          const sb = l2DistanceToSimilarity(b2.distance) + w2 * (b2.fact.surprise ?? 0);
+          return sb - sa;
+        });
+      }
       const seenIds = new Set(results.map((r) => r.fact.id));
       const expandedFacts = [...results.map((r) => ({ fact: r.fact, note: "" }))];
       for (const { fact } of results.slice(0, 3)) {
@@ -25035,6 +25051,7 @@ async function computeInjectContextDeferred(userPrompt, project, via, sessionId)
       const lines = ["\u{1F4CC} \uAD00\uB828 \uACFC\uAC70 \uACB0\uC815:"];
       let blockChars = lines[0].length;
       const injectedIds = [];
+      const injectedSurprises = [];
       for (const { fact, note } of fresh) {
         const dateStr = fact.created_at.slice(0, 10);
         const line = `- ${note ? note + " " : ""}[${fact.category}] ${truncateFact(fact.fact)} (${dateStr})`;
@@ -25042,6 +25059,7 @@ async function computeInjectContextDeferred(userPrompt, project, via, sessionId)
         lines.push(line);
         blockChars += line.length + 1;
         injectedIds.push(fact.id);
+        injectedSurprises.push(fact.surprise != null ? Math.round(fact.surprise * 100) / 100 : null);
       }
       if (Date.now() - t0 < REPEAT_ELAPSED_BUDGET_MS) {
         try {
@@ -25064,7 +25082,9 @@ async function computeInjectContextDeferred(userPrompt, project, via, sessionId)
         deduped: dedupedCount,
         chars: block.length,
         duration_ms: Date.now() - t0,
-        via
+        via,
+        surprise: injectedSurprises,
+        ...w2 > 0 ? { surprise_w: w2 } : {}
       });
       return {
         block,

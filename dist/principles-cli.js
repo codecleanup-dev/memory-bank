@@ -33,7 +33,7 @@ const USAGE = `Usage: memory-bank principles <list|add|import|activate|deactivat
   deactivate  Deactivate a principle: --slug S (its conflicts leave the queue; canon file stays yours to update)
   conflicts   Active fact↔principle conflict queue [--limit N] [--json]
   resolve     Close a conflict: --id CONFLICT_ID --resolution ${CONFLICT_RESOLUTIONS.join('|')}
-  check       Scan active facts with the LLM judge [--dry-run] [--max-facts N] [--batch-size N] [--recheck] [--json]`;
+  check       Scan active facts with the LLM judge [--dry-run] [--max-facts N] [--batch-size N] [--threshold T] [--votes K] [--recheck] [--json]`;
 function parseArgs(argv) {
     const flags = new Set();
     const values = new Map();
@@ -48,6 +48,8 @@ function parseArgs(argv) {
         '--resolution',
         '--max-facts',
         '--batch-size',
+        '--threshold',
+        '--votes',
     ]);
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
@@ -202,6 +204,10 @@ async function main() {
                     recheck: opts.flags.has('--recheck'),
                     maxFacts: intOpt(opts, '--max-facts', 200),
                     batchSize: intOpt(opts, '--batch-size', 20),
+                    confidenceThreshold: opts.values.has('--threshold')
+                        ? parseFloat(opts.values.get('--threshold') ?? '')
+                        : undefined,
+                    votes: opts.values.has('--votes') ? intOpt(opts, '--votes', 3) : undefined,
                 });
                 if (json) {
                     console.log(JSON.stringify(result, null, 2));

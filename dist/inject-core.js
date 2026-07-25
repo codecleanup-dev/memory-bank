@@ -28,6 +28,15 @@ function truncateFact(text) {
     const t = text.replace(/\s+/g, ' ').trim();
     return t.length > FACT_CHAR_CAP ? t.slice(0, FACT_CHAR_CAP - 1) + '…' : t;
 }
+/**
+ * E2: surprise as an injection-ranking signal, OFF by default (0) — telemetry
+ * ships first, the weight is raised only after the spec's measurement gates
+ * (docs/2026-07-25-e2-surprise-ranking-spec.md, soft-to-hard 절차).
+ */
+export function surpriseWeight(env = process.env) {
+    const raw = parseFloat(env.MEMORY_BANK_INJECT_SURPRISE_WEIGHT ?? '');
+    return Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0;
+}
 const NOOP_COMMIT = () => { };
 export async function computeInjectContext(userPrompt, project, via, sessionId) {
     // 하위호환 래퍼: 전달 확인 채널이 없는 호출자는 즉시 커밋 (기존 의미 유지)
@@ -63,6 +72,17 @@ export async function computeInjectContextDeferred(userPrompt, project, via, ses
                 });
                 return { block: '', commitLedger: NOOP_COMMIT };
             }
+            // E2 (flag 뒤, 기본 off): PRIMARY 후보만 similarity + w×surprise 로
+            // 재정렬한다. 관계 확장분은 질의 거리(similarity)가 없으므로 관계순
+            // 그대로 뒤에 붙는다. w=0(기본)이면 기존 순서와 완전 동일.
+            const w = surpriseWeight();
+            if (w > 0) {
+                results.sort((a, b) => {
+                    const sa = l2DistanceToSimilarity(a.distance) + w * (a.fact.surprise ?? 0);
+                    const sb = l2DistanceToSimilarity(b.distance) + w * (b.fact.surprise ?? 0);
+                    return sb - sa;
+                });
+            }
             // Expand with 1-hop relations
             const seenIds = new Set(results.map((r) => r.fact.id));
             const expandedFacts = [...results.map((r) => ({ fact: r.fact, note: '' }))];
@@ -93,6 +113,9 @@ export async function computeInjectContextDeferred(userPrompt, project, via, ses
             const lines = ['📌 관련 과거 결정:'];
             let blockChars = lines[0].length;
             const injectedIds = [];
+            // E2 telemetry: per-injected-fact surprise (2dp, null = unmeasured) —
+            // observation for the spec's G3 gate, no behavior change.
+            const injectedSurprises = [];
             for (const { fact, note } of fresh) {
                 const dateStr = fact.created_at.slice(0, 10);
                 const line = `- ${note ? note + ' ' : ''}[${fact.category}] ${truncateFact(fact.fact)} (${dateStr})`;
@@ -101,6 +124,7 @@ export async function computeInjectContextDeferred(userPrompt, project, via, ses
                 lines.push(line);
                 blockChars += line.length + 1;
                 injectedIds.push(fact.id);
+                injectedSurprises.push(fact.surprise != null ? Math.round(fact.surprise * 100) / 100 : null);
             }
             // Detect repeated prompts (best-effort). 동기 sqlite 검색이라 시작 후엔
             // 선점 불가 — 주입이 이미 예산을 소진했으면 시작 자체를 생략 (tail 상한).
@@ -121,6 +145,8 @@ export async function computeInjectContextDeferred(userPrompt, project, via, ses
                 candidates: candidates.length, injected: injectedIds.length,
                 deduped: dedupedCount, chars: block.length,
                 duration_ms: Date.now() - t0, via,
+                surprise: injectedSurprises,
+                ...(w > 0 ? { surprise_w: w } : {}),
             });
             // 원장 커밋은 호출자의 전달 확인 뒤로 미룬다 (위 InjectComputation 주석 참조)
             return {

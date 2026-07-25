@@ -11,6 +11,7 @@ interface InsertFactParams {
     fact_kr?: string | null;
     embedding_kr?: number[] | null;
     confidence?: number | null;
+    surprise?: number | null;
 }
 interface UpdateFactParams {
     fact?: string;
@@ -25,6 +26,38 @@ interface InsertRevisionParams {
     source_exchange_id: string | null;
 }
 export declare function insertFact(db: Database.Database, params: InsertFactParams): string;
+/**
+ * E2: corpus-relative novelty — 1 − max cosine similarity against the facts
+ * already indexed at measurement time. Deterministic and fully local (no LLM).
+ * Call BEFORE insertFact for new facts (the new row is not yet in the vec
+ * tables, so the probe cannot self-match); pass excludeFactId when measuring
+ * an already-indexed fact (backfill). Injection-ranking signal ONLY — never a
+ * storage filter (docs/2026-07-25-e2-surprise-ranking-spec.md).
+ */
+export declare function computeSurprise(db: Database.Database, embedding: number[] | null | undefined, embeddingKr?: number[] | null, excludeFactId?: string): number | null;
+export interface SurpriseBackfillResult {
+    scanned: number;
+    updated: number;
+    /** Active NULL-surprise facts that can never be measured (no embedding). */
+    unmeasurable: number;
+    /** Active NULL-surprise facts with embeddings still awaiting a later run. */
+    remaining: number;
+    distribution: {
+        count: number;
+        min: number;
+        p25: number;
+        median: number;
+        p75: number;
+        max: number;
+    } | null;
+}
+/**
+ * E2 backfill: measure surprise for active facts that predate the column.
+ * `surprise IS NULL AND embedding IS NOT NULL` is its own cursor — the
+ * predicate shrinks monotonically, so repeated runs resume naturally and
+ * embedding-less rows stay NULL (= honestly unmeasured) without looping.
+ */
+export declare function runSurpriseBackfill(db: Database.Database, limit?: number): SurpriseBackfillResult;
 export declare function getActiveFacts(db: Database.Database): Fact[];
 export declare function getFactsByProject(db: Database.Database, project: string): Fact[];
 export declare function updateFact(db: Database.Database, id: string, params: UpdateFactParams): void;
