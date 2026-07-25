@@ -268,6 +268,14 @@ export function updateFact(db: Database.Database, id: string, params: UpdateFact
   values.push(id);
   db.prepare(`UPDATE facts SET ${updates.join(', ')} WHERE id = ?`).run(...values);
 
+  // F1: a text change invalidates text-bound principle verdicts — queue the
+  // fact so the next principle-check run re-judges it and reconciles stale
+  // llm-method conflicts. Count-only touches (consolidation reinforcement)
+  // do NOT re-queue: the measured text is unchanged.
+  if (params.fact !== undefined) {
+    db.prepare('INSERT OR IGNORE INTO principle_recheck_queue (fact_id) VALUES (?)').run(id);
+  }
+
   // Update vector index (atomic DELETE+INSERT via transaction)
   if (params.embedding) {
     const p = vecParamFor(db, 'vec_facts', params.embedding);

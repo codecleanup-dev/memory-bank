@@ -312,6 +312,8 @@ function snippet(text: string, max: number = 110): string {
 export interface PrincipleCoverageInfo {
   state: 'no-principles' | 'unscanned' | 'principles-changed' | 'partial' | 'complete';
   uncheckedFacts: number;
+  /** F1: active revised facts awaiting re-judgement (optional for older callers). */
+  recheckQueued?: number;
 }
 
 function coverageNote(coverage: PrincipleCoverageInfo): string {
@@ -338,12 +340,20 @@ export function formatPrincipleConflictSection(
   coverage?: PrincipleCoverageInfo,
 ): string {
   const note = coverage ? coverageNote(coverage) : '';
+  // F1: revised facts carry text-bound verdicts that may be stale — surface
+  // the pending re-judgement queue even when the conflict count is zero.
+  const queueNote =
+    coverage && coverage.recheckQueued && coverage.recheckQueued > 0
+      ? `_${coverage.recheckQueued} revised fact(s) await re-judgement — the next \`principles check\` drains them first (stale verdicts may be cleared or re-confirmed)._`
+      : '';
   if (total === 0) {
-    if (!note) return '';
-    return `## Active principle conflicts (0)\n\n${note}\n\n`;
+    if (!note && !queueNote) return '';
+    const notes = [note, queueNote].filter(Boolean).join('\n\n');
+    return `## Active principle conflicts (0)\n\n${notes}\n\n`;
   }
   let out = `## Active principle conflicts (${total})\n\n`;
   if (note) out += `${note}\n\n`;
+  if (queueNote) out += `${queueNote}\n\n`;
   out +=
     '_A stored fact contradicts a registered operating principle — decide whether the fact is stale ' +
     '(deprecate/revise it), the principle is outdated (deactivate it and update the canon), or the pair ' +

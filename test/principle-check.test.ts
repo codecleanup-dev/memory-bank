@@ -5,7 +5,14 @@ import os from 'os';
 import Database from 'better-sqlite3';
 import { initDatabase } from '../src/db.js';
 import { suppressConsole } from './test-utils.js';
-import { addPrinciple, countActivePrincipleConflicts } from '../src/principles.js';
+import {
+  addPrinciple,
+  countActivePrincipleConflicts,
+  listActivePrincipleConflicts,
+  recordPrincipleConflict,
+  resolvePrincipleConflict,
+} from '../src/principles.js';
+import { updateFact } from '../src/fact-db.js';
 import {
   buildJudgePrompt,
   getPrincipleCheckCoverage,
@@ -216,18 +223,157 @@ describe('Principle check batch', () => {
 
     addPrinciple(db, { slug: 'p1', statement: 's1' });
     seedFiveFacts(db);
-    expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'unscanned', uncheckedFacts: 5 });
+    expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'unscanned', uncheckedFacts: 5, recheckQueued: 0 });
 
     await runPrincipleCheck(db, { judge: recordingJudge([]) });
-    expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'complete', uncheckedFacts: 0 });
+    expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'complete', uncheckedFacts: 0, recheckQueued: 0 });
 
     // A fact recorded after the scan is unmeasured until the next run.
     insertTestFact(db, 'f6', 'a new fact after the scan', '2026-01-06 00:00:00');
-    expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'partial', uncheckedFacts: 1 });
+    expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'partial', uncheckedFacts: 1, recheckQueued: 0 });
 
     // Changing the principle set voids all existing coverage.
     addPrinciple(db, { slug: 'p2', statement: 's2' });
-    expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'principles-changed', uncheckedFacts: 6 });
+    expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'principles-changed', uncheckedFacts: 6, recheckQueued: 0 });
+
+    // F1: a text revision surfaces in coverage until the queue drains.
+    updateFact(db, 'f1', { fact: 'revised text' });
+    expect(getPrincipleCheckCoverage(db).recheckQueued).toBe(1);
+  });
+
+  it('F1: text updates enqueue for re-judgement; count-only touches do not', () => {
+    addPrinciple(db, { slug: 'p1', statement: 's1' });
+    seedFiveFacts(db);
+    const queueCount = () =>
+      (db.prepare('SELECT COUNT(*) AS n FROM principle_recheck_queue').get() as { n: number }).n;
+
+    updateFact(db, 'f1', { consolidated_count_increment: true });
+    expect(queueCount()).toBe(0);
+
+    updateFact(db, 'f1', { fact: 'revised once' });
+    updateFact(db, 'f1', { fact: 'revised twice' }); // OR IGNORE — still one row
+    expect(queueCount()).toBe(1);
+  });
+
+  it('F1: drain reconciles stale verdicts, keeps re-found, spares human resolutions and manual pairs', async () => {
+    const p1 = addPrinciple(db, { slug: 'p1', statement: 's1' });
+    const p2 = addPrinciple(db, { slug: 'p2', statement: 's2' });
+    const p3 = addPrinciple(db, { slug: 'p3', statement: 's3' });
+    const pm = addPrinciple(db, { slug: 'pm', statement: 'sm' });
+    seedFiveFacts(db);
+
+    recordPrincipleConflict(db, { principleId: p1.id, factId: 'f1', method: 'llm', confidence: 0.9 });
+    recordPrincipleConflict(db, { principleId: p2.id, factId: 'f1', method: 'llm', confidence: 0.9 });
+    recordPrincipleConflict(db, { principleId: p3.id, factId: 'f1', method: 'llm', confidence: 0.9 });
+    recordPrincipleConflict(db, { principleId: pm.id, factId: 'f1', method: 'manual' });
+    const humanResolved = listActivePrincipleConflicts(db).find((c) => c.principle.slug === 'p3');
+    resolvePrincipleConflict(db, humanResolved!.conflictId, 'false_positive');
+
+    updateFact(db, 'f1', { fact: 'revised — now only violates p2' });
+
+    // Re-judgement re-finds ONLY p2, and only for the queued drain batch (f1 alone).
+    const reJudge: PrincipleJudge = async (facts) =>
+      facts.length === 1 && facts[0].id === 'f1'
+        ? [{ fact_index: 0, principle_slug: 'p2', verdict: 'contradicts', confidence: 0.9 }]
+        : [];
+
+    const run = await runPrincipleCheck(db, { judge: reJudge });
+    expect(run.recheckedFacts).toBe(1);
+    expect(run.reconciledCleared).toBe(1); // p1 pair cleared
+    expect(run.inserted).toBe(0); // p2 pair already existed
+
+    const rows = db
+      .prepare(
+        `SELECT p.slug AS slug, c.is_active, c.resolution, c.resolved_at, c.method
+         FROM principle_conflicts c JOIN principles p ON p.id = c.principle_id
+         WHERE c.fact_id = 'f1'`,
+      )
+      .all() as Array<{ slug: string; is_active: number; resolution: string | null; resolved_at: string | null; method: string }>;
+    const bySlug = new Map(rows.map((r) => [r.slug, r]));
+
+    // stale llm pair → system-cleared: inactive, resolution NULL, resolved_at set
+    expect(bySlug.get('p1')).toMatchObject({ is_active: 0, resolution: null });
+    expect(bySlug.get('p1')?.resolved_at).not.toBeNull();
+    // re-found llm pair stays active
+    expect(bySlug.get('p2')).toMatchObject({ is_active: 1 });
+    // human resolution untouched
+    expect(bySlug.get('p3')).toMatchObject({ is_active: 0, resolution: 'false_positive' });
+    // manual pair is human-owned — never reconciled
+    expect(bySlug.get('pm')).toMatchObject({ is_active: 1, method: 'manual' });
+
+    expect((db.prepare('SELECT COUNT(*) AS n FROM principle_recheck_queue').get() as { n: number }).n).toBe(0);
+  });
+
+  it('F1: queued facts consume the budget before the forward scan', async () => {
+    addPrinciple(db, { slug: 'p1', statement: 's1' });
+    seedFiveFacts(db);
+    updateFact(db, 'f3', { fact: 'revised f3' });
+
+    const seen: string[] = [];
+    const run = await runPrincipleCheck(db, { maxFacts: 1, judge: recordingJudge(seen) });
+    expect(seen).toEqual(['f3']); // queue first
+    expect(run.recheckedFacts).toBe(1);
+    expect(run.factsChecked).toBe(1);
+    expect(run.done).toBe(false);
+
+    // Forward scan resumes from the untouched cursor on the next run.
+    const seen2: string[] = [];
+    await runPrincipleCheck(db, { judge: recordingJudge(seen2) });
+    expect(seen2[0]).toBe('f1');
+  });
+
+  it('F1: unparseable re-judgement dequeues as a no-op keeping old verdicts', async () => {
+    const p1 = addPrinciple(db, { slug: 'p1', statement: 's1' });
+    seedFiveFacts(db);
+    recordPrincipleConflict(db, { principleId: p1.id, factId: 'f1', method: 'llm', confidence: 0.9 });
+    updateFact(db, 'f1', { fact: 'revised' });
+
+    const run = await runPrincipleCheck(db, { judge: async () => null });
+    expect(run.recheckedFacts).toBe(1);
+    expect(run.reconciledCleared).toBe(0);
+    expect(countActivePrincipleConflicts(db)).toBe(1); // old verdict stands
+    expect((db.prepare('SELECT COUNT(*) AS n FROM principle_recheck_queue').get() as { n: number }).n).toBe(0);
+  });
+
+  it('F1: a judge failure during the drain keeps the queue for the next run', async () => {
+    addPrinciple(db, { slug: 'p1', statement: 's1' });
+    seedFiveFacts(db);
+    updateFact(db, 'f1', { fact: 'revised' });
+
+    const run = await runPrincipleCheck(db, {
+      judge: async () => {
+        throw new Error('drain outage');
+      },
+    });
+    expect(run.error).toContain('drain outage');
+    expect(run.factsChecked).toBe(0);
+    expect((db.prepare('SELECT COUNT(*) AS n FROM principle_recheck_queue').get() as { n: number }).n).toBe(1);
+  });
+
+  it('F1: dry-run re-judges but drains nothing', async () => {
+    const p1 = addPrinciple(db, { slug: 'p1', statement: 's1' });
+    seedFiveFacts(db);
+    recordPrincipleConflict(db, { principleId: p1.id, factId: 'f1', method: 'llm', confidence: 0.9 });
+    updateFact(db, 'f1', { fact: 'revised' });
+
+    const run = await runPrincipleCheck(db, { dryRun: true, judge: async () => [] });
+    expect(run.recheckedFacts).toBe(1);
+    expect(run.reconciledCleared).toBe(0); // no reconcile on dry-run
+    expect(countActivePrincipleConflicts(db)).toBe(1);
+    expect((db.prepare('SELECT COUNT(*) AS n FROM principle_recheck_queue').get() as { n: number }).n).toBe(1);
+  });
+
+  it('F1: inactive facts are purged from the queue without judging', async () => {
+    addPrinciple(db, { slug: 'p1', statement: 's1' });
+    seedFiveFacts(db);
+    updateFact(db, 'f1', { fact: 'revised then deactivated' });
+    db.prepare(`UPDATE facts SET is_active = 0 WHERE id = 'f1'`).run();
+
+    const seen: string[] = [];
+    const run = await runPrincipleCheck(db, { judge: recordingJudge(seen) });
+    expect(run.recheckedFacts).toBe(0);
+    expect(seen).not.toContain('f1');
+    expect((db.prepare('SELECT COUNT(*) AS n FROM principle_recheck_queue').get() as { n: number }).n).toBe(0);
   });
 
   it('calibrates the default threshold to 0.8 (measured: FP band 0.75–0.85 on tranche 1)', () => {
