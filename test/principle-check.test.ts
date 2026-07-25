@@ -230,6 +230,47 @@ describe('Principle check batch', () => {
     expect(getPrincipleCheckCoverage(db)).toEqual({ state: 'principles-changed', uncheckedFacts: 6 });
   });
 
+  it('calibrates the default threshold to 0.8 (measured: FP band 0.75–0.85 on tranche 1)', () => {
+    expect(PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD).toBe(0.8);
+  });
+
+  it('honors a per-run confidenceThreshold override', async () => {
+    addPrinciple(db, { slug: 'p1', statement: 's1' });
+    seedFiveFacts(db);
+    const borderlineJudge: PrincipleJudge = async () => [
+      { fact_index: 0, principle_slug: 'p1', verdict: 'contradicts', confidence: 0.75 },
+    ];
+    const strict = await runPrincipleCheck(db, { dryRun: true, judge: borderlineJudge });
+    expect(strict.findings).toBe(0); // 0.75 < default 0.8
+    const relaxed = await runPrincipleCheck(db, {
+      dryRun: true,
+      confidenceThreshold: 0.7,
+      judge: borderlineJudge,
+    });
+    expect(relaxed.findings).toBeGreaterThan(0); // 0.75 ≥ 0.7
+  });
+
+  it('prompt enumerates the four non-contradiction guards (measured FP classes)', () => {
+    const { user } = buildJudgePrompt(
+      [
+        {
+          id: 'f1',
+          fact: 'sample',
+          category: 'decision',
+          scope_type: 'global',
+          scope_project: null,
+          created_at: '2026-01-01 00:00:00',
+        },
+      ],
+      [{ slug: 'p1', statement: 'rule one' }] as never,
+    );
+    expect(user).toContain('Do NOT flag');
+    expect(user).toContain('explicitly enumerates');
+    expect(user).toContain('reversible operations');
+    expect(user).toContain('OBSERVE or CRITICIZE');
+    expect(user).toContain('Architecture or workflow style');
+  });
+
   it('builds a prompt with principles, delimited untrusted facts, and a JSON contract', () => {
     const principles = [
       { slug: 'p1', statement: 'rule one' },

@@ -42,7 +42,10 @@ export interface JudgeFinding {
 /** Returns findings, or null when the output was unparseable (no-op + advance). */
 export type PrincipleJudge = (facts: FactForCheck[], principles: Principle[]) => Promise<JudgeFinding[] | null>;
 
-export const PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD = 0.7;
+// 0.8 is calibrated, not arbitrary: on the first live tranche (200 facts, 7
+// findings) every false positive scored 0.75–0.85 while both keep-worthy
+// findings scored 0.95 (docs/2026-07-25-principle-contradicts-followups.md F2).
+export const PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD = 0.8;
 const FACT_TEXT_LIMIT = 500;
 const CURSOR_KEY = 'cursor';
 
@@ -70,7 +73,12 @@ export function buildJudgePrompt(
   });
   user +=
     '\n## Task\n' +
-    'Report every (fact, principle) pair where the fact DIRECTLY contradicts the principle. Be conservative.\n' +
+    'Report every (fact, principle) pair where the fact records an ACTUAL practice, decision, or state that DIRECTLY violates the principle. Be conservative.\n' +
+    'Do NOT flag (non-contradictions — measured false-positive classes):\n' +
+    '- Operations outside the scope a principle explicitly enumerates (a parenthesized list in a principle is exhaustive, not illustrative)\n' +
+    '- Read-only or reversible operations (crawling, analysis, retries, improvement iterations) — these are never "irreversible"\n' +
+    '- Facts that OBSERVE or CRITICIZE a problem or gap — describing a violation is not committing one\n' +
+    '- Architecture or workflow style choices (e.g., sequential vs parallel pipelines) — style is not a propose/approve/execute collapse\n' +
     'Respond with a JSON array (empty array if none):\n' +
     '[{"fact_index": 0, "principle_slug": "slug", "verdict": "contradicts", "confidence": 0.9, "reasoning": "one line"}]';
 
@@ -135,6 +143,8 @@ export interface PrincipleCheckOptions {
   /** Force a full rescan (cursor reset) even when the principle set is unchanged. */
   recheck?: boolean;
   judge?: PrincipleJudge;
+  /** Per-run confidence cutoff override (0 < t ≤ 1); defaults to PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD. */
+  confidenceThreshold?: number;
 }
 
 export async function runPrincipleCheck(
@@ -145,6 +155,11 @@ export async function runPrincipleCheck(
   const maxFacts = Math.max(1, opts.maxFacts ?? 200);
   const dryRun = opts.dryRun ?? false;
   const judge = opts.judge ?? llmJudge;
+  const rawThreshold = opts.confidenceThreshold;
+  const confidenceThreshold =
+    typeof rawThreshold === 'number' && Number.isFinite(rawThreshold) && rawThreshold > 0 && rawThreshold <= 1
+      ? rawThreshold
+      : PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD;
 
   const result: PrincipleCheckResult = {
     activePrinciples: 0,
@@ -218,7 +233,7 @@ export async function runPrincipleCheck(
           !idBySlug.has(f.principle_slug) ||
           f.verdict !== 'contradicts' ||
           typeof f.confidence !== 'number' ||
-          f.confidence < PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD ||
+          f.confidence < confidenceThreshold ||
           f.confidence > 1
         ) {
           continue;
