@@ -706,6 +706,14 @@ export function initDatabase(): Database.Database {
   if (!factColumnNames.has('confidence')) {
     db.prepare('ALTER TABLE facts ADD COLUMN confidence REAL').run();
   }
+  // E2 surprise (0..1): corpus-relative novelty at measurement time —
+  // 1 − max cosine similarity vs the facts already indexed when measured.
+  // NULL = unmeasured (backfill pending). Injection-ranking signal ONLY:
+  // never a storage filter, never a search_facts ranking input
+  // (docs/2026-07-25-e2-surprise-ranking-spec.md).
+  if (!factColumnNames.has('surprise')) {
+    db.prepare('ALTER TABLE facts ADD COLUMN surprise REAL').run();
+  }
   const exchangeColumns = db.prepare(
     `SELECT name FROM pragma_table_info('exchanges')`
   ).all() as Array<{ name: string }>;

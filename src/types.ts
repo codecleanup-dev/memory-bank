@@ -77,6 +77,10 @@ export interface Fact {
   // created before the column existed (their confidence was gate-consumed
   // and discarded). Complements consolidated_count as a reliability signal.
   confidence?: number | null;
+  // E2: corpus-relative novelty (1 − max cosine similarity) measured at
+  // insert/backfill time; NULL = unmeasured. Injection-ranking signal only —
+  // docs/2026-07-25-e2-surprise-ranking-spec.md.
+  surprise?: number | null;
 }
 
 export interface FactRevision {

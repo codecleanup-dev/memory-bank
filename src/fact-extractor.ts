@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import type { ExtractedFact } from './types.js';
 import { callHaiku, parseJsonResponse } from './llm.js';
-import { insertFact } from './fact-db.js';
+import { computeSurprise, insertFact } from './fact-db.js';
 import { generateEmbedding, initEmbeddings } from './embeddings.js';
 import { classifyAndLinkFact, detectCoExtractionRelations } from './ontology-classifier.js';
 
@@ -218,6 +218,10 @@ export async function saveExtractedFacts(
     const embedding = await generateEmbedding(fact.fact);
     const embeddingKr = fact.fact_kr ? await generateEmbedding(fact.fact_kr) : null;
 
+    // E2: measure novelty BEFORE insert — the new fact is not yet in the vec
+    // tables, so the probe cannot self-match (ranking signal only, no gating).
+    const surprise = computeSurprise(db, embedding, embeddingKr);
+
     const id = insertFact(db, {
       fact: fact.fact,
       category: fact.category,
@@ -229,6 +233,7 @@ export async function saveExtractedFacts(
       fact_kr: fact.fact_kr ?? null,
       embedding_kr: embeddingKr,
       confidence: fact.confidence,
+      surprise,
     });
 
     savedIds.push(id);
