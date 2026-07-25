@@ -3840,7 +3840,7 @@ var require_fast_uri = __commonJS({
         if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport)) {
           if (parsed.host && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && nonSimpleDomain(parsed.host)) {
             try {
-              parsed.host = new URL("http://" + parsed.host).hostname;
+              parsed.host = URL.domainToASCII(parsed.host.toLowerCase());
             } catch (e) {
               parsed.error = parsed.error || "Host's domain name can not be converted to ASCII: " + e;
             }
@@ -23908,6 +23908,43 @@ function initDatabase() {
       saved INTEGER NOT NULL DEFAULT 0
     )
   `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principles (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      statement TEXT NOT NULL,
+      source_path TEXT,
+      layer TEXT NOT NULL DEFAULT 'principle' CHECK (layer IN ('identity','principle','policy')),
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_conflicts (
+      id TEXT PRIMARY KEY,
+      principle_id TEXT NOT NULL REFERENCES principles(id),
+      fact_id TEXT NOT NULL REFERENCES facts(id),
+      reasoning TEXT,
+      method TEXT NOT NULL DEFAULT 'llm' CHECK (method IN ('llm','manual','import')),
+      confidence REAL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      resolution TEXT CHECK (resolution IS NULL OR resolution IN ('fact_deprecated','acknowledged','false_positive','principle_updated')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      resolved_at TEXT
+    )
+  `);
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_principle_conflicts_pair
+    ON principle_conflicts(principle_id, fact_id)
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_principle_conflicts_fact ON principle_conflicts(fact_id)`);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_check_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
   migrateRelationTypeVocabulary(db);
   migrateFactsCategoryVocabulary(db);
   autoHealScopeProjects(db);
@@ -26710,6 +26747,35 @@ function hasActiveConflicts(counts) {
   return counts.activeContradictsPairs + counts.activeSupersedesPairs > 0;
 }
 
+// src/principles.ts
+function countActivePrincipleConflicts(db) {
+  return db.prepare(
+    `SELECT COUNT(*) AS n
+         FROM principle_conflicts c
+         JOIN principles p ON p.id = c.principle_id
+         JOIN facts f ON f.id = c.fact_id
+         WHERE c.is_active = 1 AND p.is_active = 1 AND f.is_active = 1`
+  ).get().n;
+}
+function annotatePrincipleConflictsForFacts(db, factIds) {
+  const map = /* @__PURE__ */ new Map();
+  if (factIds.length === 0) return map;
+  const placeholders = factIds.map(() => "?").join(",");
+  const rows = db.prepare(
+    `SELECT c.fact_id AS fact_id, p.slug AS slug, p.statement AS statement, p.layer AS layer
+       FROM principle_conflicts c
+       JOIN principles p ON p.id = c.principle_id
+       WHERE c.is_active = 1 AND p.is_active = 1 AND c.fact_id IN (${placeholders})
+       ORDER BY p.slug`
+  ).all(...factIds);
+  for (const r of rows) {
+    const list = map.get(r.fact_id) ?? [];
+    list.push({ slug: r.slug, statement: r.statement, layer: r.layer });
+    map.set(r.fact_id, list);
+  }
+  return map;
+}
+
 // src/llm.ts
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import fs8 from "node:fs";
@@ -27358,6 +27424,10 @@ Results: ${filtered.length}
         const allCategories = listCategories(db);
         const domainMap = new Map(allDomains.map((d2) => [d2.id, d2.name]));
         const catMap = new Map(allCategories.map((c) => [c.id, { name: c.name, domainId: c.domain_id }]));
+        const principleConflictMap = annotatePrincipleConflictsForFacts(
+          db,
+          filtered.map((r) => r.fact.id)
+        );
         for (const { fact, distance } of filtered) {
           const similarity = (1 - distance * distance / 2).toFixed(3);
           const catInfo = fact.ontology_category_id ? catMap.get(fact.ontology_category_id) : void 0;
@@ -27391,6 +27461,15 @@ Results: ${filtered.length}
 `;
             for (const { fact: relFact, relation } of related) {
               output += `  - [${relation.relation_type}] ${relFact.fact}
+`;
+            }
+          }
+          const principleHits = principleConflictMap.get(fact.id);
+          if (principleHits && principleHits.length > 0) {
+            output += `- \u26A0 Principle conflicts:
+`;
+            for (const hit of principleHits) {
+              output += `  - [${hit.slug}] ${hit.statement}
 `;
             }
           }
@@ -27645,9 +27724,12 @@ _Source exchanges not available._
 `;
         output += `- Single-fact categories: ${health.singleFactCategories} / ${health.totalCategories}
 `;
-        if (hasActiveConflicts(health)) {
+        const principleConflicts = countActivePrincipleConflicts(db);
+        output += `- Active principle conflicts (fact vs registered principle): ${principleConflicts}
+`;
+        if (hasActiveConflicts(health) || principleConflicts > 0) {
           output += `
-_Resolution queue available: run \`memory-bank consistency\` (\`--gate\` exits non-zero on violations)._
+_Resolution queue available: run \`memory-bank consistency\` (\`--gate\` exits non-zero on violations; principle queue: \`memory-bank principles conflicts\`)._
 `;
         }
         output += "\n";

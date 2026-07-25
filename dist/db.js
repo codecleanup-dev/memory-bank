@@ -686,6 +686,53 @@ export function initDatabase() {
       saved INTEGER NOT NULL DEFAULT 0
     )
   `);
+    // === Principles Schema (fact↔principle cross-layer conflicts) ===
+    // Curated one-line operating rules, registered ONLY through the
+    // `principles` CLI (human-gated; no auto-scraping — the rules files remain
+    // the canon, this table is a reference index for conflict checking).
+    // principle_conflicts is display/report-only state: nothing consumes it to
+    // rank, filter, or deactivate facts (report-first, like consistency.ts).
+    db.exec(`
+    CREATE TABLE IF NOT EXISTS principles (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      statement TEXT NOT NULL,
+      source_path TEXT,
+      layer TEXT NOT NULL DEFAULT 'principle' CHECK (layer IN ('identity','principle','policy')),
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+    db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_conflicts (
+      id TEXT PRIMARY KEY,
+      principle_id TEXT NOT NULL REFERENCES principles(id),
+      fact_id TEXT NOT NULL REFERENCES facts(id),
+      reasoning TEXT,
+      method TEXT NOT NULL DEFAULT 'llm' CHECK (method IN ('llm','manual','import')),
+      confidence REAL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      resolution TEXT CHECK (resolution IS NULL OR resolution IN ('fact_deprecated','acknowledged','false_positive','principle_updated')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      resolved_at TEXT
+    )
+  `);
+    // The UNIQUE pair + insert-or-ignore makes human resolutions durable: a
+    // (principle, fact) pair resolved as false_positive/acknowledged keeps its
+    // row, so re-detection can never re-open it.
+    db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_principle_conflicts_pair
+    ON principle_conflicts(principle_id, fact_id)
+  `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_principle_conflicts_fact ON principle_conflicts(fact_id)`);
+    // Keyset cursor for the principle-check batch worker (JSON value under key 'cursor').
+    db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_check_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
     // Vocabulary migrations (one-time rebuilds on legacy DBs; fresh DBs already
     // carry both CHECKs from CREATE TABLE above). Run after the ALTER block so
     // the generic column copy sees every column.

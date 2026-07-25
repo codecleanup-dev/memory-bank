@@ -36,7 +36,7 @@ import {
   type ConflictResolution,
   type PrincipleLayer,
 } from './principles.js';
-import { runPrincipleCheck } from './principle-check.js';
+import { getPrincipleCheckCoverage, runPrincipleCheck } from './principle-check.js';
 
 const USAGE = `Usage: memory-bank principles <list|add|import|activate|deactivate|conflicts|resolve|check> [options]
 
@@ -194,12 +194,14 @@ async function main(): Promise<void> {
         const limit = intOpt(opts, '--limit', 20);
         const count = countActivePrincipleConflicts(db);
         const conflicts = listActivePrincipleConflicts(db, limit);
+        const coverage = getPrincipleCheckCoverage(db);
         if (json) {
-          console.log(JSON.stringify({ count, conflicts }, null, 2));
+          console.log(JSON.stringify({ count, coverage, conflicts }, null, 2));
         } else if (count === 0) {
-          console.log('No active principle conflicts.');
+          const section = formatPrincipleConflictSection(0, [], coverage);
+          console.log(section || 'No active principle conflicts (scan complete — measured and clean).');
         } else {
-          console.log(formatPrincipleConflictSection(count, conflicts));
+          console.log(formatPrincipleConflictSection(count, conflicts, coverage));
         }
         break;
       }

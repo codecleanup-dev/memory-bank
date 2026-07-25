@@ -212,4 +212,14 @@ describe('Principles registry', () => {
     expect(section).toContain('violates the rule');
     expect(section).toContain('showing 1 of 5');
   });
+
+  it('surfaces incomplete coverage even with zero conflicts', () => {
+    expect(formatPrincipleConflictSection(0, [], { state: 'complete', uncheckedFacts: 0 })).toBe('');
+    expect(formatPrincipleConflictSection(0, [], { state: 'no-principles', uncheckedFacts: 3 })).toBe('');
+    const partial = formatPrincipleConflictSection(0, [], { state: 'partial', uncheckedFacts: 7 });
+    expect(partial).toContain('Active principle conflicts (0)');
+    expect(partial).toContain('7 active facts unmeasured');
+    const changed = formatPrincipleConflictSection(0, [], { state: 'principles-changed', uncheckedFacts: 4 });
+    expect(changed).toContain('Principle set changed');
+  });
 });

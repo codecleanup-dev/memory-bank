@@ -29,6 +29,7 @@ import {
   formatPrincipleConflictSection,
   listActivePrincipleConflicts,
 } from './principles.js';
+import { getPrincipleCheckCoverage } from './principle-check.js';
 
 function parseArgs(argv: string[]): { json: boolean; gate: boolean; gatePrinciples: boolean; limit: number } {
   const opts = { json: false, gate: false, gatePrinciples: false, limit: 20 };
@@ -60,6 +61,7 @@ function main(): void {
     const supersedes = listActiveConflicts(db, 'SUPERSEDES', opts.limit);
     const principleConflictCount = countActivePrincipleConflicts(db);
     const principleConflicts = listActivePrincipleConflicts(db, opts.limit);
+    const principleCoverage = getPrincipleCheckCoverage(db);
 
     if (opts.json) {
       console.log(
@@ -68,7 +70,11 @@ function main(): void {
             counts,
             contradicts,
             supersedes,
-            principleConflicts: { count: principleConflictCount, conflicts: principleConflicts },
+            principleConflicts: {
+              count: principleConflictCount,
+              coverage: principleCoverage,
+              conflicts: principleConflicts,
+            },
           },
           null,
           2,
@@ -76,7 +82,11 @@ function main(): void {
       );
     } else {
       let report = formatConsistencyReport(counts, contradicts, supersedes);
-      const principleSection = formatPrincipleConflictSection(principleConflictCount, principleConflicts);
+      const principleSection = formatPrincipleConflictSection(
+        principleConflictCount,
+        principleConflicts,
+        principleCoverage,
+      );
       if (principleSection) report += `\n${principleSection}`;
       console.log(report);
     }

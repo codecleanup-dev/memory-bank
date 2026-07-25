@@ -259,3 +259,40 @@ export async function runPrincipleCheck(
 
   return result;
 }
+
+/**
+ * Scan-coverage state: whether "no conflicts" actually means "measured and
+ * clean". A verdict only exists for facts the check has visited under the
+ * CURRENT principle set — absence of conflicts for unvisited facts is an
+ * unmeasured state, not a verified-consistent one.
+ */
+export interface PrincipleCheckCoverage {
+  state: 'no-principles' | 'unscanned' | 'principles-changed' | 'partial' | 'complete';
+  /** Active facts not covered by a scan against the current principle set. */
+  uncheckedFacts: number;
+}
+
+export function getPrincipleCheckCoverage(db: Database.Database): PrincipleCheckCoverage {
+  const totalActive = (
+    db.prepare('SELECT COUNT(*) AS n FROM facts WHERE is_active = 1').get() as { n: number }
+  ).n;
+  if (getActivePrinciples(db).length === 0) {
+    return { state: 'no-principles', uncheckedFacts: totalActive };
+  }
+  const cursor = readCursor(db);
+  if (!cursor) return { state: 'unscanned', uncheckedFacts: totalActive };
+  if (cursor.principles_hash !== activePrinciplesHash(db)) {
+    return { state: 'principles-changed', uncheckedFacts: totalActive };
+  }
+  const unchecked = (
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM facts
+         WHERE is_active = 1 AND (created_at > ? OR (created_at = ? AND id > ?))`,
+      )
+      .get(cursor.created_at, cursor.created_at, cursor.id) as { n: number }
+  ).n;
+  return unchecked === 0
+    ? { state: 'complete', uncheckedFacts: 0 }
+    : { state: 'partial', uncheckedFacts: unchecked };
+}

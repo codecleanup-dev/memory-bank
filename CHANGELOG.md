@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-07-25
+
+### Added
+- **fact↔principle 교차 모순 (principle contradicts)**: 운영 원칙 레지스트리
+  (`principles` — CLI 수동 큐레이션, human-gate; rules 파일이 정본) +
+  `principle_conflicts` 해소 큐. 표면화는 전부 표시 전용 — `search_facts` 결과의
+  `⚠ Principle conflicts` 주석, `graph_stats` Graph Health 카운트, `consistency`
+  리포트 섹션. 랭킹·기록·진위에는 불개입, 게이트 편입은 `--gate-principles` opt-in.
+- **`memory-bank principles` CLI**: `list / add / import / activate / deactivate /
+  conflicts / resolve / check`. `check`는 keyset 커서 배치(LLM judge, confidence
+  ≥ 0.7만 저장; unparseable→no-op+커서 전진, judge 예외→미전진 중단, 원칙 집합
+  해시 변경→전체 재스캔).
+- **Scan coverage**: "모순 0"이 "측정되고 깨끗"인지 "아직 미측정"인지 구분 —
+  `principles conflicts`/`consistency` 출력에 `unscanned / principles-changed /
+  partial / complete` 상태와 미측정 fact 수를 표시 (측정 전 상태를 무모순으로
+  오인하는 것 방지).
+
+### Notes
+- 스키마 additive (`principles` / `principle_conflicts` / `principle_check_state`)
+  — 기존 DB 무마이그레이션. 사람의 해소 결정(false_positive 등)은 영속: UNIQUE
+  pair + insert-or-ignore라 재탐지가 재오픈할 수 없음.
+- 설계 문서: `docs/2026-07-25-principle-contradicts.md` (경계선: 원칙은 표시·게이트에만 개입)
+
 ## [1.7.0] - 2026-07-17
 
 _Fork release: true merge of upstream v1.4.0–v1.4.4 (`0b879d2..1c8e465`) — restores
