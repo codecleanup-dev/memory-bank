@@ -23869,6 +23869,9 @@ function initDatabase() {
   if (!factColumnNames.has("surprise")) {
     db.prepare("ALTER TABLE facts ADD COLUMN surprise REAL").run();
   }
+  if (!factColumnNames.has("model_surprise")) {
+    db.prepare("ALTER TABLE facts ADD COLUMN model_surprise REAL").run();
+  }
   const exchangeColumns = db.prepare(
     `SELECT name FROM pragma_table_info('exchanges')`
   ).all();
@@ -23946,6 +23949,12 @@ function initDatabase() {
     CREATE TABLE IF NOT EXISTS principle_check_state (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
+    )
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_recheck_queue (
+      fact_id TEXT PRIMARY KEY,
+      enqueued_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
   migrateRelationTypeVocabulary(db);
@@ -24047,6 +24056,7 @@ function rowToFact(row) {
     ontology_category_id: row["ontology_category_id"] ?? null,
     coding_agent: row["coding_agent"] ?? null,
     surprise: row["surprise"] ?? null,
+    model_surprise: row["model_surprise"] ?? null,
     confidence: row["confidence"] ?? null
   };
 }
@@ -24188,7 +24198,7 @@ import readline from "readline";
 
 // src/archive-io.ts
 import fs3 from "fs";
-import { Readable, Transform, pipeline as pipeline2 } from "stream";
+import { Readable, Transform, pipeline as pipeline2 } from "node:stream";
 import * as zlib from "node:zlib";
 var ZST_SUFFIX = ".zst";
 var DEFAULT_MAX_DECOMPRESSED_BYTES = 256 * 1024 * 1024;

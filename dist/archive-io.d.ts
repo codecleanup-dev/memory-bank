@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { Readable } from 'stream';
+import { Readable } from 'node:stream';
 /** Strip a trailing `.zst` so archive filenames compare in canonical form. */
 export declare function canonicalArchiveName(fileName: string): string;
 /**

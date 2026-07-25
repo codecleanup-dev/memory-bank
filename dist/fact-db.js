@@ -25,14 +25,17 @@ export function insertFact(db, params) {
     const surprise = typeof params.surprise === 'number' && Number.isFinite(params.surprise)
         ? Math.min(1, Math.max(0, params.surprise))
         : null;
+    const modelSurprise = typeof params.model_surprise === 'number' && Number.isFinite(params.model_surprise)
+        ? Math.min(1, Math.max(0, params.model_surprise))
+        : null;
     db.prepare(`
-    INSERT INTO facts (id, fact, category, scope_type, scope_project, source_exchange_ids, embedding, created_at, updated_at, consolidated_count, is_active, coding_agent, fact_kr, embedding_version, confidence, surprise)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?)
+    INSERT INTO facts (id, fact, category, scope_type, scope_project, source_exchange_ids, embedding, created_at, updated_at, consolidated_count, is_active, coding_agent, fact_kr, embedding_version, confidence, surprise, model_surprise)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?)
   `).run(id, params.fact, 
     // Chokepoint normalization: every caller (extractor, backfill, sync)
     // funnels through here, so out-of-vocabulary LLM output is mapped to the
     // controlled vocabulary instead of tripping the facts.category CHECK.
-    normalizeFactCategory(params.category), params.scope_type, scopeProject, JSON.stringify(params.source_exchange_ids), params.embedding ? Buffer.from(new Float32Array(params.embedding).buffer) : null, now, now, params.coding_agent || 'claude-code', params.fact_kr ?? null, EMBEDDING_VERSION, confidence, surprise);
+    normalizeFactCategory(params.category), params.scope_type, scopeProject, JSON.stringify(params.source_exchange_ids), params.embedding ? Buffer.from(new Float32Array(params.embedding).buffer) : null, now, now, params.coding_agent || 'claude-code', params.fact_kr ?? null, EMBEDDING_VERSION, confidence, surprise, modelSurprise);
     // Insert into vector index (atomic DELETE+INSERT via transaction)
     if (params.embedding) {
         const p = vecParamFor(db, 'vec_facts', params.embedding);
@@ -175,6 +178,13 @@ export function updateFact(db, id, params) {
     }
     values.push(id);
     db.prepare(`UPDATE facts SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    // F1: a text change invalidates text-bound principle verdicts — queue the
+    // fact so the next principle-check run re-judges it and reconciles stale
+    // llm-method conflicts. Count-only touches (consolidation reinforcement)
+    // do NOT re-queue: the measured text is unchanged.
+    if (params.fact !== undefined) {
+        db.prepare('INSERT OR IGNORE INTO principle_recheck_queue (fact_id) VALUES (?)').run(id);
+    }
     // Update vector index (atomic DELETE+INSERT via transaction)
     if (params.embedding) {
         const p = vecParamFor(db, 'vec_facts', params.embedding);
@@ -524,6 +534,7 @@ function rowToFact(row) {
         ontology_category_id: row['ontology_category_id'] ?? null,
         coding_agent: row['coding_agent'] ?? null,
         surprise: row['surprise'] ?? null,
+        model_surprise: row['model_surprise'] ?? null,
         confidence: row['confidence'] ?? null,
     };
 }

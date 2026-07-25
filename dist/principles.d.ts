@@ -101,6 +101,8 @@ export declare function annotatePrincipleConflictsForFacts(db: Database.Database
 export interface PrincipleCoverageInfo {
     state: 'no-principles' | 'unscanned' | 'principles-changed' | 'partial' | 'complete';
     uncheckedFacts: number;
+    /** F1: active revised facts awaiting re-judgement (optional for older callers). */
+    recheckQueued?: number;
 }
 /**
  * Markdown section for the consistency report. Empty when there is nothing to

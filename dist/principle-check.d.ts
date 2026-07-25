@@ -77,6 +77,10 @@ export interface PrincipleCheckResult {
     done: boolean;
     /** Set when a judge call failed — the run stopped without advancing past that batch. */
     error: string | null;
+    /** F1: revised facts re-judged from the recheck queue this run (counted in factsChecked too). */
+    recheckedFacts: number;
+    /** F1: stale llm-method conflicts system-cleared because the re-judgement did not re-find them. */
+    reconciledCleared: number;
     dryRunFindings: Array<{
         factId: string;
         principleSlug: string;
@@ -107,5 +111,7 @@ export interface PrincipleCheckCoverage {
     state: 'no-principles' | 'unscanned' | 'principles-changed' | 'partial' | 'complete';
     /** Active facts not covered by a scan against the current principle set. */
     uncheckedFacts: number;
+    /** F1: active revised facts awaiting re-judgement (drained before the forward scan). */
+    recheckQueued: number;
 }
 export declare function getPrincipleCheckCoverage(db: Database.Database): PrincipleCheckCoverage;

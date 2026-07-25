@@ -641,6 +641,14 @@ export function initDatabase() {
     if (!factColumnNames.has('surprise')) {
         db.prepare('ALTER TABLE facts ADD COLUMN surprise REAL').run();
     }
+    // E2 v2 model_surprise (0..1): MODEL-relative novelty rated by the
+    // extraction LLM at extract time — the corpus-relative `surprise` failed
+    // its G2 gate as a proxy for this, so v2 measures it directly. NULL on
+    // pre-existing rows (no LLM backfill). Ranking signal only, pending its
+    // own G2 re-test (docs/2026-07-25-e2-surprise-ranking-spec.md).
+    if (!factColumnNames.has('model_surprise')) {
+        db.prepare('ALTER TABLE facts ADD COLUMN model_surprise REAL').run();
+    }
     const exchangeColumns = db.prepare(`SELECT name FROM pragma_table_info('exchanges')`).all();
     if (!exchangeColumns.some((c) => c.name === 'embedding_version')) {
         db.prepare('ALTER TABLE exchanges ADD COLUMN embedding_version INTEGER NOT NULL DEFAULT 0').run();
@@ -739,6 +747,16 @@ export function initDatabase() {
     CREATE TABLE IF NOT EXISTS principle_check_state (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
+    )
+  `);
+    // F1: facts whose TEXT changed after being judged. A verdict is bound to
+    // the text it measured — the next principle-check run re-judges queued
+    // facts FIRST and reconciles their stale llm-method conflicts
+    // (docs/2026-07-25-principle-contradicts-followups.md F1).
+    db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_recheck_queue (
+      fact_id TEXT PRIMARY KEY,
+      enqueued_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
     // Vocabulary migrations (one-time rebuilds on legacy DBs; fresh DBs already

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-07-25
+
+### Added (F1 — revision 측정시점 바인딩, followups F1 종결)
+- `principle_recheck_queue`: `updateFact` 텍스트 변경(consolidation merge 포함, count-only 제외)이
+  enqueue → 다음 `principles check`가 **forward 스캔 전에** 드레인. reconcile 의미론:
+  재발견 쌍 유지 / 미재발견 활성 자동판정 쌍 system-clear(`is_active=0`·`resolution NULL` —
+  사람 해소 4종·manual/import 쌍 불변) / unparseable→no-op 드레인 / judge 예외→큐 보존.
+- coverage에 `recheckQueued` — 모순 0이어도 재판정 대기 큐가 표시됨.
+
+### Added (E2 v2 — model_surprise, G2 기각의 직접 대응)
+- `facts.model_surprise` (0..1, NULL=미측정): 추출 LLM이 추출 시점에 **모델-상대 novelty**를
+  직접 평점(일반 어시스턴트 가정 0 ↔ 사용자 특이/기본가정 교정 1, confidence와 독립).
+  기존 행 backfill 없음 — 신규 fact부터 축적, 30일 후 G2 재검정 쿼리는 E2 스펙에 고정.
+  v1 코퍼스-상대 `surprise`는 대조 기준선으로 존치.
+
+### Fixed
+- `archive-io`: bare `'stream'` import → `node:stream` — git worktree 레이아웃에서 vite-node가
+  프로젝트 루트 상대로 오해석해 테스트 수집이 실패하던 문제 (실측).
+
+### Ops (릴리스 외 운영 기록)
+- 첫 트랜치 큐 7건 사람 해소 완료 (false_positive 5 · acknowledged 2 — judge 캘리브레이션 데이터)
+- 증분 `principles check` 일일 크론 등록 (03:17, --max-facts 400, 위원회 3표)
+
 ## [1.9.0] - 2026-07-25
 
 ### Changed (F2 — judge 정밀도, 동일 200 facts 이중 실측 게이트 PASS)

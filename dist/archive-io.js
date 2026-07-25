@@ -1,5 +1,8 @@
 import fs from 'fs';
-import { Readable, Transform, pipeline } from 'stream';
+// node: prefix required — vite-node resolves a bare 'stream' named-import
+// relative to the project root under git-worktree layouts (collection error
+// observed 2026-07-25); zlib below already uses the prefix.
+import { Readable, Transform, pipeline } from 'node:stream';
 import * as zlib from 'node:zlib';
 /**
  * Transparent access to archived conversation files.
