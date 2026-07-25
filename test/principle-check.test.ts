@@ -310,6 +310,16 @@ describe('Principle check batch', () => {
     expect(failed.factsChecked).toBe(0);
   });
 
+  it('classifies error-text LLM responses as outages, not unparseable no-ops', async () => {
+    const { isLlmErrorText } = await import('../src/principle-check.js');
+    expect(isLlmErrorText('API Error: Rate limit reached')).toBe(true);
+    expect(isLlmErrorText('  API Error: 529 overloaded_error')).toBe(true);
+    expect(isLlmErrorText('Rate limit reached for requests')).toBe(true);
+    expect(isLlmErrorText('[]')).toBe(false);
+    expect(isLlmErrorText('[{"fact_index":0}]')).toBe(false);
+    expect(isLlmErrorText('The rate of change is limited by design')).toBe(false); // mid-text, not an error banner
+  });
+
   it('builds a prompt with principles, delimited untrusted facts, and a JSON contract', () => {
     const principles = [
       { slug: 'p1', statement: 'rule one' },

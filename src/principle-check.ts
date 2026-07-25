@@ -92,11 +92,30 @@ export function buildJudgePrompt(
   return { system, user };
 }
 
+/**
+ * Error-text detection: the agent SDK surfaces some failures (rate limits,
+ * API errors) as a plain-text RESULT instead of throwing. Without this guard
+ * such a response parses to null → "unparseable, no-op + cursor advance",
+ * silently skipping facts during an outage (observed live 2026-07-25:
+ * "API Error: Rate limit reached"). Outages must throw so the run stops
+ * WITHOUT advancing — same contract as a thrown judge failure.
+ */
+export function isLlmErrorText(raw: string): boolean {
+  return /^API Error:|rate limit|overloaded_error/i.test(raw.trim());
+}
+
 /** Default judge: Haiku via the repo's shared LLM wrapper. */
 export const llmJudge: PrincipleJudge = async (facts, principles) => {
   const { system, user } = buildJudgePrompt(facts, principles);
   const raw = await callHaiku(system, user, 2048);
-  return parseJsonResponse<JudgeFinding[]>(raw);
+  // Parse FIRST: a valid verdict array wins even if its text mentions rate
+  // limits. Only a response that is BOTH unparseable AND error-shaped is an
+  // outage — this cannot wedge a batch forever on legitimate content.
+  const parsed = parseJsonResponse<JudgeFinding[]>(raw);
+  if (parsed === null && isLlmErrorText(raw)) {
+    throw new Error(`LLM error response: ${raw.trim().slice(0, 160)}`);
+  }
+  return parsed;
 };
 
 /**
