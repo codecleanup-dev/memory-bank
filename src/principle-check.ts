@@ -46,6 +46,12 @@ export type PrincipleJudge = (facts: FactForCheck[], principles: Principle[]) =>
 // findings) every false positive scored 0.75–0.85 while both keep-worthy
 // findings scored 0.95 (docs/2026-07-25-principle-contradicts-followups.md F2).
 export const PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD = 0.8;
+/**
+ * Default committee size for the LLM judge (see committeeJudge). 3 balances
+ * the measured churn suppression against LLM cost; --votes 1 restores the
+ * single-call behavior for cheap exploratory scans.
+ */
+export const DEFAULT_JUDGE_VOTES = 3;
 const FACT_TEXT_LIMIT = 500;
 const CURSOR_KEY = 'cursor';
 
@@ -77,7 +83,8 @@ export function buildJudgePrompt(
     'Do NOT flag (non-contradictions — measured false-positive classes):\n' +
     '- Operations outside the scope a principle explicitly enumerates (a parenthesized list in a principle is exhaustive, not illustrative)\n' +
     '- Read-only or reversible operations (crawling, analysis, retries, improvement iterations) — these are never "irreversible"\n' +
-    '- Facts that OBSERVE or CRITICIZE a problem or gap — describing a violation is not committing one\n' +
+    '- Facts that merely OBSERVE or CRITICIZE a gap, or propose an improvement. EXCEPTION: a practice currently in force that violates a principle IS a contradiction even when reported observationally (e.g., "X is treated as complete testing")\n' +
+    '- Goals, decisions, or aspirations that simply do not MENTION measurement, approval, or evidence — absence of a mention is not evidence the required step was skipped; flag only when the fact states the step was or will be skipped\n' +
     '- Architecture or workflow style choices (e.g., sequential vs parallel pipelines) — style is not a propose/approve/execute collapse\n' +
     'Respond with a JSON array (empty array if none):\n' +
     '[{"fact_index": 0, "principle_slug": "slug", "verdict": "contradicts", "confidence": 0.9, "reasoning": "one line"}]';
@@ -91,6 +98,54 @@ export const llmJudge: PrincipleJudge = async (facts, principles) => {
   const raw = await callHaiku(system, user, 2048);
   return parseJsonResponse<JudgeFinding[]>(raw);
 };
+
+/**
+ * Committee vote: run the judge `votes` times per batch and keep only
+ * (fact, principle) pairs that a MAJORITY of votes report, with the median
+ * confidence. Measured motivation (2026-07-25, two 200-fact re-judgings):
+ * single-vote findings churn run-to-run in the 0.80–0.85 band while
+ * keep-worthy findings recur — majority filtering removes the
+ * non-reproducible marginals that no prompt wording could pin down.
+ * All-vote failure (throw) propagates; a single vote's unparseable output
+ * counts as an empty vote, and if EVERY vote is unparseable the committee
+ * returns null (no-op + cursor advance, same contract as a single judge).
+ */
+export function committeeJudge(base: PrincipleJudge, votes: number): PrincipleJudge {
+  const voteCount = Math.max(1, Math.min(5, Math.floor(votes)));
+  if (voteCount === 1) return base;
+  const majority = Math.floor(voteCount / 2) + 1;
+  return async (facts, principles) => {
+    const perVote: Array<JudgeFinding[] | null> = [];
+    for (let v = 0; v < voteCount; v++) {
+      perVote.push(await base(facts, principles));
+    }
+    if (perVote.every((v) => v === null)) return null;
+
+    const tally = new Map<string, { finding: JudgeFinding; confidences: number[] }>();
+    for (const vote of perVote) {
+      if (!Array.isArray(vote)) continue;
+      const seenThisVote = new Set<string>();
+      for (const f of vote) {
+        if (!Number.isInteger(f.fact_index) || typeof f.principle_slug !== 'string') continue;
+        const key = `${f.fact_index}\x1f${f.principle_slug}\x1f${f.verdict}`;
+        if (seenThisVote.has(key)) continue; // one voice per vote per pair
+        seenThisVote.add(key);
+        const entry = tally.get(key) ?? { finding: f, confidences: [] };
+        entry.confidences.push(typeof f.confidence === 'number' ? f.confidence : 0);
+        tally.set(key, entry);
+      }
+    }
+
+    const agreed: JudgeFinding[] = [];
+    for (const { finding, confidences } of tally.values()) {
+      if (confidences.length < majority) continue;
+      const sorted = [...confidences].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      agreed.push({ ...finding, confidence: median });
+    }
+    return agreed;
+  };
+}
 
 interface CheckCursor {
   created_at: string;
@@ -145,6 +200,8 @@ export interface PrincipleCheckOptions {
   judge?: PrincipleJudge;
   /** Per-run confidence cutoff override (0 < t ≤ 1); defaults to PRINCIPLE_CONFLICT_CONFIDENCE_THRESHOLD. */
   confidenceThreshold?: number;
+  /** Committee size (1–5, default DEFAULT_JUDGE_VOTES): majority-vote across repeated judge calls. */
+  votes?: number;
 }
 
 export async function runPrincipleCheck(
@@ -154,7 +211,10 @@ export async function runPrincipleCheck(
   const batchSize = Math.max(1, Math.min(50, opts.batchSize ?? 20));
   const maxFacts = Math.max(1, opts.maxFacts ?? 200);
   const dryRun = opts.dryRun ?? false;
-  const judge = opts.judge ?? llmJudge;
+  // Injected judges run as-is unless a committee is explicitly requested —
+  // the k=3 default applies only to the stochastic LLM judge it was measured on.
+  const votes = Math.max(1, Math.min(5, Math.floor(opts.votes ?? (opts.judge ? 1 : DEFAULT_JUDGE_VOTES))));
+  const judge = committeeJudge(opts.judge ?? llmJudge, votes);
   const rawThreshold = opts.confidenceThreshold;
   const confidenceThreshold =
     typeof rawThreshold === 'number' && Number.isFinite(rawThreshold) && rawThreshold > 0 && rawThreshold <= 1
