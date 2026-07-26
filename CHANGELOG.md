@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.2] - 2026-07-26
+
+### Fixed (색인 오염 — 서브에이전트 워밍업 · 요약기)
+- **handshake 계열 신설**: 호스트 CLI가 서브에이전트를 띄울 때 내는 `Warmup` 교환이
+  색인되고 있었다 — 실측 17,705건으로 **전체 색인의 54.9%**, 그중 7,053건은 실패한
+  핸드셰이크라 응답 쪽이 인증 오류 문자열이었다(오류 로그가 검색 대상). 워커 프롬프트와
+  달리 이 계열은 **지금도 유입 중**(2026-07에 119건)이라 정리만으로는 부족해
+  `sync` 색인 가드와 purge 술어 양쪽에 배선했다. 판별은 접두사가 아니라 **정확 일치 +
+  `is_sidechain`** — 문자열이 6자뿐이라 접두사 규칙이면 사람이 쓴 "Warmup 루틴…"까지
+  삼킨다(실측: 정확 일치 17,705건 전부 sidechain, 다르게 이어지는 행 0건).
+- **요약기 마커 purge 대상 추가**: 8,367건. 색인 쪽은 이미 파일 단위 가드가 막고 있어
+  (2026-06·07 유입 0) 빠진 것은 제거 수단뿐이었다. `WORKER_PROMPT_PREFIXES`가 아니라
+  신설 `POLLUTION_PROMPT_LEADS`에 넣는다 — 전자는 4개 시스템 프롬프트와 1:1 결합
+  계약이라 요약기 3종이 공유하는 마커를 넣으면 "dead prefix"로 계약이 깨진다.
+- purge 스크립트: `--no-handshake`로 종전 술어 재현, `families` 출력에 활성 계열 전부 표기.
+
+### Ops
+- 라이브 정리 실행: 32,276 → **3,011 exchange**(−29,265, −90.7%). 잔여 오염 0,
+  `exchanges_fts` 일치, `quick_check ok`, 검색 정상. 실행 중 만난 `CORRUPT_VTAB`은
+  FTS5 external-content desync로 rebuild(2초) 후 해소 — 디스크 손상 아님.
+
 ## [1.10.1] - 2026-07-25
 
 ### Changed (F5 — judge 순서 효과 대응, 파일럿 양성 후 적용)
