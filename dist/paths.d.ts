@@ -92,6 +92,29 @@ export declare const WORKER_PROMPT_PREFIXES: readonly string[];
  */
 export declare function isWorkerPromptMessage(userMessage: string | null | undefined): boolean;
 /**
+ * [fork] Sub-agent warm-up handshake. NOT a plugin worker prompt — the HOST CLI
+ * emits it when spawning a sub-agent, so it lands under REAL project slugs in
+ * every project that uses sub-agents, and unlike the worker prompts above it is
+ * still arriving (measured: 119 rows in 2026-07 alone). It is machine handshake
+ * state, never knowledge: 17,705 exchanges on one corpus — 54.9% of the entire
+ * index — of which 7,053 are FAILED handshakes whose assistant side is an auth
+ * error ('Invalid API key…', 'API Error: 401…'). The index was storing error
+ * logs as searchable conversation.
+ *
+ * Discriminated by EXACT equality plus the sidechain flag, never by prefix: the
+ * string is 6 chars, so a prefix rule would also swallow a human writing
+ * "Warmup routine for …". Measured on the same corpus: all 17,705 exact matches
+ * carry is_sidechain=1, and ZERO rows start with 'Warmup' without being exactly
+ * 'Warmup' — the pair is a clean discriminator.
+ */
+export declare const AGENT_HANDSHAKE_MESSAGE = "Warmup";
+/**
+ * True if an exchange is a host-CLI sub-agent warm-up handshake. Requires the
+ * sidechain flag so a top-level human message that happens to be exactly
+ * "Warmup" is never dropped.
+ */
+export declare function isAgentHandshakeExchange(userMessage: string | null | undefined, isSidechain: boolean | number | null | undefined): boolean;
+/**
  * Get list of projects to exclude from indexing
  * Configurable via env var or config file
  */
