@@ -51,6 +51,24 @@ codex-support 완성·검증 후 활성화까지가 끝. **원작자에게 PR �
 
 ## 업스트림 동기화 기록
 
+### 2026-08-02 — upstream v1.5.0 반영 (1c8e465 → 18762b6, 34커밋) → 포크 1.11.0
+
+| 묶음 | 커밋 | 내용 | 판정 |
+|---|---|---|---|
+| LLM 재시도·복구 | 8c4aaca~13e7558 | callHaiku 유계 재시도+백오프, 빈 응답 EmptyLlmResponseError 승격(무음 손실 수정), llm-error-class 단일 소스, dead-letter(dropped_batches) | 채택 |
+| claim/리스 | 7e49c77~6ba64c2 등 | 세션 선점+claim_owner+리스 만료 회수, fact 저장·완료 마커 원자 커밋, -4 재시도 상태, 제외 목록 경로 경계 수정 | 채택 |
+| 후속 4커밋 | dba8ea8~18762b6 | analyze pending 의미 정렬, 캡처 로그 명시 제거 표시, 문서 | 채택 |
+
+충돌 해소: consolidator(인라인 분류기→re-export, 포크 변경은 upstream 상위집합 확인),
+db.ts(union: upstream 컬럼 자가치유 + 포크 vocabulary), fact-extractor(upstream 2단계
+구조 + 포크 confidence·co-extraction 재이식). 테스트 57파일 541건 전체 통과.
+적대 리뷰(2026-08-02) 반영 4건: (1) 병합 커밋 dist 혼합-버전 결함 → 릴리스 커밋에 재빌드
+dist 포함으로 해소, (2) llm-error-class.ts 'unknown' doc 주석을 실제 동작(HOLD)에 정렬
+(upstream 은 주석 stale — 다음 sync 때 충돌 시 포크판 유지), (3) CHANGELOG upstream 1.5.0
+헤딩 중복 구분 표기, (4) .codex/loopy-era upstream 런타임 산출물 유입 → 포크판 복원.
+후속 후보: 포크 자체 .codex/loopy-era 2파일에 원작자 문자열 잔존(병합 전부터, privacy 스크럽
+누락), upstream analyze.ts CLAIMED(-3) 미집계(upstream 고유 — 포크 미수정).
+
 ### 2026-07-17 — upstream v1.4.0~v1.4.4 반영 (0b879d2 → 1c8e465, 10커밋) → 포크 1.7.0
 
 | 묶음 | 커밋 | 내용 | 판정 |
