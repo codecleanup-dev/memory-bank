@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.8.0] - 2026-08-02
+
+_Fork release: true merge of upstream v1.5.0 (`1c8e465..18762b6`, 34 commits) —
+LLM 재시도·복구 + 추출 claim/리스 서브시스템 채택._
+
+### Adopted (upstream v1.5.0)
+- **빈 LLM 응답 무음 손실 수정**: `callHaiku` 유계 재시도(기본 2회 + 지수 백오프,
+  상한 5s/30s), 소진 시 `''` 대신 `EmptyLlmResponseError` throw. 이 포크에서 실측된
+  피해 상한 55세션(실질 대화 보유·0건 완료 마킹, 2026-07~08)의 재발을 차단.
+- **추출 claim/리스 서브시스템**: 세션 선점 + 소유권 토큰(`claim_owner`) + 리스 만료
+  회수, fact 삽입·완료 마커 원자 트랜잭션, 내부 실패 재시도 상태(-4), dead-letter
+  (`dropped_batches`). 적대 리뷰 25라운드 산출물.
+- **실패 3분류 단일 소스화**: `src/llm-error-class.ts` — 포크가 1.7.0에서 consolidator에
+  들고 있던 인라인 분류기(unknown→HOLD 의미론, `internal server error` regex 포함)를
+  upstream이 상위집합으로 흡수 → re-export로 전환, 포크 로직 손실 없음.
+
+### Kept (fork side on merge conflicts)
+- `insertFact` confidence 영속화: upstream 신규 원자 트랜잭션 경로에 `confidence`
+  필드 재이식 (포크 고유 컬럼).
+- Co-extraction relations 채널: 온톨로지 분류(phase 3) 이후 유지.
+- vocabulary migrations(db.ts): upstream extraction_log 컬럼 자가치유 블록과 union.
+- 버전 체계: 포크 1.8.0 (upstream 1.5.0 흡수).
+
+### Excluded at merge
+- upstream runtime 산출물(results.tsv, .claude/loopy-era/*): 포크의 삭제 유지.
+
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -170,7 +197,7 @@ upstream v1.3.2–v1.3.3 (own sections below)._
 _The sections below are upstream's own v1.4.x release notes, kept verbatim
 at the 2026-07-17 merge (fork 1.7.0). Fork-side coverage: v1.4.4 was already
 ported (hardened) in 1.6.0; inject v2 (v1.4.0) is adopted in 1.7.0._
-## [1.5.0] - 2026-08-02
+## [1.5.0] - 2026-08-02 (upstream)
 
 ### Fixed — LLM 호출 실패·빈 응답에 재시도·복구가 없던 문제 (사용자 피드백)
 

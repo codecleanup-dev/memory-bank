@@ -2,7 +2,7 @@ import { callHaiku, parseJsonResponse } from './llm.js';
 import { classifyLlmError, LlmCallError } from './llm-error-class.js';
 import { insertFact } from './fact-db.js';
 import { generateEmbedding, initEmbeddings } from './embeddings.js';
-import { classifyAndLinkFact } from './ontology-classifier.js';
+import { classifyAndLinkFact, detectCoExtractionRelations } from './ontology-classifier.js';
 import { randomUUID } from 'node:crypto';
 import { claimSessionSql, renewClaimSql, failureMarkerUpsertSql, freshClaimPredicate, getExtractionConfig, EXTRACTION_STATE, MAX_INTERNAL_RETRIES, } from './pending-extraction.js';
 export const EXTRACTION_SYSTEM_PROMPT = `You are an expert at extracting long-term facts from conversations.
@@ -283,6 +283,7 @@ commitMarker) {
                 coding_agent: codingAgent,
                 fact_kr: p.fact.fact_kr ?? null,
                 embedding_kr: p.embeddingKr,
+                confidence: p.fact.confidence,
             }));
         }
         if (commitMarker && commitMarker(facts.length, savedIds.length) === 0) {
@@ -303,6 +304,17 @@ commitMarker) {
         }
         catch (err) {
             console.error(`Ontology pipeline failed for fact ${savedIds[i]}:`, err);
+        }
+    }
+    // Co-extraction relation channel: consecutive facts of this batch are
+    // probed for DEPENDS_ON/DERIVED_FROM links the similarity channel cannot
+    // nominate (bounded at MAX_COEXTRACT_PAIRS probes; non-fatal).
+    if (savedIds.length >= 2) {
+        try {
+            await detectCoExtractionRelations(db, savedIds);
+        }
+        catch (err) {
+            console.error('Co-extraction relation detection failed:', err);
         }
     }
     return savedIds;
