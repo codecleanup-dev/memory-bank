@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.8.0] - 2026-08-02
+## [1.11.0] - 2026-08-03
 
 _Fork release: true merge of upstream v1.5.0 (`1c8e465..18762b6`, 34 commits) —
 LLM 재시도·복구 + 추출 claim/리스 서브시스템 채택._
@@ -31,6 +31,108 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.10.2] - 2026-07-26
+
+### Fixed (색인 오염 — 서브에이전트 워밍업 · 요약기)
+- **handshake 계열 신설**: 호스트 CLI가 서브에이전트를 띄울 때 내는 `Warmup` 교환이
+  색인되고 있었다 — 실측 17,705건으로 **전체 색인의 54.9%**, 그중 7,053건은 실패한
+  핸드셰이크라 응답 쪽이 인증 오류 문자열이었다(오류 로그가 검색 대상). 워커 프롬프트와
+  달리 이 계열은 **지금도 유입 중**(2026-07에 119건)이라 정리만으로는 부족해
+  `sync` 색인 가드와 purge 술어 양쪽에 배선했다. 판별은 접두사가 아니라 **정확 일치 +
+  `is_sidechain`** — 문자열이 6자뿐이라 접두사 규칙이면 사람이 쓴 "Warmup 루틴…"까지
+  삼킨다(실측: 정확 일치 17,705건 전부 sidechain, 다르게 이어지는 행 0건).
+- **요약기 마커 purge 대상 추가**: 8,367건. 색인 쪽은 이미 파일 단위 가드가 막고 있어
+  (2026-06·07 유입 0) 빠진 것은 제거 수단뿐이었다. `WORKER_PROMPT_PREFIXES`가 아니라
+  신설 `POLLUTION_PROMPT_LEADS`에 넣는다 — 전자는 4개 시스템 프롬프트와 1:1 결합
+  계약이라 요약기 3종이 공유하는 마커를 넣으면 "dead prefix"로 계약이 깨진다.
+- purge 스크립트: `--no-handshake`로 종전 술어 재현, `families` 출력에 활성 계열 전부 표기.
+
+### Ops
+- 라이브 정리 실행: 32,276 → **3,011 exchange**(−29,265, −90.7%). 잔여 오염 0,
+  `exchanges_fts` 일치, `quick_check ok`, 검색 정상. 실행 중 만난 `CORRUPT_VTAB`은
+  FTS5 external-content desync로 rebuild(2초) 후 해소 — 디스크 손상 아님.
+
+## [1.10.1] - 2026-07-25
+
+### Changed (F5 — judge 순서 효과 대응, 파일럿 양성 후 적용)
+- **위원회 표별 배치 셔플**: 파일럿 실측(동일 200 facts, 단일표 4런)에서 동일순서 재현율
+  J=0.400 vs 교차순서 평균 0.218 — orderEffectDelta 0.182 > 임계 0.10으로 **계통적 순서
+  효과 실재** 판명. `committeeJudge`가 2표부터 독립 배치 순열로 판정하고 `fact_index`를
+  호출자 순서로 역매핑 — 순서-계통 편향이 표간 분산으로 바뀌어 다수결이 흡수한다.
+  (배경: 질문 순서 효과 — 판정이 배치 순서에 의존하는 현상의 직접 측정·대응)
+
+### Ops
+- stale fact 1건 정식 revise (Node 핀 방향 역전 기록 — revision 기록 + 재판정 큐 자동 등록,
+  F1 경로 라이브 첫 사용)
+
+## [1.10.0] - 2026-07-25
+
+### Added (F1 — revision 측정시점 바인딩, followups F1 종결)
+- `principle_recheck_queue`: `updateFact` 텍스트 변경(consolidation merge 포함, count-only 제외)이
+  enqueue → 다음 `principles check`가 **forward 스캔 전에** 드레인. reconcile 의미론:
+  재발견 쌍 유지 / 미재발견 활성 자동판정 쌍 system-clear(`is_active=0`·`resolution NULL` —
+  사람 해소 4종·manual/import 쌍 불변) / unparseable→no-op 드레인 / judge 예외→큐 보존.
+- coverage에 `recheckQueued` — 모순 0이어도 재판정 대기 큐가 표시됨.
+
+### Added (E2 v2 — model_surprise, G2 기각의 직접 대응)
+- `facts.model_surprise` (0..1, NULL=미측정): 추출 LLM이 추출 시점에 **모델-상대 novelty**를
+  직접 평점(일반 어시스턴트 가정 0 ↔ 사용자 특이/기본가정 교정 1, confidence와 독립).
+  기존 행 backfill 없음 — 신규 fact부터 축적, 30일 후 G2 재검정 쿼리는 E2 스펙에 고정.
+  v1 코퍼스-상대 `surprise`는 대조 기준선으로 존치.
+
+### Fixed
+- `archive-io`: bare `'stream'` import → `node:stream` — git worktree 레이아웃에서 vite-node가
+  프로젝트 루트 상대로 오해석해 테스트 수집이 실패하던 문제 (실측).
+
+### Ops (릴리스 외 운영 기록)
+- 첫 트랜치 큐 7건 사람 해소 완료 (false_positive 5 · acknowledged 2 — judge 캘리브레이션 데이터)
+- 증분 `principles check` 일일 크론 등록 (03:17, --max-facts 400, 위원회 3표)
+
+## [1.9.0] - 2026-07-25
+
+### Changed (F2 — judge 정밀도, 동일 200 facts 이중 실측 게이트 PASS)
+- **NOT-contradiction 가드 5종**: 스코프 열거 밖 비위반 / 가역 작업 ≠ irreversible /
+  관찰-비판 fact 예외(practice-in-force는 위반) / "언급 부재 ≠ 위반" / 아키텍처 스타일 비위반.
+  실측: 기존 FP 클래스 5종이 독립 이중 측정(A: n=2, B: 3라운드)에서 공히 0 재출현.
+- **threshold 0.7→0.8** (캘리브레이션: FP 밴드 0.75–0.85, 정당 0.95) + `check --threshold T`
+- **위원회 3표 다수결·중앙값 confidence** (기본, `--votes K`): 단발 judge의 0.80–0.85 밴드
+  런간 churn 실측 대응 — 주입 judge는 `votes` 명시 시에만 위원회.
+- **outage 오분류 수정**: SDK가 rate limit을 텍스트 결과로 반환 시 "unparseable→커서 전진"으로
+  facts를 조용히 스킵하던 구멍 — 파싱 실패+에러 배너일 때만 throw(미전진). 라이브 실사고에서 발견.
+
+### Added (E2 — surprise 주입 랭킹 필드, 스펙: docs/2026-07-25-e2-surprise-ranking-spec.md)
+- `facts.surprise` (0..1, NULL=미측정): 결정론 novelty `1 − max cosine 유사도`, insert 시
+  pre-insert KNN으로 계산(자기매칭 구조적 불가). **주입 랭킹 신호 전용** — 저장 필터·검색 랭킹 불개입.
+- `memory-bank surprise-backfill [--limit N]`: NULL 술어=자연 커서, embedding 없는 행은 NULL 유지.
+- 주입 telemetry(injected fact별 surprise) + `MEMORY_BANK_INJECT_SURPRISE_WEIGHT`(기본 0 —
+  측정 게이트 G1–G3 통과 후에만 상향 논의).
+
+### Docs
+- followups: F2 이중 실측(A/B) + 조정 노트, F3(잔여 judge FP 모드 2종), F4(sync transient IO backoff)
+
+## [1.8.0] - 2026-07-25
+
+### Added
+- **fact↔principle 교차 모순 (principle contradicts)**: 운영 원칙 레지스트리
+  (`principles` — CLI 수동 큐레이션, human-gate; rules 파일이 정본) +
+  `principle_conflicts` 해소 큐. 표면화는 전부 표시 전용 — `search_facts` 결과의
+  `⚠ Principle conflicts` 주석, `graph_stats` Graph Health 카운트, `consistency`
+  리포트 섹션. 랭킹·기록·진위에는 불개입, 게이트 편입은 `--gate-principles` opt-in.
+- **`memory-bank principles` CLI**: `list / add / import / activate / deactivate /
+  conflicts / resolve / check`. `check`는 keyset 커서 배치(LLM judge, confidence
+  ≥ 0.7만 저장; unparseable→no-op+커서 전진, judge 예외→미전진 중단, 원칙 집합
+  해시 변경→전체 재스캔).
+- **Scan coverage**: "모순 0"이 "측정되고 깨끗"인지 "아직 미측정"인지 구분 —
+  `principles conflicts`/`consistency` 출력에 `unscanned / principles-changed /
+  partial / complete` 상태와 미측정 fact 수를 표시 (측정 전 상태를 무모순으로
+  오인하는 것 방지).
+
+### Notes
+- 스키마 additive (`principles` / `principle_conflicts` / `principle_check_state`)
+  — 기존 DB 무마이그레이션. 사람의 해소 결정(false_positive 등)은 영속: UNIQUE
+  pair + insert-or-ignore라 재탐지가 재오픈할 수 없음.
+- 설계 문서: `docs/2026-07-25-principle-contradicts.md` (경계선: 원칙은 표시·게이트에만 개입)
 
 ## [1.7.0] - 2026-07-17
 

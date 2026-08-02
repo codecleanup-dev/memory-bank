@@ -1,4 +1,10 @@
 /**
+ * E2: surprise as an injection-ranking signal, OFF by default (0) — telemetry
+ * ships first, the weight is raised only after the spec's measurement gates
+ * (docs/2026-07-25-e2-surprise-ranking-spec.md, soft-to-hard 절차).
+ */
+export declare function surpriseWeight(env?: NodeJS.ProcessEnv): number;
+/**
  * Compute the UserPromptSubmit context block for a prompt: top-K similar
  * facts gated by the probe baseline, expanded with 1-hop ontology relations,
  * plus repeated-prompt detection. Returns '' when there is nothing to inject.

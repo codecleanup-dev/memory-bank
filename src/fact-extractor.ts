@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import type { ExtractedFact } from './types.js';
 import { callHaiku, parseJsonResponse } from './llm.js';
 import { classifyLlmError, LlmCallError } from './llm-error-class.js';
-import { insertFact } from './fact-db.js';
+import { computeSurprise, insertFact } from './fact-db.js';
 import { generateEmbedding, initEmbeddings } from './embeddings.js';
 import { classifyAndLinkFact, detectCoExtractionRelations } from './ontology-classifier.js';
 import { randomUUID } from 'node:crypto';
@@ -34,7 +34,8 @@ export const EXTRACTION_SYSTEM_PROMPT = `You are an expert at extracting long-te
     "fact_kr": "사용자는 상태 관리에 Riverpod을 사용한다",
     "category": "decision",
     "scope_type": "project",
-    "confidence": 0.9
+    "confidence": 0.9,
+    "model_surprise": 0.8
   }
 ]
 
@@ -52,7 +53,13 @@ export const EXTRACTION_SYSTEM_PROMPT = `You are an expert at extracting long-te
 ## confidence criteria
 - 0.9+: explicit decision/declaration
 - 0.7-0.9: inferred from behavior
-- Below 0.7: do not extract`;
+- Below 0.7: do not extract
+
+## model_surprise criteria (0..1, rate independently of confidence)
+How unexpected is this fact to a GENERIC assistant with no knowledge of this user/project?
+- 0.0-0.2: any assistant would already assume it (framework defaults, common practice)
+- 0.3-0.6: mildly specific (typical project-level choices)
+- 0.7-1.0: user/project-specific, surprising, or CORRECTS a default assumption`;
 
 /** 선점(claim)을 잃어 작업을 중단할 때 던진다. 호출자는 이것을 실패가 아니라
  *  "다른 러너가 이 세션을 가져갔다"로 읽어야 한다 — 예산을 소모하지 않는다. */
@@ -304,6 +311,9 @@ export async function saveExtractedFacts(
   const savedIds: string[] = [];
   const commit = db.transaction(() => {
     for (const p of prepared) {
+      // E2: measure novelty BEFORE insert — the new fact is not yet in the vec
+      // tables, so the probe cannot self-match (ranking signal only, no gating).
+      const surprise = computeSurprise(db, p.embedding, p.embeddingKr);
       savedIds.push(insertFact(db, {
         fact: p.fact.fact,
         category: p.fact.category,
@@ -315,6 +325,8 @@ export async function saveExtractedFacts(
         fact_kr: p.fact.fact_kr ?? null,
         embedding_kr: p.embeddingKr,
         confidence: p.fact.confidence,
+        surprise,
+        model_surprise: p.fact.model_surprise ?? null,
       }));
     }
     if (commitMarker && commitMarker(facts.length, savedIds.length) === 0) {

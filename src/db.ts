@@ -706,6 +706,22 @@ export function initDatabase(): Database.Database {
   if (!factColumnNames.has('confidence')) {
     db.prepare('ALTER TABLE facts ADD COLUMN confidence REAL').run();
   }
+  // E2 surprise (0..1): corpus-relative novelty at measurement time —
+  // 1 − max cosine similarity vs the facts already indexed when measured.
+  // NULL = unmeasured (backfill pending). Injection-ranking signal ONLY:
+  // never a storage filter, never a search_facts ranking input
+  // (docs/2026-07-25-e2-surprise-ranking-spec.md).
+  if (!factColumnNames.has('surprise')) {
+    db.prepare('ALTER TABLE facts ADD COLUMN surprise REAL').run();
+  }
+  // E2 v2 model_surprise (0..1): MODEL-relative novelty rated by the
+  // extraction LLM at extract time — the corpus-relative `surprise` failed
+  // its G2 gate as a proxy for this, so v2 measures it directly. NULL on
+  // pre-existing rows (no LLM backfill). Ranking signal only, pending its
+  // own G2 re-test (docs/2026-07-25-e2-surprise-ranking-spec.md).
+  if (!factColumnNames.has('model_surprise')) {
+    db.prepare('ALTER TABLE facts ADD COLUMN model_surprise REAL').run();
+  }
   const exchangeColumns = db.prepare(
     `SELECT name FROM pragma_table_info('exchanges')`
   ).all() as Array<{ name: string }>;
@@ -815,6 +831,64 @@ export function initDatabase(): Database.Database {
       }
     }
   }
+
+  // === Principles Schema (fact↔principle cross-layer conflicts) ===
+  // Curated one-line operating rules, registered ONLY through the
+  // `principles` CLI (human-gated; no auto-scraping — the rules files remain
+  // the canon, this table is a reference index for conflict checking).
+  // principle_conflicts is display/report-only state: nothing consumes it to
+  // rank, filter, or deactivate facts (report-first, like consistency.ts).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principles (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      statement TEXT NOT NULL,
+      source_path TEXT,
+      layer TEXT NOT NULL DEFAULT 'principle' CHECK (layer IN ('identity','principle','policy')),
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_conflicts (
+      id TEXT PRIMARY KEY,
+      principle_id TEXT NOT NULL REFERENCES principles(id),
+      fact_id TEXT NOT NULL REFERENCES facts(id),
+      reasoning TEXT,
+      method TEXT NOT NULL DEFAULT 'llm' CHECK (method IN ('llm','manual','import')),
+      confidence REAL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      resolution TEXT CHECK (resolution IS NULL OR resolution IN ('fact_deprecated','acknowledged','false_positive','principle_updated')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      resolved_at TEXT
+    )
+  `);
+  // The UNIQUE pair + insert-or-ignore makes human resolutions durable: a
+  // (principle, fact) pair resolved as false_positive/acknowledged keeps its
+  // row, so re-detection can never re-open it.
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_principle_conflicts_pair
+    ON principle_conflicts(principle_id, fact_id)
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_principle_conflicts_fact ON principle_conflicts(fact_id)`);
+  // Keyset cursor for the principle-check batch worker (JSON value under key 'cursor').
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_check_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
+  // F1: facts whose TEXT changed after being judged. A verdict is bound to
+  // the text it measured — the next principle-check run re-judges queued
+  // facts FIRST and reconciles their stale llm-method conflicts
+  // (docs/2026-07-25-principle-contradicts-followups.md F1).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_recheck_queue (
+      fact_id TEXT PRIMARY KEY,
+      enqueued_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
 
   // Vocabulary migrations (one-time rebuilds on legacy DBs; fresh DBs already
   // carry both CHECKs from CREATE TABLE above). Run after the ALTER block so

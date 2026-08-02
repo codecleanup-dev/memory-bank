@@ -5,9 +5,17 @@ import {
   normalizeFactText,
   passesConfidenceGate,
   selectSpreadBatches,
+  EXTRACTION_SYSTEM_PROMPT,
 } from '../src/fact-extractor.js';
 
 describe('Fact Extractor', () => {
+  it('E2 v2: system prompt asks for model-relative novelty, independent of confidence', () => {
+    expect(EXTRACTION_SYSTEM_PROMPT).toContain('model_surprise');
+    expect(EXTRACTION_SYSTEM_PROMPT).toContain('GENERIC assistant');
+    expect(EXTRACTION_SYSTEM_PROMPT).toContain('CORRECTS a default assumption');
+    expect(EXTRACTION_SYSTEM_PROMPT).toContain('rate independently of confidence');
+  });
+
   describe('buildExtractionPrompt', () => {
     it('should format exchanges into extraction prompt', () => {
       const exchanges = [

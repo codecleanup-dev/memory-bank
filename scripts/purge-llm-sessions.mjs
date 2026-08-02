@@ -35,7 +35,8 @@
  *     PRAGMA foreign_keys is ON, which we don't assume).
  *
  * Usage:
- *   node scripts/purge-llm-sessions.mjs                            # dry-run, slug family
+ *   node scripts/purge-llm-sessions.mjs                            # dry-run, slug + handshake
+ *   node scripts/purge-llm-sessions.mjs --no-handshake             # pre-fork predicate (slug only)
  *   node scripts/purge-llm-sessions.mjs --apply                    # backup + delete, slug family
  *   node scripts/purge-llm-sessions.mjs --legacy-prompts           # dry-run, BOTH families
  *   node scripts/purge-llm-sessions.mjs --legacy-prompts --apply   # backup + delete, BOTH families
@@ -51,6 +52,10 @@ import { buildPollutionWhere } from '../dist/pollution-predicate.js';
 
 const apply = process.argv.includes('--apply');
 const legacyPrompts = process.argv.includes('--legacy-prompts');
+// [fork] handshake family (host-CLI sub-agent 'Warmup' rows) is ON by default —
+// its discriminator is exact-equality + is_sidechain, so it cannot swallow a
+// human message. --no-handshake reproduces the pre-fork predicate.
+const handshake = !process.argv.includes('--no-handshake');
 
 function main() {
   const db = initDatabase();
@@ -58,7 +63,7 @@ function main() {
     // Build the pollution predicate once (shared src helper, canonical prefixes);
     // every count / backup / delete below uses the SAME (where, params) so they
     // can never diverge.
-    const { where, params } = buildPollutionWhere({ legacyPrompts });
+    const { where, params } = buildPollutionWhere({ legacyPrompts, handshake });
 
     const counts = {
       exchanges: db.prepare(`SELECT count(*) AS n FROM exchanges WHERE ${where}`).get(...params).n,
@@ -70,7 +75,9 @@ function main() {
       ).get(...params).n,
     };
 
-    console.log(`families: slug${legacyPrompts ? ' + legacy-prompts' : ''}`);
+    // [fork] name every active family so a count can never look like it came
+    // from the slug family alone.
+    console.log(`families: slug${legacyPrompts ? ' + legacy-prompts' : ''}${handshake ? ' + handshake' : ''}`);
     console.log(`polluted exchanges: ${counts.exchanges}`);
     console.log(`polluted tool_calls: ${counts.toolCalls}`);
     console.log(`polluted vectors:    ${counts.vectors}`);

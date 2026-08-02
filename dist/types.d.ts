@@ -57,6 +57,8 @@ export interface Fact {
     ontology_category_id?: string | null;
     coding_agent?: string | null;
     confidence?: number | null;
+    surprise?: number | null;
+    model_surprise?: number | null;
 }
 export interface FactRevision {
     id: string;
@@ -77,6 +79,8 @@ export interface ExtractedFact {
     category: FactCategory;
     scope_type: FactScopeType;
     confidence: number;
+    /** E2 v2: model-relative novelty rated by the extraction LLM (0..1, optional). */
+    model_surprise?: number;
 }
 export interface ConsolidationResult {
     relation: FactRelation;

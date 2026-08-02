@@ -23866,6 +23866,12 @@ function initDatabase() {
   if (!factColumnNames.has("confidence")) {
     db.prepare("ALTER TABLE facts ADD COLUMN confidence REAL").run();
   }
+  if (!factColumnNames.has("surprise")) {
+    db.prepare("ALTER TABLE facts ADD COLUMN surprise REAL").run();
+  }
+  if (!factColumnNames.has("model_surprise")) {
+    db.prepare("ALTER TABLE facts ADD COLUMN model_surprise REAL").run();
+  }
   const exchangeColumns = db.prepare(
     `SELECT name FROM pragma_table_info('exchanges')`
   ).all();
@@ -23937,6 +23943,49 @@ function initDatabase() {
       }
     }
   }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principles (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      statement TEXT NOT NULL,
+      source_path TEXT,
+      layer TEXT NOT NULL DEFAULT 'principle' CHECK (layer IN ('identity','principle','policy')),
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_conflicts (
+      id TEXT PRIMARY KEY,
+      principle_id TEXT NOT NULL REFERENCES principles(id),
+      fact_id TEXT NOT NULL REFERENCES facts(id),
+      reasoning TEXT,
+      method TEXT NOT NULL DEFAULT 'llm' CHECK (method IN ('llm','manual','import')),
+      confidence REAL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      resolution TEXT CHECK (resolution IS NULL OR resolution IN ('fact_deprecated','acknowledged','false_positive','principle_updated')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      resolved_at TEXT
+    )
+  `);
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_principle_conflicts_pair
+    ON principle_conflicts(principle_id, fact_id)
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_principle_conflicts_fact ON principle_conflicts(fact_id)`);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_check_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS principle_recheck_queue (
+      fact_id TEXT PRIMARY KEY,
+      enqueued_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
   migrateRelationTypeVocabulary(db);
   migrateFactsCategoryVocabulary(db);
   autoHealScopeProjects(db);
@@ -24035,6 +24084,8 @@ function rowToFact(row) {
     is_active: Boolean(row["is_active"]),
     ontology_category_id: row["ontology_category_id"] ?? null,
     coding_agent: row["coding_agent"] ?? null,
+    surprise: row["surprise"] ?? null,
+    model_surprise: row["model_surprise"] ?? null,
     confidence: row["confidence"] ?? null
   };
 }
@@ -24176,7 +24227,7 @@ import readline from "readline";
 
 // src/archive-io.ts
 import fs3 from "fs";
-import { Readable, Transform, pipeline as pipeline2 } from "stream";
+import { Readable, Transform, pipeline as pipeline2 } from "node:stream";
 import * as zlib from "node:zlib";
 var ZST_SUFFIX = ".zst";
 var DEFAULT_MAX_DECOMPRESSED_BYTES = 256 * 1024 * 1024;
@@ -24966,6 +25017,10 @@ function truncateFact(text) {
   const t = text.replace(/\s+/g, " ").trim();
   return t.length > FACT_CHAR_CAP ? t.slice(0, FACT_CHAR_CAP - 1) + "\u2026" : t;
 }
+function surpriseWeight(env = process.env) {
+  const raw = parseFloat(env.MEMORY_BANK_INJECT_SURPRISE_WEIGHT ?? "");
+  return Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0;
+}
 var NOOP_COMMIT = () => {
 };
 async function computeInjectContextDeferred(userPrompt, project, via, sessionId) {
@@ -24997,6 +25052,14 @@ async function computeInjectContextDeferred(userPrompt, project, via, sessionId)
         });
         return { block: "", commitLedger: NOOP_COMMIT };
       }
+      const w2 = surpriseWeight();
+      if (w2 > 0) {
+        results.sort((a, b2) => {
+          const sa = l2DistanceToSimilarity(a.distance) + w2 * (a.fact.surprise ?? 0);
+          const sb = l2DistanceToSimilarity(b2.distance) + w2 * (b2.fact.surprise ?? 0);
+          return sb - sa;
+        });
+      }
       const seenIds = new Set(results.map((r) => r.fact.id));
       const expandedFacts = [...results.map((r) => ({ fact: r.fact, note: "" }))];
       for (const { fact } of results.slice(0, 3)) {
@@ -25027,6 +25090,7 @@ async function computeInjectContextDeferred(userPrompt, project, via, sessionId)
       const lines = ["\u{1F4CC} \uAD00\uB828 \uACFC\uAC70 \uACB0\uC815:"];
       let blockChars = lines[0].length;
       const injectedIds = [];
+      const injectedSurprises = [];
       for (const { fact, note } of fresh) {
         const dateStr = fact.created_at.slice(0, 10);
         const line = `- ${note ? note + " " : ""}[${fact.category}] ${truncateFact(fact.fact)} (${dateStr})`;
@@ -25034,6 +25098,7 @@ async function computeInjectContextDeferred(userPrompt, project, via, sessionId)
         lines.push(line);
         blockChars += line.length + 1;
         injectedIds.push(fact.id);
+        injectedSurprises.push(fact.surprise != null ? Math.round(fact.surprise * 100) / 100 : null);
       }
       if (Date.now() - t0 < REPEAT_ELAPSED_BUDGET_MS) {
         try {
@@ -25056,7 +25121,9 @@ async function computeInjectContextDeferred(userPrompt, project, via, sessionId)
         deduped: dedupedCount,
         chars: block.length,
         duration_ms: Date.now() - t0,
-        via
+        via,
+        surprise: injectedSurprises,
+        ...w2 > 0 ? { surprise_w: w2 } : {}
       });
       return {
         block,
@@ -26739,6 +26806,35 @@ function hasActiveConflicts(counts) {
   return counts.activeContradictsPairs + counts.activeSupersedesPairs > 0;
 }
 
+// src/principles.ts
+function countActivePrincipleConflicts(db) {
+  return db.prepare(
+    `SELECT COUNT(*) AS n
+         FROM principle_conflicts c
+         JOIN principles p ON p.id = c.principle_id
+         JOIN facts f ON f.id = c.fact_id
+         WHERE c.is_active = 1 AND p.is_active = 1 AND f.is_active = 1`
+  ).get().n;
+}
+function annotatePrincipleConflictsForFacts(db, factIds) {
+  const map = /* @__PURE__ */ new Map();
+  if (factIds.length === 0) return map;
+  const placeholders = factIds.map(() => "?").join(",");
+  const rows = db.prepare(
+    `SELECT c.fact_id AS fact_id, p.slug AS slug, p.statement AS statement, p.layer AS layer
+       FROM principle_conflicts c
+       JOIN principles p ON p.id = c.principle_id
+       WHERE c.is_active = 1 AND p.is_active = 1 AND c.fact_id IN (${placeholders})
+       ORDER BY p.slug`
+  ).all(...factIds);
+  for (const r of rows) {
+    const list = map.get(r.fact_id) ?? [];
+    list.push({ slug: r.slug, statement: r.statement, layer: r.layer });
+    map.set(r.fact_id, list);
+  }
+  return map;
+}
+
 // src/llm.ts
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import fs8 from "node:fs";
@@ -27488,6 +27584,10 @@ Results: ${filtered.length}
         const allCategories = listCategories(db);
         const domainMap = new Map(allDomains.map((d2) => [d2.id, d2.name]));
         const catMap = new Map(allCategories.map((c) => [c.id, { name: c.name, domainId: c.domain_id }]));
+        const principleConflictMap = annotatePrincipleConflictsForFacts(
+          db,
+          filtered.map((r) => r.fact.id)
+        );
         for (const { fact, distance } of filtered) {
           const similarity = (1 - distance * distance / 2).toFixed(3);
           const catInfo = fact.ontology_category_id ? catMap.get(fact.ontology_category_id) : void 0;
@@ -27521,6 +27621,15 @@ Results: ${filtered.length}
 `;
             for (const { fact: relFact, relation } of related) {
               output += `  - [${relation.relation_type}] ${relFact.fact}
+`;
+            }
+          }
+          const principleHits = principleConflictMap.get(fact.id);
+          if (principleHits && principleHits.length > 0) {
+            output += `- \u26A0 Principle conflicts:
+`;
+            for (const hit of principleHits) {
+              output += `  - [${hit.slug}] ${hit.statement}
 `;
             }
           }
@@ -27775,9 +27884,12 @@ _Source exchanges not available._
 `;
         output += `- Single-fact categories: ${health.singleFactCategories} / ${health.totalCategories}
 `;
-        if (hasActiveConflicts(health)) {
+        const principleConflicts = countActivePrincipleConflicts(db);
+        output += `- Active principle conflicts (fact vs registered principle): ${principleConflicts}
+`;
+        if (hasActiveConflicts(health) || principleConflicts > 0) {
           output += `
-_Resolution queue available: run \`memory-bank consistency\` (\`--gate\` exits non-zero on violations)._
+_Resolution queue available: run \`memory-bank consistency\` (\`--gate\` exits non-zero on violations; principle queue: \`memory-bank principles conflicts\`)._
 `;
         }
         output += "\n";

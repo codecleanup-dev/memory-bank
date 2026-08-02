@@ -30,6 +30,7 @@ import { generateEmbedding, initEmbeddings } from './embeddings.js';
 import { listDomains, listCategories, getRelatedFacts } from './ontology-db.js';
 import { buildOntologyView } from './ontology-view.js';
 import { getConsistencyCounts, hasActiveConflicts } from './consistency.js';
+import { annotatePrincipleConflictsForFacts, countActivePrincipleConflicts } from './principles.js';
 import { askAvatar } from './avatar-responder.js';
 import path from 'path';
 import fs from 'fs';
@@ -542,6 +543,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const domainMap = new Map(allDomains.map(d => [d.id, d.name]));
         const catMap = new Map(allCategories.map(c => [c.id, { name: c.name, domainId: c.domain_id }]));
 
+        // Display-only annotation (one IN query for the page): facts that
+        // contradict a registered operating principle get a warning line.
+        // Deliberately NOT a ranking/filter signal — surfacing only.
+        const principleConflictMap = annotatePrincipleConflictsForFacts(
+          db,
+          filtered.map((r) => r.fact.id),
+        );
+
         for (const { fact, distance } of filtered) {
           const similarity = (1 - distance * distance / 2).toFixed(3);
           const catInfo = fact.ontology_category_id ? catMap.get(fact.ontology_category_id) : undefined;
@@ -573,6 +582,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             output += `- Related:\n`;
             for (const { fact: relFact, relation } of related) {
               output += `  - [${relation.relation_type}] ${relFact.fact}\n`;
+            }
+          }
+
+          const principleHits = principleConflictMap.get(fact.id);
+          if (principleHits && principleHits.length > 0) {
+            output += `- ⚠ Principle conflicts:\n`;
+            for (const hit of principleHits) {
+              output += `  - [${hit.slug}] ${hit.statement}\n`;
             }
           }
 
@@ -807,8 +824,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         output += `- Active CONTRADICTS pairs (both sides still active): ${health.activeContradictsPairs}\n`;
         output += `- Active SUPERSEDES pairs (superseded fact still active): ${health.activeSupersedesPairs}\n`;
         output += `- Single-fact categories: ${health.singleFactCategories} / ${health.totalCategories}\n`;
-        if (hasActiveConflicts(health)) {
-          output += `\n_Resolution queue available: run \`memory-bank consistency\` (\`--gate\` exits non-zero on violations)._\n`;
+        const principleConflicts = countActivePrincipleConflicts(db);
+        output += `- Active principle conflicts (fact vs registered principle): ${principleConflicts}\n`;
+        if (hasActiveConflicts(health) || principleConflicts > 0) {
+          output += `\n_Resolution queue available: run \`memory-bank consistency\` (\`--gate\` exits non-zero on violations; principle queue: \`memory-bank principles conflicts\`)._\n`;
         }
         output += '\n';
 

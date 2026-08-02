@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { SUMMARIZER_CONTEXT_MARKER } from './constants.js';
-import { getExcludedProjects, isExcludedProject, isWorkerPromptMessage, detectCodingAgent, findJsonlFiles } from './paths.js';
+import { getExcludedProjects, isExcludedProject, isWorkerPromptMessage, isAgentHandshakeExchange, detectCodingAgent, findJsonlFiles } from './paths.js';
 import { sniffCodexProject, encodeProjectPath } from './parser.js';
 import { archiveFileExists, readArchiveFile, statArchiveFile } from './archive-io.js';
 
@@ -210,6 +210,11 @@ export async function syncConversations(
           // Worker-prompt exchange = ephemeral state, not knowledge — never index.
           // Applies to every source branch (claude AND codex discovery paths).
           if (isWorkerPromptMessage(exchange.userMessage)) continue;
+          // [fork] Same rule for host-CLI sub-agent warm-up handshakes. Unlike
+          // the worker prompts these are STILL arriving (any project that spawns
+          // sub-agents produces them), so without this guard a purge only buys
+          // time. Exact-equality + sidechain — see isAgentHandshakeExchange.
+          if (isAgentHandshakeExchange(exchange.userMessage, exchange.isSidechain)) continue;
           // Tag each exchange with the coding agent
           exchange.codingAgent = codingAgent;
 

@@ -22,14 +22,20 @@ export function insertFact(db, params) {
     const confidence = typeof params.confidence === 'number' && Number.isFinite(params.confidence)
         ? Math.min(1, Math.max(0, params.confidence))
         : null;
+    const surprise = typeof params.surprise === 'number' && Number.isFinite(params.surprise)
+        ? Math.min(1, Math.max(0, params.surprise))
+        : null;
+    const modelSurprise = typeof params.model_surprise === 'number' && Number.isFinite(params.model_surprise)
+        ? Math.min(1, Math.max(0, params.model_surprise))
+        : null;
     db.prepare(`
-    INSERT INTO facts (id, fact, category, scope_type, scope_project, source_exchange_ids, embedding, created_at, updated_at, consolidated_count, is_active, coding_agent, fact_kr, embedding_version, confidence)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?)
+    INSERT INTO facts (id, fact, category, scope_type, scope_project, source_exchange_ids, embedding, created_at, updated_at, consolidated_count, is_active, coding_agent, fact_kr, embedding_version, confidence, surprise, model_surprise)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?)
   `).run(id, params.fact, 
     // Chokepoint normalization: every caller (extractor, backfill, sync)
     // funnels through here, so out-of-vocabulary LLM output is mapped to the
     // controlled vocabulary instead of tripping the facts.category CHECK.
-    normalizeFactCategory(params.category), params.scope_type, scopeProject, JSON.stringify(params.source_exchange_ids), params.embedding ? Buffer.from(new Float32Array(params.embedding).buffer) : null, now, now, params.coding_agent || 'claude-code', params.fact_kr ?? null, EMBEDDING_VERSION, confidence);
+    normalizeFactCategory(params.category), params.scope_type, scopeProject, JSON.stringify(params.source_exchange_ids), params.embedding ? Buffer.from(new Float32Array(params.embedding).buffer) : null, now, now, params.coding_agent || 'claude-code', params.fact_kr ?? null, EMBEDDING_VERSION, confidence, surprise, modelSurprise);
     // Insert into vector index (atomic DELETE+INSERT via transaction)
     if (params.embedding) {
         const p = vecParamFor(db, 'vec_facts', params.embedding);
@@ -49,6 +55,97 @@ export function insertFact(db, params) {
         upsertVecKr(id, pk.blob);
     }
     return id;
+}
+/**
+ * E2: corpus-relative novelty — 1 − max cosine similarity against the facts
+ * already indexed at measurement time. Deterministic and fully local (no LLM).
+ * Call BEFORE insertFact for new facts (the new row is not yet in the vec
+ * tables, so the probe cannot self-match); pass excludeFactId when measuring
+ * an already-indexed fact (backfill). Injection-ranking signal ONLY — never a
+ * storage filter (docs/2026-07-25-e2-surprise-ranking-spec.md).
+ */
+export function computeSurprise(db, embedding, embeddingKr, excludeFactId) {
+    if (!embedding || embedding.length === 0)
+        return null;
+    let minDistance = Infinity;
+    const probe = (emb, table) => {
+        try {
+            const p = vecParamFor(db, table, emb);
+            // LIMIT 2: the nearest row may be the fact itself (backfill path).
+            const rows = db.prepare(`
+        SELECT id, distance FROM ${table}
+        WHERE embedding MATCH ${p.sql}
+        ORDER BY distance
+        LIMIT 2
+      `).all(p.blob);
+            for (const r of rows) {
+                if (excludeFactId && r.id === excludeFactId)
+                    continue;
+                const d = normalizeVecDistance(r.distance, p.dt);
+                if (d < minDistance)
+                    minDistance = d;
+            }
+        }
+        catch {
+            /* table may not exist on very old DBs */
+        }
+    };
+    probe(embedding, 'vec_facts');
+    probe(embedding, 'vec_facts_kr');
+    if (embeddingKr && embeddingKr.length > 0) {
+        probe(embeddingKr, 'vec_facts');
+        probe(embeddingKr, 'vec_facts_kr');
+    }
+    if (!Number.isFinite(minDistance))
+        return 1; // empty corpus — maximally novel
+    const maxSimilarity = l2DistanceToSimilarity(minDistance);
+    return Math.min(1, Math.max(0, 1 - maxSimilarity));
+}
+/**
+ * E2 backfill: measure surprise for active facts that predate the column.
+ * `surprise IS NULL AND embedding IS NOT NULL` is its own cursor — the
+ * predicate shrinks monotonically, so repeated runs resume naturally and
+ * embedding-less rows stay NULL (= honestly unmeasured) without looping.
+ */
+export function runSurpriseBackfill(db, limit = 2000) {
+    const rows = db.prepare(`
+    SELECT id, embedding FROM facts
+    WHERE is_active = 1 AND surprise IS NULL AND embedding IS NOT NULL AND length(embedding) > 0
+    ORDER BY created_at, id
+    LIMIT ?
+  `).all(limit);
+    const update = db.prepare('UPDATE facts SET surprise = ? WHERE id = ?');
+    let updated = 0;
+    for (const row of rows) {
+        const embedding = Array.from(new Float32Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength / 4));
+        const surprise = computeSurprise(db, embedding, null, row.id);
+        if (surprise === null)
+            continue;
+        update.run(surprise, row.id);
+        updated += 1;
+    }
+    const unmeasurable = db.prepare(`
+      SELECT COUNT(*) AS n FROM facts
+      WHERE is_active = 1 AND surprise IS NULL AND (embedding IS NULL OR length(embedding) = 0)
+    `).get().n;
+    const remaining = db.prepare(`
+      SELECT COUNT(*) AS n FROM facts
+      WHERE is_active = 1 AND surprise IS NULL AND embedding IS NOT NULL AND length(embedding) > 0
+    `).get().n;
+    const values = db.prepare('SELECT surprise AS s FROM facts WHERE is_active = 1 AND surprise IS NOT NULL ORDER BY s')
+        .all().map((r) => r.s);
+    const pct = (q) => values[Math.min(values.length - 1, Math.floor(q * values.length))];
+    const distribution = values.length === 0
+        ? null
+        : {
+            count: values.length,
+            min: values[0],
+            p25: pct(0.25),
+            median: pct(0.5),
+            p75: pct(0.75),
+            max: values[values.length - 1],
+        };
+    return { scanned: rows.length, updated, unmeasurable, remaining, distribution };
 }
 export function getActiveFacts(db) {
     return db.prepare('SELECT * FROM facts WHERE is_active = 1 ORDER BY consolidated_count DESC')
@@ -81,6 +178,13 @@ export function updateFact(db, id, params) {
     }
     values.push(id);
     db.prepare(`UPDATE facts SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    // F1: a text change invalidates text-bound principle verdicts — queue the
+    // fact so the next principle-check run re-judges it and reconciles stale
+    // llm-method conflicts. Count-only touches (consolidation reinforcement)
+    // do NOT re-queue: the measured text is unchanged.
+    if (params.fact !== undefined) {
+        db.prepare('INSERT OR IGNORE INTO principle_recheck_queue (fact_id) VALUES (?)').run(id);
+    }
     // Update vector index (atomic DELETE+INSERT via transaction)
     if (params.embedding) {
         const p = vecParamFor(db, 'vec_facts', params.embedding);
@@ -429,6 +533,8 @@ function rowToFact(row) {
         is_active: Boolean(row['is_active']),
         ontology_category_id: row['ontology_category_id'] ?? null,
         coding_agent: row['coding_agent'] ?? null,
+        surprise: row['surprise'] ?? null,
+        model_surprise: row['model_surprise'] ?? null,
         confidence: row['confidence'] ?? null,
     };
 }
