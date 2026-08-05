@@ -213,7 +213,7 @@ const toSet = (findings, threshold) =>
   );
 
 // ── 수집 ──
-async function collect(outDir) {
+async function collect(outDir, { resume = false } = {}) {
   mkdirSync(outDir, { recursive: true });
   const rawPath = join(outDir, 'raw.jsonl');
   const log = (obj) => {
@@ -228,29 +228,56 @@ async function collect(outDir) {
     process.exit(2);
   }
   const batches = partitionBatches(facts);
-  log({
-    type: 'meta',
-    startedAt: new Date().toISOString(),
-    dbPath: DB_PATH,
-    sampleSize: facts.length,
-    sampleHash: sha256(facts.map((f) => f.id).join('\n')),
-    principles: principles.length,
-    principlesHash,
-    config: { SAMPLE_SIZE, BATCH_SIZE, S_RUNS, O_SEEDS, C_SEEDS, COMMITTEE_VOTES, CONFIDENCE_PRIMARY },
-  });
+  const sampleHash = sha256(facts.map((f) => f.id).join('\n'));
+
+  // resume: 완료(run-done) 런은 스킵. 표본·원칙이 원 수집과 달라졌으면 중단 —
+  // 다른 입력의 런을 한 결과 디렉토리에 섞으면 측정이 오염된다.
+  const doneRuns = new Set();
+  if (resume && existsSync(rawPath)) {
+    const prior = readFileSync(rawPath, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    const meta = prior.find((l) => l.type === 'meta');
+    if (!meta) { console.error('resume: meta 없음'); process.exit(2); }
+    if (meta.sampleHash !== sampleHash || meta.principlesHash !== principlesHash) {
+      console.error(`resume 중단: 표본/원칙 드리프트 (sample ${meta.sampleHash === sampleHash ? 'ok' : 'CHANGED'}, principles ${meta.principlesHash === principlesHash ? 'ok' : 'CHANGED'})`);
+      process.exit(2);
+    }
+    for (const l of prior) if (l.type === 'run-done') doneRuns.add(l.run);
+    log({ type: 'resume-meta', resumedAt: new Date().toISOString(), skippingRuns: [...doneRuns] });
+    console.log(`resume: 완료 런 ${doneRuns.size}개 스킵 — ${[...doneRuns].join(', ')}`);
+  } else {
+    log({
+      type: 'meta',
+      startedAt: new Date().toISOString(),
+      dbPath: DB_PATH,
+      sampleSize: facts.length,
+      sampleHash,
+      principles: principles.length,
+      principlesHash,
+      config: { SAMPLE_SIZE, BATCH_SIZE, S_RUNS, O_SEEDS, C_SEEDS, COMMITTEE_VOTES, CONFIDENCE_PRIMARY },
+    });
+  }
 
   const runs = [];
   for (let i = 1; i <= S_RUNS; i++) runs.push({ label: `S${i}`, kind: 'single', seed: null });
   for (const s of O_SEEDS) runs.push({ label: `O${s}`, kind: 'single', seed: s });
   for (const s of C_SEEDS) runs.push({ label: `C${s}`, kind: 'committee', seed: s });
+  const pending = runs.filter((r) => !doneRuns.has(r.label));
 
-  for (const r of runs) {
-    const findings =
-      r.kind === 'single'
-        ? await runSingleVote(batches, principles, r.seed, r.label, log)
-        : await runCommittee(batches, principles, r.seed, r.label, log);
-    log({ type: 'run-done', run: r.label, kind: r.kind, seed: r.seed, findings: findings.length, detail: findings });
-  }
+  // 실행 병렬화는 런 단위만 — 런 내부는 순차라 O 런의 rng 스트림 결정론이 보존된다.
+  // (측정 설계가 아니라 실행 세부: 각 판정 콜은 상호 독립)
+  const CONCURRENCY = Math.max(1, Math.min(4, parseInt(process.env.HARNESS_CONCURRENCY || '3', 10) || 3));
+  let next = 0;
+  const worker = async () => {
+    while (next < pending.length) {
+      const r = pending[next++];
+      const findings =
+        r.kind === 'single'
+          ? await runSingleVote(batches, principles, r.seed, r.label, log)
+          : await runCommittee(batches, principles, r.seed, r.label, log);
+      log({ type: 'run-done', run: r.label, kind: r.kind, seed: r.seed, findings: findings.length, detail: findings });
+    }
+  };
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   log({ type: 'collect-done', finishedAt: new Date().toISOString() });
   console.log(`\n수집 완료 → ${rawPath}\n분석: node bench/f5-order-effect-rerun.mjs --analyze ${outDir}`);
 }
@@ -324,9 +351,28 @@ if (argv.includes('--plan')) {
   console.log(`raw findings: ${Array.isArray(out) ? out.length : out} / valid: ${valid.length}`);
   console.log(JSON.stringify(valid.slice(0, 3), null, 2));
   process.exit(0); // Agent SDK 가 핸들을 남겨 이벤트 루프가 안 비는 경우 대비 — 명시 종료
+} else if (argv.includes('--probe')) {
+  // rate limit 회복 탐지: 초소형 판정 1콜. 성공 exit 0 / 실패 exit 2.
+  const { callHaiku } = await import('../dist/llm.js');
+  try {
+    const raw = await callHaiku('Reply with exactly: []', 'Reply with exactly: []', 16);
+    if (/rate limit|API Error|overloaded/i.test(raw)) { console.log(`probe: limited — ${raw.slice(0, 80)}`); process.exit(2); }
+    console.log(`probe: ok — ${raw.trim().slice(0, 40)}`);
+    process.exit(0);
+  } catch (e) {
+    console.log(`probe: fail — ${String(e).slice(0, 120)}`);
+    process.exit(2);
+  }
 } else if (argv.includes('--collect')) {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  await collect(join('bench', 'results', `f5-rerun-${stamp}`));
+  const resumeIdx = argv.indexOf('--resume');
+  if (resumeIdx !== -1) {
+    const dir = argv[resumeIdx + 1];
+    if (!dir) { console.error('--resume <dir>'); process.exit(2); }
+    await collect(dir, { resume: true });
+  } else {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    await collect(join('bench', 'results', `f5-rerun-${stamp}`));
+  }
   process.exit(0);
 } else if (argv.includes('--analyze')) {
   const dir = argv[argv.indexOf('--analyze') + 1];
