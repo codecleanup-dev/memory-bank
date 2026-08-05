@@ -130,8 +130,8 @@ function snapshotSample() {
       source_path: p.source ?? null,
       layer: p.layer ?? 'principle',
     }));
-    const principlesHash = sha256(seedRaw);
-    return { facts, principles, principlesHash };
+    const principlesSha256 = sha256(seedRaw);
+    return { facts, principles, principlesSha256 };
   } finally {
     db.close();
   }
@@ -222,13 +222,13 @@ async function collect(outDir, { resume = false } = {}) {
     else if (obj.type === 'run-done') console.log(`── ${obj.run} 완료: findings ${obj.findings}`);
   };
 
-  const { facts, principles, principlesHash } = snapshotSample();
+  const { facts, principles, principlesSha256 } = snapshotSample();
   if (facts.length < SAMPLE_SIZE) {
     console.error(`표본 부족: active facts ${facts.length} < ${SAMPLE_SIZE}`);
     process.exit(2);
   }
   const batches = partitionBatches(facts);
-  const sampleHash = sha256(facts.map((f) => f.id).join('\n'));
+  const sampleSha256 = sha256(facts.map((f) => f.id).join('\n'));
 
   // resume: 완료(run-done) 런은 스킵. 표본·원칙이 원 수집과 달라졌으면 중단 —
   // 다른 입력의 런을 한 결과 디렉토리에 섞으면 측정이 오염된다.
@@ -237,8 +237,8 @@ async function collect(outDir, { resume = false } = {}) {
     const prior = readFileSync(rawPath, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     const meta = prior.find((l) => l.type === 'meta');
     if (!meta) { console.error('resume: meta 없음'); process.exit(2); }
-    if (meta.sampleHash !== sampleHash || meta.principlesHash !== principlesHash) {
-      console.error(`resume 중단: 표본/원칙 드리프트 (sample ${meta.sampleHash === sampleHash ? 'ok' : 'CHANGED'}, principles ${meta.principlesHash === principlesHash ? 'ok' : 'CHANGED'})`);
+    if (meta.sampleSha256 !== sampleSha256 || meta.principlesSha256 !== principlesSha256) {
+      console.error(`resume 중단: 표본/원칙 드리프트 (sample ${meta.sampleSha256 === sampleSha256 ? 'ok' : 'CHANGED'}, principles ${meta.principlesSha256 === principlesSha256 ? 'ok' : 'CHANGED'})`);
       process.exit(2);
     }
     for (const l of prior) if (l.type === 'run-done') doneRuns.add(l.run);
@@ -250,9 +250,9 @@ async function collect(outDir, { resume = false } = {}) {
       startedAt: new Date().toISOString(),
       dbPath: DB_PATH,
       sampleSize: facts.length,
-      sampleHash,
+      sampleSha256,
       principles: principles.length,
-      principlesHash,
+      principlesSha256,
       config: { SAMPLE_SIZE, BATCH_SIZE, S_RUNS, O_SEEDS, C_SEEDS, COMMITTEE_VOTES, CONFIDENCE_PRIMARY },
     });
   }
@@ -327,7 +327,7 @@ function analyze(outDir) {
   };
 
   const result = {
-    meta: { sampleHash: meta.sampleHash, sampleSize: meta.sampleSize, principles: meta.principles, principlesHash: meta.principlesHash, config: meta.config },
+    meta: { sampleSha256: meta.sampleSha256, sampleSize: meta.sampleSize, principles: meta.principles, principlesSha256: meta.principlesSha256, config: meta.config },
     primary: summarize('primary'),
     secondary: summarize('secondary'),
   };
