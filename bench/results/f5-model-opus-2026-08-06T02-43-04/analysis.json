@@ -1,0 +1,110 @@
+{
+  "meta": {
+    "sampleSha256": "b1d91b13902e290230329e93f00d9572eced00f48503afe299ebb2fc20c400c7",
+    "sampleSize": 200,
+    "principles": 10,
+    "principlesSha256": "fd239d962a94a3eed262c8f46f35a4cfbcc4371fba1bdec791679751e805c203",
+    "judgeModel": "opus",
+    "config": {
+      "SAMPLE_SIZE": 200,
+      "BATCH_SIZE": 20,
+      "sRuns": 3,
+      "oSeeds": [
+        41,
+        97,
+        131
+      ],
+      "cSeeds": [],
+      "COMMITTEE_VOTES": 3,
+      "CONFIDENCE_PRIMARY": 0.8
+    }
+  },
+  "primary": {
+    "setSizes": {
+      "S2": 2,
+      "S1": 2,
+      "S3": 2,
+      "O41": 2,
+      "O97": 3,
+      "O131": 2
+    },
+    "J_SS": {
+      "mean": 1,
+      "pairs": 3,
+      "ci": {
+        "lo": 1,
+        "hi": 1
+      }
+    },
+    "J_SO": {
+      "mean": 0.8888888888888888,
+      "pairs": 9,
+      "ci": {
+        "lo": 0.7777777777777778,
+        "hi": 1
+      }
+    },
+    "J_OO": {
+      "mean": 0.7777777777777777,
+      "pairs": 3
+    },
+    "J_CC": {
+      "mean": null,
+      "pairs": 0,
+      "ci": {
+        "lo": null,
+        "hi": null
+      }
+    },
+    "orderEffectDelta": 0.11111111111111116,
+    "deltaCI": {
+      "lo": 0.03703703703703687,
+      "hi": 0.2222222222222222
+    },
+    "pilotThreshold": 0.1
+  },
+  "secondary": {
+    "setSizes": {
+      "S2": 3,
+      "S1": 3,
+      "S3": 3,
+      "O41": 3,
+      "O97": 3,
+      "O131": 2
+    },
+    "J_SS": {
+      "mean": 1,
+      "pairs": 3,
+      "ci": {
+        "lo": 1,
+        "hi": 1
+      }
+    },
+    "J_SO": {
+      "mean": 0.7222222222222222,
+      "pairs": 9,
+      "ci": {
+        "lo": 0.5925925925925926,
+        "hi": 0.8518518518518519
+      }
+    },
+    "J_OO": {
+      "mean": 0.611111111111111,
+      "pairs": 3
+    },
+    "J_CC": {
+      "mean": null,
+      "pairs": 0,
+      "ci": {
+        "lo": null,
+        "hi": null
+      }
+    },
+    "orderEffectDelta": 0.2777777777777778,
+    "deltaCI": {
+      "lo": 0.12962962962962965,
+      "hi": 0.40740740740740744
+    },
+    "pilotThreshold": 0.1
+  }
+}

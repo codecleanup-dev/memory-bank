@@ -1,0 +1,110 @@
+{
+  "meta": {
+    "sampleSha256": "b1d91b13902e290230329e93f00d9572eced00f48503afe299ebb2fc20c400c7",
+    "sampleSize": 200,
+    "principles": 10,
+    "principlesSha256": "fd239d962a94a3eed262c8f46f35a4cfbcc4371fba1bdec791679751e805c203",
+    "judgeModel": "sonnet",
+    "config": {
+      "SAMPLE_SIZE": 200,
+      "BATCH_SIZE": 20,
+      "sRuns": 3,
+      "oSeeds": [
+        41,
+        97,
+        131
+      ],
+      "cSeeds": [],
+      "COMMITTEE_VOTES": 3,
+      "CONFIDENCE_PRIMARY": 0.8
+    }
+  },
+  "primary": {
+    "setSizes": {
+      "S1": 3,
+      "S2": 3,
+      "O41": 6,
+      "S3": 3,
+      "O97": 5,
+      "O131": 3
+    },
+    "J_SS": {
+      "mean": 0.6666666666666666,
+      "pairs": 3,
+      "ci": {
+        "lo": 0.5,
+        "hi": 1
+      }
+    },
+    "J_SO": {
+      "mean": 0.591005291005291,
+      "pairs": 9,
+      "ci": {
+        "lo": 0.4470899470899471,
+        "hi": 0.7555555555555555
+      }
+    },
+    "J_OO": {
+      "mean": 0.6444444444444445,
+      "pairs": 3
+    },
+    "J_CC": {
+      "mean": null,
+      "pairs": 0,
+      "ci": {
+        "lo": null,
+        "hi": null
+      }
+    },
+    "orderEffectDelta": 0.07566137566137565,
+    "deltaCI": {
+      "lo": -0.20211640211640214,
+      "hi": 0.39576719576719577
+    },
+    "pilotThreshold": 0.1
+  },
+  "secondary": {
+    "setSizes": {
+      "S1": 3,
+      "S2": 3,
+      "O41": 7,
+      "S3": 3,
+      "O97": 5,
+      "O131": 3
+    },
+    "J_SS": {
+      "mean": 0.6666666666666666,
+      "pairs": 3,
+      "ci": {
+        "lo": 0.5,
+        "hi": 1
+      }
+    },
+    "J_SO": {
+      "mean": 0.5711640211640211,
+      "pairs": 9,
+      "ci": {
+        "lo": 0.4198412698412699,
+        "hi": 0.7452380952380953
+      }
+    },
+    "J_OO": {
+      "mean": 0.580952380952381,
+      "pairs": 3
+    },
+    "J_CC": {
+      "mean": null,
+      "pairs": 0,
+      "ci": {
+        "lo": null,
+        "hi": null
+      }
+    },
+    "orderEffectDelta": 0.09550264550264553,
+    "deltaCI": {
+      "lo": -0.18968253968253967,
+      "hi": 0.4261904761904761
+    },
+    "pilotThreshold": 0.1
+  }
+}

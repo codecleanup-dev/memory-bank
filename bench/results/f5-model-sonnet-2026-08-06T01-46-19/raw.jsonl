@@ -1,0 +1,68 @@
+{"type":"meta","startedAt":"2026-08-06T01:46:19.246Z","dbPath":"/Users/choa712-mac/.config/superpowers/conversation-index/db.sqlite","sampleSize":200,"sampleSha256":"b1d91b13902e290230329e93f00d9572eced00f48503afe299ebb2fc20c400c7","principles":10,"principlesSha256":"fd239d962a94a3eed262c8f46f35a4cfbcc4371fba1bdec791679751e805c203","config":{"SAMPLE_SIZE":200,"BATCH_SIZE":20,"sRuns":3,"oSeeds":[41,97,131],"cSeeds":[],"COMMITTEE_VOTES":3,"CONFIDENCE_PRIMARY":0.8},"judgeModel":"sonnet"}
+{"type":"batch","run":"S1","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S2","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S1","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S2","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S1","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":4,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S2","batch":4,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S1","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":6,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":6,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"S1","kind":"single","seed":null,"findings":3,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Fact states 'build success = test complete' is a wrong judgment, indicating completion was claimed without executed verification"},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Current practice treats build success and type checking as complete testing, directly violating the principle that 'a successful build alone is not evidence of working software'"},{"fact_id":"2964868f-372e-4f0a-893f-88fdb07f0d10","principle_slug":"protected-branch-pr-only","confidence":0.85,"reasoning":"Automatic pushes when error-free would bypass PR requirement if targeting protected branches"}]}
+{"type":"batch","run":"S2","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"S2","kind":"single","seed":null,"findings":3,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Fact states build success was incorrectly treated as completion of testing, directly violating the requirement that completion claims be backed by executed verification."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Current practice treats build success and type checking as complete testing, directly violating the principle that build alone is not evidence of working software"},{"fact_id":"2964868f-372e-4f0a-893f-88fdb07f0d10","principle_slug":"human-gate-irreversible","confidence":0.95,"reasoning":"Automatic git pushes (production deploys to remote) are irreversible operations that require explicit human approval, but fact mandates they happen automatically."}]}
+{"type":"batch","run":"S3","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O41","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S3","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O41","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S3","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":3,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O41","batch":4,"judged":20,"raw":2,"valid":2}
+{"type":"batch","run":"S3","batch":4,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O41","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":6,"judged":20,"raw":2,"valid":2}
+{"type":"batch","run":"S3","batch":6,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"O41","kind":"single","seed":41,"findings":7,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Fact records that Phase 4 treats 'build success = testing complete', which directly violates the principle that completion claims must be backed by executed verification beyond a successful build."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Practice treats build success as complete testing, directly violating principle that build alone is not evidence of working software"},{"fact_id":"7fc92c38-1501-437f-8637-c913b446633b","principle_slug":"protected-branch-pr-only","confidence":0.85,"reasoning":"User preference to handle Git operations without pull requests when requested directly conflicts with the mandate that protected branches receive changes only through PRs."},{"fact_id":"2964868f-372e-4f0a-893f-88fdb07f0d10","principle_slug":"human-gate-irreversible","confidence":0.85,"reasoning":"Automatic git pushes (irreversible production operations) occur without explicit human approval per user expectation."},{"fact_id":"061acf72-43d9-46f0-bd88-6f3ee7354af2","principle_slug":"human-gate-irreversible","confidence":0.75,"reasoning":"Pre-commit hook auto-allows commits after gates pass, removing human approval step for irreversible git operations."},{"fact_id":"8679a8e1-7fd4-436c-9fd7-6f6a63cb89b5","principle_slug":"human-gate-irreversible","confidence":0.85,"reasoning":"Automatic push to remote (irreversible operation) occurs without explicit human approval per the fact's description of automatic behavior."},{"fact_id":"8c606103-e26d-4ea1-8a23-f9ce16abd669","principle_slug":"human-gate-irreversible","confidence":0.85,"reasoning":"Auto-commit with push after work completion executes irreversible remote push without requiring explicit human gate."}]}
+{"type":"batch","run":"S3","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"S3","kind":"single","seed":null,"findings":3,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Fact states build success was incorrectly treated as completion of testing, violating the requirement that completion claims be backed by executed verification."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Pattern treats build success as complete testing, but principle explicitly states 'A successful build alone is not evidence of working software'"},{"fact_id":"2964868f-372e-4f0a-893f-88fdb07f0d10","principle_slug":"human-gate-irreversible","confidence":0.95,"reasoning":"Automatic git pushes (irreversible production operation) occur without explicit human approval when work is error-free."}]}
+{"type":"batch","run":"O97","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O131","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O97","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O131","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O97","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":4,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O131","batch":4,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O97","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":6,"judged":20,"raw":2,"valid":2}
+{"type":"batch","run":"O131","batch":6,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"O97","kind":"single","seed":97,"findings":5,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Records a practice where build success was treated as completion of testing, violating the requirement that completion claims be backed by executed verification."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Current practice treats build success as complete testing without functional verification, directly violating 'build alone is not evidence of working software'"},{"fact_id":"2964868f-372e-4f0a-893f-88fdb07f0d10","principle_slug":"human-gate-irreversible","confidence":0.95,"reasoning":"Automatic git pushes (irreversible production operations) occur without explicit human approval per user preference."},{"fact_id":"8679a8e1-7fd4-436c-9fd7-6f6a63cb89b5","principle_slug":"human-gate-irreversible","confidence":0.85,"reasoning":"Automatic push to remote (irreversible operation) occurs without explicit human approval when no errors occur"},{"fact_id":"8c606103-e26d-4ea1-8a23-f9ce16abd669","principle_slug":"human-gate-irreversible","confidence":0.85,"reasoning":"Auto-commit with push after work completion executes irreversible push operation without requiring explicit human approval"}]}
+{"type":"batch","run":"O131","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"O131","kind":"single","seed":131,"findings":3,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Fact records that build success was incorrectly treated as completion of testing, violating the requirement that completion claims be backed by executed verification beyond builds."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Current practice treats build success as complete testing without functional verification"},{"fact_id":"2964868f-372e-4f0a-893f-88fdb07f0d10","principle_slug":"human-gate-irreversible","confidence":0.85,"reasoning":"Automatic pushes to remote (likely protected branches) bypass explicit human approval for irreversible production deploys."}]}
+{"type":"collect-done","finishedAt":"2026-08-06T02:27:20.041Z"}
