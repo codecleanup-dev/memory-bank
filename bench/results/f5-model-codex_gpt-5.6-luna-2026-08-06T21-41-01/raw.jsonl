@@ -1,0 +1,68 @@
+{"type":"meta","startedAt":"2026-08-06T21:41:01.990Z","dbPath":"/Users/choa712-mac/.config/superpowers/conversation-index/db.sqlite","sampleSize":200,"sampleSha256":"b1d91b13902e290230329e93f00d9572eced00f48503afe299ebb2fc20c400c7","principles":10,"principlesSha256":"fd239d962a94a3eed262c8f46f35a4cfbcc4371fba1bdec791679751e805c203","config":{"SAMPLE_SIZE":200,"BATCH_SIZE":20,"sRuns":3,"oSeeds":[41,97,131],"cSeeds":[],"COMMITTEE_VOTES":3,"CONFIDENCE_PRIMARY":0.8},"judgeModel":"codex:gpt-5.6-luna+low"}
+{"type":"batch","run":"S2","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S1","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S2","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S1","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S2","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":4,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":4,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":6,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":6,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"S1","kind":"single","seed":null,"findings":2,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.92,"reasoning":"Treating a successful build as completed functional testing makes a completion claim without executed functional verification."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.98,"reasoning":"Treating build success and type checking as complete testing despite no functional testing makes completion claims without evidence that the software works."}]}
+{"type":"batch","run":"S2","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"S2","kind":"single","seed":null,"findings":2,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.99,"reasoning":"Treating a successful build as completion of testing violates the requirement for executed verification beyond a build."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.98,"reasoning":"Treating build success and type checking as complete testing without functional verification makes completion claims unsupported by executed evidence."}]}
+{"type":"batch","run":"O41","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S3","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O41","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S3","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O41","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":4,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":4,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":6,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":6,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"O41","kind":"single","seed":41,"findings":2,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.96,"reasoning":"Treating build success as test completion makes a completion claim without executed verification of working software."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.99,"reasoning":"Treating build success and type checking as complete testing despite no functional testing violates the requirement for executed verification evidence."}]}
+{"type":"batch","run":"S3","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"S3","kind":"single","seed":null,"findings":2,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.99,"reasoning":"Treating a successful build as completed testing makes a completion claim without executed functional verification."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.98,"reasoning":"Treating build success and type checking as complete testing without functional verification makes completion claims without executed evidence that the software works."}]}
+{"type":"batch","run":"O97","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O131","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O97","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O97","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O97","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":4,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":4,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":6,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":6,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"O97","kind":"single","seed":97,"findings":2,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.99,"reasoning":"Treating a successful build as test completion makes a completion claim without executed functional verification."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.98,"reasoning":"Treating build success and type checking as complete testing despite no functional testing directly violates the requirement that completion claims be supported by evidence of working software."}]}
+{"type":"batch","run":"O131","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"O131","kind":"single","seed":131,"findings":2,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.97,"reasoning":"Treating a successful build as completed testing violates the requirement that completion claims be backed by executed verification."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.98,"reasoning":"Treating build success and type checking as complete testing without functional testing makes completion claims unsupported by adequate executed verification."}]}
+{"type":"collect-done","finishedAt":"2026-08-06T21:49:44.329Z"}
