@@ -38,7 +38,11 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { llmJudge, committeeJudge } from '../dist/principle-check.js';
+import { llmJudge, committeeJudge, buildJudgePrompt } from '../dist/principle-check.js';
+import { parseJsonResponse } from '../dist/llm.js';
+import { execFile } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { readFile as readFileAsync, rm as rmAsync } from 'node:fs/promises';
 
 // ── 사전등록 파라미터 ──
 const SAMPLE_SIZE = 200;
@@ -137,6 +141,49 @@ function snapshotSample() {
   }
 }
 
+// ── 교차 벤더 심판 (HARNESS_JUDGE=codex) ──
+// codex exec 를 read-only 샌드박스로 스폰해 동일 프롬프트(buildJudgePrompt)를 판정.
+// 모델은 CODEX_MODEL(기본 gpt-5.6-luna) + reasoning effort low. 실패는 throw(fail-stop).
+const CODEX_MODEL = process.env.CODEX_MODEL || 'gpt-5.6-luna';
+let codexSeq = 0;
+function codexExec(prompt, timeoutMs = 180_000) {
+  const outFile = `${tmpdir()}/f5-codex-${process.pid}-${codexSeq++}.txt`;
+  return new Promise((resolve, reject) => {
+    const child = execFile(
+      'codex',
+      ['exec', '-m', CODEX_MODEL, '-c', 'model_reasoning_effort=low', '-s', 'read-only', '-o', outFile, '-'],
+      { timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024 },
+      async (err) => {
+        try {
+          const text = await readFileAsync(outFile, 'utf8').catch(() => '');
+          await rmAsync(outFile, { force: true }).catch(() => {});
+          if (err && !text) return reject(new Error(`codex exec failed: ${String(err).slice(0, 200)}`));
+          resolve(text);
+        } catch (e) {
+          reject(e);
+        }
+      },
+    );
+    child.stdin.write(prompt);
+    child.stdin.end();
+  });
+}
+
+const codexJudge = async (facts, principles) => {
+  const { system, user } = buildJudgePrompt(facts, principles);
+  const raw = await codexExec(`${system}\n\n${user}`);
+  const parsed = parseJsonResponse(raw);
+  if (parsed === null && /rate limit|quota|error/i.test(raw.slice(0, 200)) && raw.trim().length < 300) {
+    throw new Error(`codex judge error response: ${raw.trim().slice(0, 160)}`);
+  }
+  return parsed;
+};
+
+const ACTIVE_JUDGE = process.env.HARNESS_JUDGE === 'codex' ? codexJudge : llmJudge;
+const JUDGE_LABEL = process.env.HARNESS_JUDGE === 'codex'
+  ? `codex:${CODEX_MODEL}+low`
+  : (process.env.MEMORY_BANK_FACT_MODEL || 'haiku (default)');
+
 function partitionBatches(facts) {
   const batches = [];
   for (let i = 0; i < facts.length; i += BATCH_SIZE) {
@@ -184,7 +231,7 @@ async function runSingleVote(batches, principles, seed, label, log) {
   const findings = [];
   for (let b = 0; b < batches.length; b++) {
     const batch = rng ? shuffled(batches[b], rng) : batches[b];
-    const out = await llmJudge(batch, principles);
+    const out = await ACTIVE_JUDGE(batch, principles);
     const valid = validateFindings(out, batch, new Set(principles.map((p) => p.slug)));
     findings.push(...valid);
     log({ type: 'batch', run: label, batch: b, judged: batch.length, raw: Array.isArray(out) ? out.length : null, valid: valid.length });
@@ -194,7 +241,7 @@ async function runSingleVote(batches, principles, seed, label, log) {
 
 /** 위원회 런(after 축): 배포본 committeeJudge — canonical 입력, 표별 셔플은 내부에서. */
 async function runCommittee(batches, principles, seed, label, log) {
-  const judge = committeeJudge(llmJudge, COMMITTEE_VOTES, mulberry32(seed));
+  const judge = committeeJudge(ACTIVE_JUDGE, COMMITTEE_VOTES, mulberry32(seed));
   const findings = [];
   for (let b = 0; b < batches.length; b++) {
     const out = await judge(batches[b], principles);
@@ -213,7 +260,8 @@ const toSet = (findings, threshold) =>
   );
 
 // ── 수집 ──
-async function collect(outDir, { resume = false } = {}) {
+async function collect(outDir, { resume = false, design = null } = {}) {
+  const D = design ?? { sRuns: S_RUNS, oSeeds: O_SEEDS, cSeeds: C_SEEDS };
   mkdirSync(outDir, { recursive: true });
   const rawPath = join(outDir, 'raw.jsonl');
   const log = (obj) => {
@@ -253,14 +301,15 @@ async function collect(outDir, { resume = false } = {}) {
       sampleSha256,
       principles: principles.length,
       principlesSha256,
-      config: { SAMPLE_SIZE, BATCH_SIZE, S_RUNS, O_SEEDS, C_SEEDS, COMMITTEE_VOTES, CONFIDENCE_PRIMARY },
+      config: { SAMPLE_SIZE, BATCH_SIZE, sRuns: D.sRuns, oSeeds: D.oSeeds, cSeeds: D.cSeeds, COMMITTEE_VOTES, CONFIDENCE_PRIMARY },
+      judgeModel: JUDGE_LABEL,
     });
   }
 
   const runs = [];
-  for (let i = 1; i <= S_RUNS; i++) runs.push({ label: `S${i}`, kind: 'single', seed: null });
-  for (const s of O_SEEDS) runs.push({ label: `O${s}`, kind: 'single', seed: s });
-  for (const s of C_SEEDS) runs.push({ label: `C${s}`, kind: 'committee', seed: s });
+  for (let i = 1; i <= D.sRuns; i++) runs.push({ label: `S${i}`, kind: 'single', seed: null });
+  for (const s of D.oSeeds) runs.push({ label: `O${s}`, kind: 'single', seed: s });
+  for (const s of D.cSeeds) runs.push({ label: `C${s}`, kind: 'committee', seed: s });
   const pending = runs.filter((r) => !doneRuns.has(r.label));
 
   // 실행 병렬화는 런 단위만 — 런 내부는 순차라 O 런의 rng 스트림 결정론이 보존된다.
@@ -327,7 +376,7 @@ function analyze(outDir) {
   };
 
   const result = {
-    meta: { sampleSha256: meta.sampleSha256, sampleSize: meta.sampleSize, principles: meta.principles, principlesSha256: meta.principlesSha256, config: meta.config },
+    meta: { sampleSha256: meta.sampleSha256, sampleSize: meta.sampleSize, principles: meta.principles, principlesSha256: meta.principlesSha256, judgeModel: meta.judgeModel ?? 'haiku (default)', config: meta.config },
     primary: summarize('primary'),
     secondary: summarize('secondary'),
   };
@@ -346,7 +395,7 @@ if (argv.includes('--plan')) {
   const { facts, principles } = snapshotSample();
   const batch = partitionBatches(facts)[0];
   console.log(`smoke: 1배치 ${batch.length} facts, principles ${principles.length}`);
-  const out = await llmJudge(batch, principles);
+  const out = await ACTIVE_JUDGE(batch, principles);
   const valid = validateFindings(out, batch, new Set(principles.map((p) => p.slug)));
   console.log(`raw findings: ${Array.isArray(out) ? out.length : out} / valid: ${valid.length}`);
   console.log(JSON.stringify(valid.slice(0, 3), null, 2));
@@ -355,7 +404,9 @@ if (argv.includes('--plan')) {
   // rate limit 회복 탐지: 초소형 판정 1콜. 성공 exit 0 / 실패 exit 2.
   const { callHaiku } = await import('../dist/llm.js');
   try {
-    const raw = await callHaiku('Reply with exactly: []', 'Reply with exactly: []', 16);
+    const raw = process.env.HARNESS_JUDGE === 'codex'
+      ? await codexExec('Reply with exactly: []')
+      : await callHaiku('Reply with exactly: []', 'Reply with exactly: []', 16);
     if (/rate limit|API Error|overloaded/i.test(raw)) { console.log(`probe: limited — ${raw.slice(0, 80)}`); process.exit(2); }
     console.log(`probe: ok — ${raw.trim().slice(0, 40)}`);
     process.exit(0);
@@ -363,6 +414,24 @@ if (argv.includes('--plan')) {
     console.log(`probe: fail — ${String(e).slice(0, 120)}`);
     process.exit(2);
   }
+} else if (argv.includes('--model-check')) {
+  // 교차 모델 검증 (사전등록 축소 설계): 질문은 delta 의 존재 여부뿐이므로
+  // S 3런 + O 시드 3종(41/97/131) = 60콜, 위원회 생략. 심판 모델은
+  // MEMORY_BANK_FACT_MODEL 로 지정하고 meta.judgeModel 에 기록된다.
+  const model = process.env.HARNESS_JUDGE === 'codex' ? `codex_${CODEX_MODEL}` : process.env.MEMORY_BANK_FACT_MODEL;
+  if (!model) { console.error('--model-check 는 MEMORY_BANK_FACT_MODEL 또는 HARNESS_JUDGE=codex 지정 필수'); process.exit(2); }
+  const resumeIdx2 = argv.indexOf('--resume');
+  if (resumeIdx2 !== -1) {
+    const dir = argv[resumeIdx2 + 1];
+    if (!dir) { console.error('--resume <dir>'); process.exit(2); }
+    await collect(dir, { resume: true, design: { sRuns: 3, oSeeds: [41, 97, 131], cSeeds: [] } });
+  } else {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    await collect(join('bench', 'results', `f5-model-${model.replace(/[^a-z0-9.-]/gi, '_')}-${stamp}`), {
+      design: { sRuns: 3, oSeeds: [41, 97, 131], cSeeds: [] },
+    });
+  }
+  process.exit(0);
 } else if (argv.includes('--collect')) {
   const resumeIdx = argv.indexOf('--resume');
   if (resumeIdx !== -1) {

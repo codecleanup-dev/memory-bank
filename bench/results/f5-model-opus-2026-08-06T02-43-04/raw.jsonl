@@ -1,0 +1,68 @@
+{"type":"meta","startedAt":"2026-08-06T02:43:04.168Z","dbPath":"/Users/choa712-mac/.config/superpowers/conversation-index/db.sqlite","sampleSize":200,"sampleSha256":"b1d91b13902e290230329e93f00d9572eced00f48503afe299ebb2fc20c400c7","principles":10,"principlesSha256":"fd239d962a94a3eed262c8f46f35a4cfbcc4371fba1bdec791679751e805c203","config":{"SAMPLE_SIZE":200,"BATCH_SIZE":20,"sRuns":3,"oSeeds":[41,97,131],"cSeeds":[],"COMMITTEE_VOTES":3,"CONFIDENCE_PRIMARY":0.8},"judgeModel":"opus"}
+{"type":"batch","run":"S2","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S1","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S2","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S1","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S2","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":4,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":4,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":6,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S1","batch":6,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S2","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S1","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S2","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"S2","kind":"single","seed":null,"findings":3,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.85,"reasoning":"Fact states that in /team Phase 4, build success is incorrectly treated as test completion ('빌드 성공 = 테스트 완료로 잘못 판단'), which directly violates the principle that a successful build alone is not evidence of working software."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.92,"reasoning":"Existing pattern treats build success as complete testing, directly violating principle that 'A successful build alone is not evidence of working software'"},{"fact_id":"8679a8e1-7fd4-436c-9fd7-6f6a63cb89b5","principle_slug":"human-gate-irreversible","confidence":0.75,"reasoning":"Automatic push to remote is an irreversible operation that this preference states happens without explicit human approval"}]}
+{"type":"batch","run":"S1","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"S1","kind":"single","seed":null,"findings":3,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.85,"reasoning":"Fact states that in /team Phase 4, build success is incorrectly treated as test completion ('빌드 성공 = 테스트 완료로 잘못 판단'), which directly violates the principle that a successful build alone is not evidence of working software."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.92,"reasoning":"Fact documents an active practice treating build success as complete testing, directly violating the principle that 'a successful build alone is not evidence of working software'"},{"fact_id":"8679a8e1-7fd4-436c-9fd7-6f6a63cb89b5","principle_slug":"human-gate-irreversible","confidence":0.75,"reasoning":"Auto-pushing to remote without explicit approval could affect protected branches, which is an irreversible operation requiring human gate"}]}
+{"type":"batch","run":"S3","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O41","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S3","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O41","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S3","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":4,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":4,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":6,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O41","batch":6,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"S3","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O41","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"S3","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"S3","kind":"single","seed":null,"findings":3,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.85,"reasoning":"Fact states that in /team Phase 4, build success is incorrectly treated as test completion ('빌드 성공 = 테스트 완료로 잘못 판단'), which directly violates the principle that a successful build alone is not evidence of working software."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.92,"reasoning":"Existing pattern treats build success as 'complete testing', directly violating principle that 'a successful build alone is not evidence of working software'"},{"fact_id":"8679a8e1-7fd4-436c-9fd7-6f6a63cb89b5","principle_slug":"human-gate-irreversible","confidence":0.75,"reasoning":"Auto-pushing to remote is an irreversible operation that this fact states happens automatically without explicit human approval when no errors occur."}]}
+{"type":"batch","run":"O41","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"O41","kind":"single","seed":41,"findings":3,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.85,"reasoning":"Fact states that in Phase 4, build success is currently treated as test completion ('빌드 성공 = 테스트 완료로 잘못 판단'), which directly violates the principle that a successful build alone is not evidence of working software."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Fact states existing pattern treats build success as complete testing; principle explicitly states 'A successful build alone is not evidence of working software.'"},{"fact_id":"8679a8e1-7fd4-436c-9fd7-6f6a63cb89b5","principle_slug":"human-gate-irreversible","confidence":0.75,"reasoning":"Automatically pushing changes without explicit human approval violates the requirement for human approval before production deploys (pushes to remote)."}]}
+{"type":"batch","run":"O97","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O131","batch":0,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O97","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O131","batch":1,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O97","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":2,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":3,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":4,"judged":20,"raw":1,"valid":1}
+{"type":"batch","run":"O131","batch":4,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":5,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":6,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":6,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":7,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O131","batch":8,"judged":20,"raw":0,"valid":0}
+{"type":"batch","run":"O97","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"O97","kind":"single","seed":97,"findings":3,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.85,"reasoning":"Fact records an active practice where build success is treated as test completion, directly violating the principle that a successful build alone is not evidence of working software."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Fact describes an existing pattern that treats build success as 'complete testing' despite no functional testing, directly violating the principle that 'a successful build alone is not evidence of working software'"},{"fact_id":"2964868f-372e-4f0a-893f-88fdb07f0d10","principle_slug":"human-gate-irreversible","confidence":0.85,"reasoning":"User expects automatic git pushes without explicit approval, but pushes to remote are potentially irreversible operations requiring human approval."}]}
+{"type":"batch","run":"O131","batch":9,"judged":20,"raw":0,"valid":0}
+{"type":"run-done","run":"O131","kind":"single","seed":131,"findings":2,"detail":[{"fact_id":"b2c7040d-2cf9-4a65-bcc9-d3a8054aa749","principle_slug":"evidence-over-claims","confidence":0.85,"reasoning":"Fact states that in /team Phase 4, build success is incorrectly treated as test completion - this is an active practice that directly violates requiring executed verification beyond just a successful build."},{"fact_id":"c8fd93fa-5723-4bf3-ad06-870e434e9719","principle_slug":"evidence-over-claims","confidence":0.95,"reasoning":"Fact records an active practice treating build success and type checking as 'complete testing' despite no functional tests, directly violating the principle that 'a successful build alone is not evidence of working software.'"}]}
+{"type":"collect-done","finishedAt":"2026-08-06T03:08:31.877Z"}
