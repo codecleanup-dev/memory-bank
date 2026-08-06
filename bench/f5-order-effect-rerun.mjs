@@ -252,6 +252,20 @@ async function runCommittee(batches, principles, seed, label, log) {
   return findings;
 }
 
+/** 고정순서 3표(셔플 없는 위원회) — 교락 해소 칸: rng 상수 0.999999 는
+ * Fisher–Yates 에서 j=i(항등 순열)를 강제하므로 3표 모두 호출자 순서 그대로 판정한다. */
+async function runFixedVotes(batches, principles, label, log) {
+  const judge = committeeJudge(ACTIVE_JUDGE, COMMITTEE_VOTES, () => 0.999999);
+  const findings = [];
+  for (let b = 0; b < batches.length; b++) {
+    const out = await judge(batches[b], principles);
+    const valid = validateFindings(out, batches[b], new Set(principles.map((p) => p.slug)));
+    findings.push(...valid);
+    log({ type: 'batch', run: label, batch: b, judged: batches[b].length, raw: Array.isArray(out) ? out.length : null, valid: valid.length });
+  }
+  return findings;
+}
+
 const toSet = (findings, threshold) =>
   new Set(
     findings
@@ -310,6 +324,7 @@ async function collect(outDir, { resume = false, design = null } = {}) {
   for (let i = 1; i <= D.sRuns; i++) runs.push({ label: `S${i}`, kind: 'single', seed: null });
   for (const s of D.oSeeds) runs.push({ label: `O${s}`, kind: 'single', seed: s });
   for (const s of D.cSeeds) runs.push({ label: `C${s}`, kind: 'committee', seed: s });
+  for (const r of D.extraRuns ?? []) runs.push(r);
   const pending = runs.filter((r) => !doneRuns.has(r.label));
 
   // 실행 병렬화는 런 단위만 — 런 내부는 순차라 O 런의 rng 스트림 결정론이 보존된다.
@@ -322,7 +337,9 @@ async function collect(outDir, { resume = false, design = null } = {}) {
       const findings =
         r.kind === 'single'
           ? await runSingleVote(batches, principles, r.seed, r.label, log)
-          : await runCommittee(batches, principles, r.seed, r.label, log);
+          : r.kind === 'fixed'
+            ? await runFixedVotes(batches, principles, r.label, log)
+            : await runCommittee(batches, principles, r.seed, r.label, log);
       log({ type: 'run-done', run: r.label, kind: r.kind, seed: r.seed, findings: findings.length, detail: findings });
     }
   };
@@ -414,6 +431,47 @@ if (argv.includes('--plan')) {
     console.log(`probe: fail — ${String(e).slice(0, 120)}`);
     process.exit(2);
   }
+} else if (argv.includes('--repair-check')) {
+  // 리뷰 수리 측정 (사전등록): (a) 고정순서 3표 위원회 4런 — J_CC 의 위원회/셔플 교락 해소
+  // (b) 같은 시드(41) 반복 2런 — 메커니즘 분리: J(R41a,R41b) 가 J_SS 급이면 "임의 고정
+  // 순서는 안정" = 위치 효과 쪽, J_OO 급이면 원래 순서(시간순 군집)가 특별 = 인접성 쪽.
+  const REPAIR_DESIGN = {
+    sRuns: 0,
+    oSeeds: [],
+    cSeeds: [],
+    extraRuns: [
+      { label: 'F1', kind: 'fixed', seed: null },
+      { label: 'F2', kind: 'fixed', seed: null },
+      { label: 'F3', kind: 'fixed', seed: null },
+      { label: 'F4', kind: 'fixed', seed: null },
+      { label: 'R41a', kind: 'single', seed: 41 },
+      { label: 'R41b', kind: 'single', seed: 41 },
+    ],
+  };
+  const rIdx = argv.indexOf('--resume');
+  if (rIdx !== -1) {
+    const dir = argv[rIdx + 1];
+    if (!dir) { console.error('--resume <dir>'); process.exit(2); }
+    await collect(dir, { resume: true, design: REPAIR_DESIGN });
+    process.exit(0);
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  await collect(join('bench', 'results', `f5-repair-${stamp}`), {
+    design: {
+      sRuns: 0,
+      oSeeds: [],
+      cSeeds: [],
+      extraRuns: [
+        { label: 'F1', kind: 'fixed', seed: null },
+        { label: 'F2', kind: 'fixed', seed: null },
+        { label: 'F3', kind: 'fixed', seed: null },
+        { label: 'F4', kind: 'fixed', seed: null },
+        { label: 'R41a', kind: 'single', seed: 41 },
+        { label: 'R41b', kind: 'single', seed: 41 },
+      ],
+    },
+  });
+  process.exit(0);
 } else if (argv.includes('--model-check')) {
   // 교차 모델 검증 (사전등록 축소 설계): 질문은 delta 의 존재 여부뿐이므로
   // S 3런 + O 시드 3종(41/97/131) = 60콜, 위원회 생략. 심판 모델은
