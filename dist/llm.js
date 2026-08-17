@@ -132,27 +132,33 @@ function backoffMs(attempt) {
     return Math.min(base * Math.pow(3, attempt), MAX_BACKOFF_MS);
 }
 const sleep = (ms) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
+/** env 정수 파싱 + 상한 클램프 — 빈값·비정수·음수가 0(즉시 포기)이 되지 않게. */
+function boundedMs(raw, def, cap) {
+    const s = raw == null ? '' : String(raw).trim();
+    const v = /^\d+$/.test(s) ? parseInt(s, 10) : def;
+    return Math.min(Math.max(v, 1), cap);
+}
 /** 단발 호출 — Agent SDK 우선, 실패 시(그리고 키가 있을 때만) Anthropic SDK 폴백. */
 async function callOnce(systemPrompt, userMessage, maxTokens) {
     const model = process.env.MEMORY_BANK_FACT_MODEL || 'haiku';
     // Try Claude Agent SDK first (works inside Claude Code without API key)
     try {
-        // 🚨 result 를 받아도 **break/return 하지 않는다** — 스트림을 끝까지 소진한다.
+        // 🚨 result 를 받아도 곧바로 이탈하지 않는다 — 스트림을 소진해야 자식이 정리된다.
         //
-        // Agent SDK 0.1.9 는 for-await 를 중도 이탈해도 spawn 한 자식 프로세스를 정리하지
-        // 않는다. 호출 1회마다 자식 1개가 영구히 남고, 백필처럼 풀로 반복 호출하면 그
-        // 잔여물이 머신을 잠식한다 (2026-08-17 실측: backfill 2시간 22분 동안 자식 163개
-        // 누적, load 급등으로 다른 세션의 리뷰 게이트가 3회 연속 watchdog 타임아웃 —
-        // 그 사이 게이트는 fail-open soft-pass 였다).
+        // Agent SDK 0.1.9 는 for-await 를 중도 이탈해도 spawn 한 자식을 정리하지 않는다.
+        // 호출 1회마다 자식 1개가 남고, 백필처럼 풀로 반복 호출하면 머신을 잠식한다
+        // (2026-08-17 실측: backfill 2시간 22분에 자식 163개, load 급등으로 다른 세션의
+        // 리뷰 게이트가 3회 연속 watchdog 타임아웃 — 그 사이 게이트는 fail-open 이었다).
         //
-        // 실측 대조 (동일 프롬프트 1회 호출):
-        //   result 에서 break  → 호출 후 자식 1개 잔존, 3초 뒤에도 1개
-        //   스트림 끝까지 소진 → 호출 후 자식 0개
+        // 동일 프롬프트 1회 호출 대조: break → 자식 1개 잔존 / 끝까지 소진 → 0개.
         //
-        // SDK 는 abort/timeout 옵션을 노출하지 않으므로(타입에 부재) 소진이 유일한 정리
-        // 경로다. 비용은 result 이후의 잔여 메시지를 더 읽는 것뿐이다.
-        let sdkResult = null;
-        for await (const message of query({
+        // 다만 **무한 소진은 금지**다. result 를 낸 뒤 닫히지 않는 스트림이 있으면 누수를
+        // 매달림으로 바꾸는 것이라 더 나쁘다(적대 리뷰). 소진에 상한을 두고, 넘으면 결과를
+        // 들고 나간다 — 그 경우 자식이 남을 수 있으나 이 함수가 매달리는 것보다 낫다.
+        // 상한 대기는 next() 자체에 race 를 걸어야 한다. 루프 안 시각 검사만으로는 다음
+        // 메시지가 영영 안 올 때 await 에서 그대로 멈춘다.
+        const drainMs = boundedMs(process.env.MEMORY_BANK_LLM_DRAIN_MS, 15_000, 120_000);
+        const stream = query({
             prompt: `${systemPrompt}\n\n${userMessage}`,
             options: {
                 model,
@@ -166,12 +172,52 @@ async function callOnce(systemPrompt, userMessage, maxTokens) {
                 settingSources: [],
                 cwd: llmWorkdir(),
             },
-        })) {
-            if (sdkResult === null &&
-                message && typeof message === 'object' && 'type' in message &&
-                message.type === 'result') {
-                sdkResult = message.result || '';
+        });
+        const iter = stream[Symbol.asyncIterator] ? stream[Symbol.asyncIterator]() : stream;
+        let sdkResult = null;
+        let drainDeadline = 0;
+        const TIMED_OUT = Symbol('drain-timeout');
+        try {
+            for (;;) {
+                let step;
+                if (sdkResult === null) {
+                    step = await iter.next();
+                }
+                else {
+                    const remaining = drainDeadline - Date.now();
+                    if (remaining <= 0)
+                        break;
+                    step = await Promise.race([
+                        iter.next(),
+                        sleep(remaining).then(() => TIMED_OUT),
+                    ]);
+                    if (step === TIMED_OUT)
+                        break;
+                }
+                if (!step || step.done)
+                    break;
+                const message = step.value;
+                if (sdkResult === null &&
+                    message && typeof message === 'object' && 'type' in message &&
+                    message.type === 'result') {
+                    sdkResult = message.result || '';
+                    drainDeadline = Date.now() + drainMs;
+                }
             }
+        }
+        catch (streamError) {
+            // 결과를 이미 확보했다면 정리 단계의 예외로 그것을 버리지 않는다 — 버리면
+            // Anthropic 폴백으로 내려가 **같은 요청을 중복 과금**하거나, 키가 없을 때
+            // 성공한 호출이 실패로 뒤집힌다 (적대 리뷰).
+            if (sdkResult === null)
+                throw streamError;
+        }
+        finally {
+            // 조기 이탈(상한 초과)에서도 이터레이터에 정리 기회를 준다.
+            try {
+                await iter.return?.();
+            }
+            catch { /* best-effort */ }
         }
         // result 메시지 없이 끝났으면 호출 실패이지 "빈 답변"이 아니다 — 기존 계약 유지.
         return sdkResult ?? '';

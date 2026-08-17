@@ -26975,11 +26975,16 @@ function backoffMs(attempt) {
   return Math.min(base * Math.pow(3, attempt), MAX_BACKOFF_MS);
 }
 var sleep2 = (ms) => ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve();
+function boundedMs(raw, def, cap) {
+  const s = raw == null ? "" : String(raw).trim();
+  const v2 = /^\d+$/.test(s) ? parseInt(s, 10) : def;
+  return Math.min(Math.max(v2, 1), cap);
+}
 async function callOnce(systemPrompt, userMessage, maxTokens) {
   const model = process.env.MEMORY_BANK_FACT_MODEL || "haiku";
   try {
-    let sdkResult = null;
-    for await (const message of query({
+    const drainMs = boundedMs(process.env.MEMORY_BANK_LLM_DRAIN_MS, 15e3, 12e4);
+    const stream = query({
       prompt: `${systemPrompt}
 
 ${userMessage}`,
@@ -26995,9 +27000,38 @@ ${userMessage}`,
         settingSources: [],
         cwd: llmWorkdir()
       }
-    })) {
-      if (sdkResult === null && message && typeof message === "object" && "type" in message && message.type === "result") {
-        sdkResult = message.result || "";
+    });
+    const iter = stream[Symbol.asyncIterator] ? stream[Symbol.asyncIterator]() : stream;
+    let sdkResult = null;
+    let drainDeadline = 0;
+    const TIMED_OUT = Symbol("drain-timeout");
+    try {
+      for (; ; ) {
+        let step;
+        if (sdkResult === null) {
+          step = await iter.next();
+        } else {
+          const remaining = drainDeadline - Date.now();
+          if (remaining <= 0) break;
+          step = await Promise.race([
+            iter.next(),
+            sleep2(remaining).then(() => TIMED_OUT)
+          ]);
+          if (step === TIMED_OUT) break;
+        }
+        if (!step || step.done) break;
+        const message = step.value;
+        if (sdkResult === null && message && typeof message === "object" && "type" in message && message.type === "result") {
+          sdkResult = message.result || "";
+          drainDeadline = Date.now() + drainMs;
+        }
+      }
+    } catch (streamError) {
+      if (sdkResult === null) throw streamError;
+    } finally {
+      try {
+        await iter.return?.();
+      } catch {
       }
     }
     return sdkResult ?? "";
