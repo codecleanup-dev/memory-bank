@@ -132,6 +132,8 @@ function backoffMs(attempt) {
     return Math.min(base * Math.pow(3, attempt), MAX_BACKOFF_MS);
 }
 const sleep = (ms) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
+/** 이터레이터 정리 대기 상한 — 정리는 best-effort 이지 계약이 아니다. */
+const CLEANUP_MS = 2_000;
 /** env 정수 파싱 + 상한 클램프 — 빈값·비정수·음수가 0(즉시 포기)이 되지 않게. */
 function boundedMs(raw, def, cap) {
     const s = raw == null ? '' : String(raw).trim();
@@ -213,9 +215,18 @@ async function callOnce(systemPrompt, userMessage, maxTokens) {
                 throw streamError;
         }
         finally {
-            // 조기 이탈(상한 초과)에서도 이터레이터에 정리 기회를 준다.
+            // 조기 이탈(상한 초과)에서도 이터레이터에 정리 기회를 준다 — **단 무제한 대기 금지**.
+            //
+            // 표준 async generator 는 return() 을 pending next() 뒤에 직렬화한다. 소진 상한으로
+            // 빠져나온 시점에는 next() 가 여전히 pending 이므로, return() 을 그냥 await 하면
+            // 방금 없앤 매달림이 finally 에서 그대로 재현된다 (적대 리뷰 지적, 실측: 정리 상한을
+            // 빼면 generator 테스트가 20초 매달린 뒤 실패). 정리는 best-effort 이지 계약이
+            // 아니므로 짧은 상한을 걸고 넘어간다.
             try {
-                await iter.return?.();
+                const ret = iter.return?.();
+                if (ret && typeof ret.then === 'function') {
+                    await Promise.race([ret, sleep(CLEANUP_MS)]);
+                }
             }
             catch { /* best-effort */ }
         }

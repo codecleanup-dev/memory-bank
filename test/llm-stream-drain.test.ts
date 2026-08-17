@@ -55,6 +55,15 @@ function throwsAfterResultStream(text: string) {
   };
 }
 
+/**
+ * 진짜 async generator — 수제 이터레이터와 달리 return() 이 pending next() 뒤에
+ * 직렬화된다. 정리 대기에 상한이 없으면 소진 상한을 지켜도 finally 에서 멈춘다.
+ */
+async function* realGeneratorThatHangs(text: string) {
+  yield resultMessage(text);
+  await new Promise<never>(() => {});
+}
+
 describe('callOnce 스트림 소진', () => {
   beforeEach(() => {
     queryMock.mockReset();
@@ -79,6 +88,20 @@ describe('callOnce 스트림 소진', () => {
     // 상한(50ms)을 크게 넘지 않아야 한다 — 매달리면 테스트 타임아웃으로 죽는다
     expect(elapsed).toBeLessThan(5_000);
   }, 15_000);
+
+  it('진짜 async generator 가 멈춰도 정리 대기에서 매달리지 않는다', async () => {
+    // 수제 이터레이터는 return() 이 없어 이 경로를 못 밟는다 (적대 리뷰 지적).
+    queryMock.mockReturnValue(realGeneratorThatHangs('GEN-OK'));
+    const { callHaiku } = await import('../src/llm.js');
+
+    const started = Date.now();
+    const out = await callHaiku('sys', 'msg', 64);
+    const elapsed = Date.now() - started;
+
+    expect(out).toBe('GEN-OK');
+    // 소진 상한(50ms) + 정리 상한(2s) 안쪽이어야 한다. 상한을 빼면 20초 매달린다.
+    expect(elapsed).toBeLessThan(8_000);
+  }, 20_000);
 
   it('result 후 예외가 나도 확보한 결과를 버리지 않는다', async () => {
     queryMock.mockReturnValue(throwsAfterResultStream('KEEP-ME'));

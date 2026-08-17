@@ -26975,6 +26975,7 @@ function backoffMs(attempt) {
   return Math.min(base * Math.pow(3, attempt), MAX_BACKOFF_MS);
 }
 var sleep2 = (ms) => ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve();
+var CLEANUP_MS = 2e3;
 function boundedMs(raw, def, cap) {
   const s = raw == null ? "" : String(raw).trim();
   const v2 = /^\d+$/.test(s) ? parseInt(s, 10) : def;
@@ -27030,7 +27031,10 @@ ${userMessage}`,
       if (sdkResult === null) throw streamError;
     } finally {
       try {
-        await iter.return?.();
+        const ret = iter.return?.();
+        if (ret && typeof ret.then === "function") {
+          await Promise.race([ret, sleep2(CLEANUP_MS)]);
+        }
       } catch {
       }
     }
