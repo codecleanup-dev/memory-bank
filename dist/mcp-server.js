@@ -26978,6 +26978,7 @@ var sleep2 = (ms) => ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.re
 async function callOnce(systemPrompt, userMessage, maxTokens) {
   const model = process.env.MEMORY_BANK_FACT_MODEL || "haiku";
   try {
+    let sdkResult = null;
     for await (const message of query({
       prompt: `${systemPrompt}
 
@@ -26995,11 +26996,11 @@ ${userMessage}`,
         cwd: llmWorkdir()
       }
     })) {
-      if (message && typeof message === "object" && "type" in message && message.type === "result") {
-        return message.result || "";
+      if (sdkResult === null && message && typeof message === "object" && "type" in message && message.type === "result") {
+        sdkResult = message.result || "";
       }
     }
-    return "";
+    return sdkResult ?? "";
   } catch (agentSdkError) {
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.MEMORY_BANK_API_TOKEN;
     if (!apiKey) {

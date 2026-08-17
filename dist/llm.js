@@ -137,6 +137,21 @@ async function callOnce(systemPrompt, userMessage, maxTokens) {
     const model = process.env.MEMORY_BANK_FACT_MODEL || 'haiku';
     // Try Claude Agent SDK first (works inside Claude Code without API key)
     try {
+        // 🚨 result 를 받아도 **break/return 하지 않는다** — 스트림을 끝까지 소진한다.
+        //
+        // Agent SDK 0.1.9 는 for-await 를 중도 이탈해도 spawn 한 자식 프로세스를 정리하지
+        // 않는다. 호출 1회마다 자식 1개가 영구히 남고, 백필처럼 풀로 반복 호출하면 그
+        // 잔여물이 머신을 잠식한다 (2026-08-17 실측: backfill 2시간 22분 동안 자식 163개
+        // 누적, load 급등으로 다른 세션의 리뷰 게이트가 3회 연속 watchdog 타임아웃 —
+        // 그 사이 게이트는 fail-open soft-pass 였다).
+        //
+        // 실측 대조 (동일 프롬프트 1회 호출):
+        //   result 에서 break  → 호출 후 자식 1개 잔존, 3초 뒤에도 1개
+        //   스트림 끝까지 소진 → 호출 후 자식 0개
+        //
+        // SDK 는 abort/timeout 옵션을 노출하지 않으므로(타입에 부재) 소진이 유일한 정리
+        // 경로다. 비용은 result 이후의 잔여 메시지를 더 읽는 것뿐이다.
+        let sdkResult = null;
         for await (const message of query({
             prompt: `${systemPrompt}\n\n${userMessage}`,
             options: {
@@ -152,12 +167,14 @@ async function callOnce(systemPrompt, userMessage, maxTokens) {
                 cwd: llmWorkdir(),
             },
         })) {
-            if (message && typeof message === 'object' && 'type' in message && message.type === 'result') {
-                return message.result || '';
+            if (sdkResult === null &&
+                message && typeof message === 'object' && 'type' in message &&
+                message.type === 'result') {
+                sdkResult = message.result || '';
             }
         }
-        // 스트림이 result 메시지 없이 끝남 — 호출 실패이지 "빈 답변"이 아니다.
-        return '';
+        // result 메시지 없이 끝났으면 호출 실패이지 "빈 답변"이 아니다 — 기존 계약 유지.
+        return sdkResult ?? '';
     }
     catch (agentSdkError) {
         // Fallback to direct Anthropic SDK if agent SDK fails (standalone mode)
