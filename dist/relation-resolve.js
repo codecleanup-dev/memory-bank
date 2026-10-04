@@ -310,12 +310,18 @@ export function planAction(pair, verdict, confidence) {
             return { kind: 'keep', reason: 'unclear' };
     }
 }
-/** Relation ids an earlier --apply run has already judged (any action, `keep` included). */
-function judgedRelationIds(db) {
+/**
+ * Relation ids an earlier --apply run already judged WHILE THEY WERE of this type (`keep`
+ * rows included). Keyed on the judged type on purpose: a CONTRADICTS edge retyped to
+ * SUPERSEDES keeps its id, and the supersedes pass must still get to see it.
+ */
+function judgedRelationIds(db, type) {
     const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'relation_resolution_log'").get();
     if (!exists)
         return new Set();
-    const rows = db.prepare('SELECT DISTINCT relation_id FROM relation_resolution_log').all();
+    const rows = db
+        .prepare('SELECT DISTINCT relation_id FROM relation_resolution_log WHERE relation_type_before = ?')
+        .all(type);
     return new Set(rows.map((r) => r.relation_id));
 }
 export function defaultArchivePath() {
@@ -440,6 +446,12 @@ function applyAction(db, pair, action, verdict, confidence, judgeReasoning) {
             return { result: 'deleted', record: base };
         }
         if (action.kind === 'retype') {
+            // A SUPERSEDES edge already pointing the OTHER way says the opposite of this verdict.
+            // Do not create a bidirectional supersedes pair and do not drop the original edge:
+            // the graph has two contradicting claims about direction and a human must pick.
+            if (action.to === 'SUPERSEDES' && relationExistsBetween(db, action.targetId, action.sourceId, 'SUPERSEDES')) {
+                return { result: 'skipped-conflicting-edge', record: null };
+            }
             // The (source, type, target) triple is unique: if the retyped edge already exists the
             // CONTRADICTS/SUPERSEDES row is simply noise on top of it — drop it instead.
             if (relationExistsBetween(db, action.sourceId, action.targetId, action.to)) {
@@ -479,7 +491,7 @@ export async function resolveQueue(db, type, opts) {
         ensureResolutionLog(db);
     // Fetch the whole active queue, drop what an earlier apply run already judged (unless
     // --rejudge), then take the bounded slice — so repeated bounded runs make progress.
-    const judged = opts.rejudge ? new Set() : judgedRelationIds(db);
+    const judged = opts.rejudge ? new Set() : judgedRelationIds(db, type);
     const allPairs = listActiveConflicts(db, type, 1_000_000);
     const fresh = allPairs.filter((p) => !judged.has(p.relationId));
     const pairs = opts.limit > 0 ? fresh.slice(0, opts.limit) : fresh;

@@ -122,7 +122,7 @@ export interface ResolvedPair {
     planned: PlannedAction['kind'];
     reason: string;
     /** What actually happened under --apply (absent on dry-run / keep). */
-    applied?: 'retyped' | 'deleted' | 'deleted-duplicate-after-retype' | 'deactivated' | 'skipped-changed';
+    applied?: 'retyped' | 'deleted' | 'deleted-duplicate-after-retype' | 'deactivated' | 'skipped-changed' | 'skipped-conflicting-edge';
 }
 export interface ResolveOptions {
     apply: boolean;

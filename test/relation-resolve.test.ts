@@ -613,6 +613,48 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('a CONTRADICTS edge retyped to SUPERSEDES is still examined by the next supersedes run', async () => {
+    const db = initDatabase();
+    try {
+      const newer = mkFact(db, 'project uses Tailwind CSS now');
+      const older = mkFact(db, 'project may adopt Tailwind');
+      const rel = createRelation(db, newer, 'CONTRADICTS', older, 'odd label');
+      const contradictsJudge = tableJudge({ 'project uses Tailwind CSS now': { verdict: 'SUPERSEDED_BY_SOURCE', confidence: 0.9 } });
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge: contradictsJudge, archivePath: archive });
+      expect(relation(db, rel.id)?.relation_type).toBe('SUPERSEDES');
+
+      const supersedesJudge = tableJudge({ 'project uses Tailwind CSS now': { verdict: 'TARGET_REDUNDANT', confidence: 0.95 } });
+      const second = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge: supersedesJudge, archivePath: archive });
+
+      expect(second.examined).toBe(1);
+      expect(second.previouslyJudged).toBe(0);
+      expect(second.applied).toEqual({ deactivated: 1 });
+      expect(active(db, older)).toBe(0);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('retyping to SUPERSEDES never creates a bidirectional pair: a reverse edge leaves the pair for a human', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'claim A');
+      const b = mkFact(db, 'claim B');
+      createRelation(db, b, 'SUPERSEDES', a, 'B replaced A (recorded earlier)');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'odd label');
+      const judge = tableJudge({ 'claim A': { verdict: 'SUPERSEDED_BY_SOURCE', confidence: 0.9 } }); // committee says A supersedes B
+
+      const summary = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+
+      expect(summary.applied).toEqual({ 'skipped-conflicting-edge': 1 });
+      expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS');
+      expect(db.prepare("SELECT COUNT(*) AS n FROM ontology_relations WHERE relation_type = 'SUPERSEDES'").get()).toEqual({ n: 1 });
+      expect(db.prepare('SELECT COUNT(*) AS n FROM relation_resolution_log').get()).toEqual({ n: 0 });
+    } finally {
+      db.close();
+    }
+  });
+
   it('resolveModelId maps SDK aliases to full ids and passes full ids through', () => {
     expect(resolveModelId('sonnet')).toBe('claude-sonnet-5');
     expect(resolveModelId(' Haiku ')).toBe('claude-haiku-4-5-20251001');
