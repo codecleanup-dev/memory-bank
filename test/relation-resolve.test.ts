@@ -204,7 +204,7 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       const rel = createRelation(db, newer, 'SUPERSEDES', older, 'replacement');
       const s2 = mkFact(db, 'reversed: the stale one recorded as superseding');
       const t2 = mkFact(db, 'reversed: the actually current claim');
-      createRelation(db, s2, 'SUPERSEDES', t2, 'direction flipped');
+      const rel2 = createRelation(db, s2, 'SUPERSEDES', t2, 'direction flipped');
       const judge = tableJudge({
         'TeamAI relays Claude and Codex through a Node supervisor': { verdict: 'TARGET_REDUNDANT', confidence: 0.95 },
         'reversed: the stale one recorded as superseding': { verdict: 'SOURCE_REDUNDANT', confidence: 0.92 },
@@ -224,13 +224,19 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       expect(rev.new_fact).toContain('TeamAI');
       expect(rev.reason).toContain(newer);
       expect(relation(db, rel.id)?.relation_type).toBe('SUPERSEDES'); // edge stays; it simply leaves the active-active queue
+      // The reversed edge now agrees with the verdict: survivor -> retired fact.
+      const corrected = db.prepare('SELECT source_fact_id, target_fact_id, reasoning FROM ontology_relations WHERE id = ?').get(rel2.id) as {
+        source_fact_id: string; target_fact_id: string; reasoning: string;
+      };
+      expect(corrected).toMatchObject({ source_fact_id: t2, target_fact_id: s2 });
+      expect(corrected.reasoning).toContain('direction corrected');
       expect(listActiveConflicts(db, 'SUPERSEDES')).toHaveLength(0);
       const lines = fs.readFileSync(archive, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
       expect(lines.map((l) => l.action)).toEqual(['deactivate', 'deactivate']);
       // Queue order is by relation created_at (ms resolution): two edges created in the same
       // instant may come back in either order, so look the record up instead of indexing.
-      expect(lines).toContainEqual(expect.objectContaining({ deactivated_fact_id: older, survivor_fact_id: newer }));
-      expect(lines).toContainEqual(expect.objectContaining({ deactivated_fact_id: s2, survivor_fact_id: t2 }));
+      expect(lines).toContainEqual(expect.objectContaining({ deactivated_fact_id: older, survivor_fact_id: newer, source_after: null }));
+      expect(lines).toContainEqual(expect.objectContaining({ deactivated_fact_id: s2, survivor_fact_id: t2, source_after: t2, target_after: s2 }));
     } finally {
       db.close();
     }
@@ -374,7 +380,31 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
-  it('unparseable judge output skips the batch without acting', async () => {
+  it('retiring the source when the corrected edge already exists drops the wrong-way edge instead of duplicating it', async () => {
+    const db = initDatabase();
+    try {
+      const stale = mkFact(db, 'stale claim recorded as superseding');
+      const current = mkFact(db, 'current claim');
+      const wrongWay = createRelation(db, stale, 'SUPERSEDES', current, 'flipped');
+      const rightWay = createRelation(db, current, 'SUPERSEDES', stale, 'correct');
+      const judge = tableJudge({ 'stale claim recorded as superseding': { verdict: 'SOURCE_REDUNDANT', confidence: 0.95 } });
+
+      const summary = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive });
+
+      // Both edges are active-active pairs; the right-way one is judged too and simply retires nothing new.
+      expect(summary.applied.deactivated).toBeGreaterThanOrEqual(1);
+      expect(active(db, stale)).toBe(0);
+      expect(active(db, current)).toBe(1);
+      expect(relation(db, wrongWay.id)).toBeUndefined();
+      expect(relation(db, rightWay.id)?.relation_type).toBe('SUPERSEDES');
+      const row = db.prepare("SELECT note FROM relation_resolution_log WHERE deactivated_fact_id = ? AND action = 'deactivate'").get(stale) as { note: string };
+      expect(row.note).toContain('edge deleted');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('unparseable judge output skips the batch without acting and, under apply, is remembered so bounded runs move on', async () => {
     const db = initDatabase();
     try {
       const a = mkFact(db, 'x');
@@ -387,6 +417,15 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       expect(summary.unparseableBatches).toBe(1);
       expect(summary.judged).toBe(0);
       expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS');
+      const log = db.prepare('SELECT action, note FROM relation_resolution_log').all() as Array<{ action: string; note: string }>;
+      expect(log).toEqual([{ action: 'unresolved', note: 'unparseable judge output' }]);
+      const again = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      expect(again.examined).toBe(0);
+      expect(again.previouslyJudged).toBe(1);
+      // A dry run never writes: the same failure leaves no row behind.
+      const dry = await resolveQueue(db, 'CONTRADICTS', { apply: false, limit: 0, judge, rejudge: true, archivePath: archive });
+      expect(dry.unparseableBatches).toBe(1);
+      expect((db.prepare('SELECT COUNT(*) AS n FROM relation_resolution_log').get() as { n: number }).n).toBe(1);
     } finally {
       db.close();
     }

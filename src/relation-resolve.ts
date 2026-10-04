@@ -746,7 +746,38 @@ function applyAction(
       source_exchange_id: null,
     });
     deactivateFact(db, loser.id);
-    const rec: LogRecord = { ...base, action: 'deactivate', deactivated_fact_id: loser.id, survivor_fact_id: survivor.id };
+    // The stored edge must agree with the verdict: SUPERSEDES points from the claim that
+    // answers now to the one it replaced. When the retired fact is the SOURCE, the stored
+    // direction says the opposite of what was just decided; correct it in the same
+    // transaction (or drop it when the correct edge already exists) and log the result.
+    let sourceAfter: string | null = null;
+    let targetAfter: string | null = null;
+    let noteAfter: string | null = null;
+    if (loser.id === pair.source.id) {
+      if (relationExistsBetween(db, survivor.id, loser.id, pair.relationType)) {
+        db.prepare('DELETE FROM ontology_relations WHERE id = ?').run(pair.relationId);
+        noteAfter = `edge deleted: a ${pair.relationType} edge already points from the survivor to the retired fact`;
+      } else {
+        db.prepare('UPDATE ontology_relations SET source_fact_id = ?, target_fact_id = ?, reasoning = ? WHERE id = ?').run(
+          survivor.id,
+          loser.id,
+          `${note} | direction corrected; was ${pair.source.id} -> ${pair.target.id}: ${live.reasoning ?? ''}`.trim(),
+          pair.relationId,
+        );
+        sourceAfter = survivor.id;
+        targetAfter = loser.id;
+        noteAfter = 'edge direction corrected: survivor -> retired fact';
+      }
+    }
+    const rec: LogRecord = {
+      ...base,
+      action: 'deactivate',
+      deactivated_fact_id: loser.id,
+      survivor_fact_id: survivor.id,
+      source_after: sourceAfter,
+      target_after: targetAfter,
+      note: noteAfter,
+    };
     insertLog(db, rec);
     return { result: 'deactivated', record: rec };
   });
@@ -785,6 +816,9 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
     if (verdicts === null) {
       summary.unparseableBatches++;
       opts.onProgress?.(`batch ${start / batchSize + 1}: unparseable judge output, skipped`);
+      // Remembered under --apply so a bounded run does not re-select the same batch forever;
+      // --rejudge brings these pairs back once the judge output is usable again.
+      if (opts.apply) for (const p of batch) recordUnresolved(db, p, 'unparseable judge output');
       continue;
     }
     // One verdict per pair. cleanVote drops invalid indexes/confidences and any pair the

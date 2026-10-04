@@ -177,7 +177,7 @@ CREATE TABLE relation_resolution_log (
   relation_type_before TEXT NOT NULL,
   relation_type_after TEXT,
   source_fact_id TEXT NOT NULL, target_fact_id TEXT NOT NULL,
-  source_after TEXT, target_after TEXT, -- retype may swap direction
+  source_after TEXT, target_after TEXT, -- retype may swap direction; deactivate records a corrected edge direction
   source_fact TEXT NOT NULL, target_fact TEXT NOT NULL,
   reasoning_before TEXT,
   verdict TEXT NOT NULL, confidence REAL NOT NULL, judge_reasoning TEXT,
