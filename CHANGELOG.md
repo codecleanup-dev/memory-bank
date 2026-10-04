@@ -22,12 +22,13 @@ _consistency 큐의 게이트된 정리. 설계 노트: `docs/2026-10-05-relatio
   측정(2026-10-05, 활성 40쌍 표본): 기존 CONTRADICTS 라벨의 약 3/4 이 서로 무관한 쌍이었다.
 
 ### Tests
-- `test/relation-resolve.test.ts` 26건(dry-run 불변·로그 테이블 미생성, 삭제·재분류·중복 간선, 비활성화 양방향,
+- `test/relation-resolve.test.ts` 27건(dry-run 불변·로그 테이블 미생성, 삭제·재분류·중복 간선, 비활성화 양방향,
   네 가드(scope·확인 횟수·임계값·판정 길이), 같은 트랜잭션 감사 행과 미러 실패 격리, 판정 중 본문·확인 횟수 변경
   건너뛰기, 판정 불가, 위원회 과반, 자기모순 표 무효, 범위 밖 confidence 제외, 단일 판정의 중복 응답 무효,
   배열 속 null·스칼라 원소 무시, 모델 별칭 → 전체 id 변환, 자기 참조 간선 보호, 간선 reasoning 변경 건너뛰기,
-  제한 런의 큐 전진(`--rejudge`, 재분류된 간선은 다음 유형 런에 다시 보임), 역방향 SUPERSEDES 와 충돌하는
-  재분류 보류, 정책 임계값), `test/relation-detect-gate.test.ts` 4건.
+  제한 런의 큐 전진(`--rejudge`, 재분류된 간선은 다음 유형 런에 다시 보임, 본문·reasoning 이 바뀐 쌍은 다시 판정,
+  변경 중 keep 은 기록 안 함), 역방향 SUPERSEDES 와 충돌하는 재분류 보류, 정책 임계값),
+  `test/relation-detect-gate.test.ts` 4건.
 
 ## [1.11.0] - 2026-08-03
 

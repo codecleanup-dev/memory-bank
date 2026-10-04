@@ -380,18 +380,41 @@ export interface ResolveSummary {
   archivePath: string;
 }
 
+interface JudgedSnapshot {
+  source_fact: string;
+  target_fact: string;
+  reasoning_before: string | null;
+}
+
 /**
- * Relation ids an earlier --apply run already judged WHILE THEY WERE of this type (`keep`
- * rows included). Keyed on the judged type on purpose: a CONTRADICTS edge retyped to
- * SUPERSEDES keeps its id, and the supersedes pass must still get to see it.
+ * What an earlier --apply run judged for each relation WHILE IT WAS of this type (`keep`
+ * rows included): the latest row per relation id, with the texts the committee read.
+ * Keyed on the judged type on purpose: a CONTRADICTS edge retyped to SUPERSEDES keeps
+ * its id, and the supersedes pass must still get to see it. The caller only skips a pair
+ * when its current texts still equal the judged ones; an edited fact or corrected
+ * reasoning makes the pair new again.
  */
-function judgedRelationIds(db: Database.Database, type: ConflictType): Set<string> {
+function judgedSnapshots(db: Database.Database, type: ConflictType): Map<string, JudgedSnapshot> {
   const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'relation_resolution_log'").get();
-  if (!exists) return new Set();
+  const out = new Map<string, JudgedSnapshot>();
+  if (!exists) return out;
   const rows = db
-    .prepare('SELECT DISTINCT relation_id FROM relation_resolution_log WHERE relation_type_before = ?')
-    .all(type) as Array<{ relation_id: string }>;
-  return new Set(rows.map((r) => r.relation_id));
+    .prepare(
+      `SELECT relation_id, source_fact, target_fact, reasoning_before
+       FROM relation_resolution_log WHERE relation_type_before = ? ORDER BY id ASC`,
+    )
+    .all(type) as Array<{ relation_id: string } & JudgedSnapshot>;
+  for (const r of rows) out.set(r.relation_id, { source_fact: r.source_fact, target_fact: r.target_fact, reasoning_before: r.reasoning_before });
+  return out;
+}
+
+function alreadyJudged(pair: ConflictPair, snap: JudgedSnapshot | undefined): boolean {
+  return (
+    !!snap &&
+    snap.source_fact === pair.source.fact &&
+    snap.target_fact === pair.target.fact &&
+    (snap.reasoning_before ?? null) === (pair.reasoning ?? null)
+  );
 }
 
 export function defaultArchivePath(): string {
@@ -511,29 +534,34 @@ function applyAction(
 ): Applied {
   if (action.kind === 'keep') {
     // No mutation, but remember the verdict so a later bounded run does not re-pay for it.
-    const stamp = new Date().toISOString();
-    const rec: LogRecord = {
-      ts: stamp,
-      action: 'keep',
-      relation_id: pair.relationId,
-      relation_type_before: pair.relationType,
-      relation_type_after: pair.relationType,
-      source_fact_id: pair.source.id,
-      target_fact_id: pair.target.id,
-      source_after: null,
-      target_after: null,
-      source_fact: pair.source.fact,
-      target_fact: pair.target.fact,
-      reasoning_before: pair.reasoning,
-      verdict,
-      confidence,
-      judge_reasoning: judgeReasoning,
-      deactivated_fact_id: null,
-      survivor_fact_id: null,
-      note: action.reason,
-    };
-    insertLog(db, rec);
-    return { result: undefined, record: null }; // keep rows are not mirrored: nothing changed
+    // The row is written only if the pair is still what the committee saw; a pair that
+    // changed meanwhile gets no keep row and will be judged afresh next run.
+    const keepTx = db.transaction((): Applied => {
+      if (!unchanged(db, pair)) return { result: 'skipped-changed', record: null };
+      const rec: LogRecord = {
+        ts: new Date().toISOString(),
+        action: 'keep',
+        relation_id: pair.relationId,
+        relation_type_before: pair.relationType,
+        relation_type_after: pair.relationType,
+        source_fact_id: pair.source.id,
+        target_fact_id: pair.target.id,
+        source_after: null,
+        target_after: null,
+        source_fact: pair.source.fact,
+        target_fact: pair.target.fact,
+        reasoning_before: pair.reasoning,
+        verdict,
+        confidence,
+        judge_reasoning: judgeReasoning,
+        deactivated_fact_id: null,
+        survivor_fact_id: null,
+        note: action.reason,
+      };
+      insertLog(db, rec);
+      return { result: undefined, record: null }; // keep rows are not mirrored: nothing changed
+    });
+    return keepTx.immediate();
   }
   // BEGIN IMMEDIATE takes the write lock before the re-check, so no other writer can
   // slip a change in between "still unchanged" and the mutation.
@@ -616,9 +644,9 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
   if (opts.apply) ensureResolutionLog(db);
   // Fetch the whole active queue, drop what an earlier apply run already judged (unless
   // --rejudge), then take the bounded slice — so repeated bounded runs make progress.
-  const judged = opts.rejudge ? new Set<string>() : judgedRelationIds(db, type);
+  const judged = opts.rejudge ? new Map<string, JudgedSnapshot>() : judgedSnapshots(db, type);
   const allPairs = listActiveConflicts(db, type, 1_000_000);
-  const fresh = allPairs.filter((p) => !judged.has(p.relationId));
+  const fresh = allPairs.filter((p) => !alreadyJudged(p, judged.get(p.relationId)));
   const pairs = opts.limit > 0 ? fresh.slice(0, opts.limit) : fresh;
   const summary: ResolveSummary = {
     type,

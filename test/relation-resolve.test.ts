@@ -594,7 +594,9 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       const second = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 1, judge, archivePath: archive });
 
       expect(first.judged + second.judged).toBe(2);
-      expect(second.previouslyJudged).toBe(1);
+      // Queue order between two edges created in the same instant is undefined: if the first
+      // run took the noise pair it was deleted, so nothing is left to skip in the second run.
+      expect(second.previouslyJudged).toBe(first.pairs[0].relationId === kept.id ? 1 : 0);
       expect(new Set([first.pairs[0].relationId, second.pairs[0].relationId])).toEqual(new Set([kept.id, noise.id]));
       expect(relation(db, kept.id)?.relation_type).toBe('CONTRADICTS');
       expect(relation(db, noise.id)).toBeUndefined();
@@ -608,6 +610,39 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       const again = await resolveQueue(db, 'CONTRADICTS', { apply: false, limit: 1, rejudge: true, judge, archivePath: archive });
       expect(again.examined).toBe(1);
       expect(again.pairs[0].relationId).toBe(kept.id);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('a kept pair is re-examined once a fact or the edge reasoning changes, and a keep row needs an unchanged pair', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'kept A');
+      const b = mkFact(db, 'kept B');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'real');
+      const judge = tableJudge({ 'kept A': { verdict: 'TRUE_CONFLICT', confidence: 0.95 } });
+
+      const first = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      expect(first.judged).toBe(1);
+      const second = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      expect(second.examined).toBe(0);
+
+      db.prepare('UPDATE facts SET fact = ? WHERE id = ?').run('kept B, corrected', b);
+      const third = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      expect(third.examined).toBe(1); // the edited pair is new again
+      expect(third.previouslyJudged).toBe(0);
+
+      // A keep verdict for a pair that changed while the judge was thinking writes no row.
+      db.prepare('UPDATE ontology_relations SET reasoning = ? WHERE id = ?').run('fresh reasoning', rel.id);
+      const racing: PairJudge = async (pairs) => {
+        db.prepare('UPDATE ontology_relations SET reasoning = ? WHERE id = ?').run('changed again mid-judge', rel.id);
+        return pairs.map((_, i) => ({ pair_index: i, verdict: 'TRUE_CONFLICT', confidence: 0.95 }));
+      };
+      const rowsBefore = (db.prepare('SELECT COUNT(*) AS n FROM relation_resolution_log').get() as { n: number }).n;
+      const fourth = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge: racing, archivePath: archive });
+      expect(fourth.applied).toEqual({ 'skipped-changed': 1 });
+      expect((db.prepare('SELECT COUNT(*) AS n FROM relation_resolution_log').get() as { n: number }).n).toBe(rowsBefore);
     } finally {
       db.close();
     }
