@@ -10,7 +10,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
  */
 
 // query() 를 모킹 — 호출마다 다음 시나리오를 방출한다.
-const scenarios: Array<{ result?: string; throws?: unknown; noResultMessage?: boolean }> = [];
+const scenarios: Array<{
+  result?: string;
+  throws?: unknown;
+  noResultMessage?: boolean;
+  /** error result: subtype other than success (is_error true unless set), optional errors[] */
+  subtype?: string;
+  is_error?: boolean;
+  errors?: string[];
+}> = [];
 let queryCalls = 0;
 
 vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
@@ -21,6 +29,16 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
       async *[Symbol.asyncIterator]() {
         if (scenario?.throws) throw scenario.throws;
         if (scenario?.noResultMessage) return; // 스트림이 result 없이 끝남
+        if (scenario?.subtype) {
+          yield {
+            type: 'result',
+            subtype: scenario.subtype,
+            is_error: scenario.is_error ?? true,
+            errors: scenario.errors,
+            result: scenario.result ?? '',
+          } as never;
+          return;
+        }
         yield { type: 'result', result: scenario?.result ?? '' } as never;
       },
     };
@@ -56,6 +74,20 @@ describe('callHaiku 재시도/복구', () => {
     const { callHaiku } = await llm();
     scenarios.push({ noResultMessage: true }, { result: 'recovered' });
     expect(await callHaiku('sys', 'user')).toBe('recovered');
+    expect(queryCalls).toBe(2);
+  });
+
+  it('AC1c: 에러 result(subtype≠success)는 "빈 응답" 이 아니라 원인이 보이는 에러로 재시도되고, 소진 시 그 원인으로 throw 한다', async () => {
+    const { callHaiku } = await llm();
+    scenarios.push({ subtype: 'error_during_execution', errors: ['rate limited by proxy'] });
+    await expect(callHaiku('sys', 'user')).rejects.toThrow(/Agent SDK result error: error_during_execution \| rate limited by proxy/);
+    expect(queryCalls).toBe(3); // 기본 재시도 2회 소진
+  });
+
+  it('AC1d: 에러 result 뒤의 정상 result 는 그대로 반환된다 (일회성 전송 오류 흡수)', async () => {
+    const { callHaiku } = await llm();
+    scenarios.push({ subtype: 'error_max_turns' }, { result: 'ok after error' });
+    expect(await callHaiku('sys', 'user')).toBe('ok after error');
     expect(queryCalls).toBe(2);
   });
 

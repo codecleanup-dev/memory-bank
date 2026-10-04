@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.12.1] - 2026-10-05
+
+_resolve 런이 판정 호출 한 번의 실패로 통째로 죽지 않게 한다. 첫 라이브 런(contradicts 62배치·supersedes 35배치)이
+각각 4·8배치 뒤 `LLM returned an empty response (attempt 3/3)` 로 중단된 실측에서 나왔다._
+
+### Fixed
+- **`memory-bank resolve`**: 위원회의 한 표가 전송 오류·재시도 소진으로 도착하지 않으면 그 표만 결석으로 치고
+  나머지 표로 과반을 낸다 (`committeePairJudge` 가 표 단위로 예외를 흡수, `onVoteError` 콜백). 도착한 표가 과반에
+  못 미치는 배치는 `unavailableBatches` 로 집계만 하고 **아무것도 기록하지 않아** 다음 런이 다시 고른다
+  (판정 출력이 깨진 배치와 구분). 표가 하나라도 결석한 배치에서는 합의 실패 쌍도, 전부 파싱 불가인 결과도
+  기록하지 않는다(결석한 표가 과반이나 읽을 수 있는 답이 될 수 있었다). 요약에 `judgeFailures`·`unavailableBatches` 행 추가, 진행 로그에 실패 사유 1줄.
+- **`callHaiku`** (`src/llm.ts`): Agent SDK 의 에러 result(`is_error` 또는 `subtype≠success`)를 빈 문자열로
+  돌리지 않고 subtype·errors 를 담은 에러로 던진다. 지금까지 모든 전송·모델 오류가 "빈 응답" 으로만 보였다.
+  재시도 의미론은 그대로(유한 재시도 후 throw).
+
+### Tests
+- `test/relation-resolve.test.ts` +6 (한 표 결석 시 나머지 과반으로 진행, 전표 결석 배치는 기록 없이 다음 런으로,
+  과반 미달 배치는 복구 뒤 다시 선택됨, 결석 1표 + 의견 불일치는 spoiled 지만 기록 없음, 결석 1표 + 파싱 불가 2표도
+  기록 없음, 단일 표 결석 생존),
+  `test/llm-retry.test.ts` +2 (에러 result 의 사유 노출과 재시도, 뒤따르는 정상 result 반환).
+
 ## [1.12.0] - 2026-10-05
 
 _consistency 큐의 게이트된 정리. 설계 노트: `docs/2026-10-05-relation-resolution.md`._

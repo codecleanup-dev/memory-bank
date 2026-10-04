@@ -26996,7 +26996,12 @@ ${userMessage}`,
       }
     })) {
       if (message && typeof message === "object" && "type" in message && message.type === "result") {
-        return message.result || "";
+        const m2 = message;
+        if (m2.is_error === true || typeof m2.subtype === "string" && m2.subtype !== "success") {
+          const detail = [m2.subtype, ...Array.isArray(m2.errors) ? m2.errors : [], typeof m2.result === "string" ? m2.result : ""].filter((s) => typeof s === "string" && s.trim() !== "").join(" | ").slice(0, 300);
+          throw new Error(`Agent SDK result error: ${detail || "no detail"}`);
+        }
+        return m2.result || "";
       }
     }
     return "";

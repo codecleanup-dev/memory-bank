@@ -153,7 +153,18 @@ async function callOnce(systemPrompt, userMessage, maxTokens) {
             },
         })) {
             if (message && typeof message === 'object' && 'type' in message && message.type === 'result') {
-                return message.result || '';
+                const m = message;
+                // An error result (is_error, or a subtype other than success) carries no answer text.
+                // Returning '' here hid the real cause behind "LLM returned an empty response" for
+                // every retry; surface it so the log says what the transport or model actually did.
+                if (m.is_error === true || (typeof m.subtype === 'string' && m.subtype !== 'success')) {
+                    const detail = [m.subtype, ...(Array.isArray(m.errors) ? m.errors : []), typeof m.result === 'string' ? m.result : '']
+                        .filter((s) => typeof s === 'string' && s.trim() !== '')
+                        .join(' | ')
+                        .slice(0, 300);
+                    throw new Error(`Agent SDK result error: ${detail || 'no detail'}`);
+                }
+                return m.result || '';
             }
         }
         // 스트림이 result 메시지 없이 끝남 — 호출 실패이지 "빈 답변"이 아니다.
