@@ -252,6 +252,10 @@ function sameScope(a, b) {
 export function planAction(pair, verdict, confidence) {
     const s = pair.source;
     const t = pair.target;
+    // A self-referential edge (the schema allows source == target) has no "other" fact:
+    // retiring the loser would retire the survivor. Nothing automatic is safe here.
+    if (s.id === t.id)
+        return { kind: 'keep', reason: 'self-referential edge; left for a human' };
     const low = (need) => confidence < need;
     if (pair.relationType === 'CONTRADICTS') {
         switch (verdict) {
@@ -346,6 +350,10 @@ function unchanged(db, pair) {
     if (!row)
         return null;
     if (row.relation_type !== pair.relationType || row.source_fact_id !== pair.source.id || row.target_fact_id !== pair.target.id)
+        return null;
+    // The extractor's reasoning is part of what the committee read; a corrected explanation
+    // invalidates the verdict (and would otherwise be archived as if it were the judged text).
+    if ((row.reasoning ?? null) !== (pair.reasoning ?? null))
         return null;
     const same = (id, snap) => {
         const f = db

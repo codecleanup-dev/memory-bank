@@ -281,6 +281,9 @@ function sameScope(a: ConflictPair['source'], b: ConflictPair['target']): boolea
 export function planAction(pair: ConflictPair, verdict: Verdict, confidence: number): PlannedAction {
   const s = pair.source;
   const t = pair.target;
+  // A self-referential edge (the schema allows source == target) has no "other" fact:
+  // retiring the loser would retire the survivor. Nothing automatic is safe here.
+  if (s.id === t.id) return { kind: 'keep', reason: 'self-referential edge; left for a human' };
   const low = (need: number) => confidence < need;
   if (pair.relationType === 'CONTRADICTS') {
     switch (verdict) {
@@ -450,6 +453,9 @@ function unchanged(db: Database.Database, pair: ConflictPair): LiveRow | null {
     .get(pair.relationId) as LiveRow | undefined;
   if (!row) return null;
   if (row.relation_type !== pair.relationType || row.source_fact_id !== pair.source.id || row.target_fact_id !== pair.target.id) return null;
+  // The extractor's reasoning is part of what the committee read; a corrected explanation
+  // invalidates the verdict (and would otherwise be archived as if it were the judged text).
+  if ((row.reasoning ?? null) !== (pair.reasoning ?? null)) return null;
   const same = (id: string, snap: ConflictPair['source']): boolean => {
     const f = db
       .prepare(`SELECT is_active, fact, category, scope_type, scope_project, consolidated_count FROM facts WHERE id = ?`)

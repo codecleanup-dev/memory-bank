@@ -536,6 +536,46 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('a self-referential edge never retires its only fact', async () => {
+    const db = initDatabase();
+    try {
+      const only = mkFact(db, 'the only fact');
+      db.prepare(
+        `INSERT INTO ontology_relations (id, source_fact_id, relation_type, target_fact_id, reasoning, created_at)
+         VALUES ('self-edge', ?, 'SUPERSEDES', ?, 'self', ?)`,
+      ).run(only, only, new Date().toISOString());
+      const judge = tableJudge({ 'the only fact': { verdict: 'TARGET_REDUNDANT', confidence: 0.99 } });
+
+      const summary = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive });
+
+      expect(summary.applied).toEqual({});
+      expect(active(db, only)).toBe(1);
+      expect(summary.pairs[0].reason).toContain('self-referential');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('skips a pair whose edge reasoning was corrected while the judge was thinking', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'r1');
+      const b = mkFact(db, 'r2');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'original explanation');
+      const judge: PairJudge = async (pairs) => {
+        db.prepare('UPDATE ontology_relations SET reasoning = ? WHERE id = ?').run('corrected explanation', rel.id);
+        return pairs.map((_, i) => ({ pair_index: i, verdict: 'UNRELATED', confidence: 0.95 }));
+      };
+
+      const summary = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+
+      expect(summary.applied).toEqual({ 'skipped-changed': 1 });
+      expect(relation(db, rel.id)?.reasoning).toBe('corrected explanation');
+    } finally {
+      db.close();
+    }
+  });
+
   it('resolveModelId maps SDK aliases to full ids and passes full ids through', () => {
     expect(resolveModelId('sonnet')).toBe('claude-sonnet-5');
     expect(resolveModelId(' Haiku ')).toBe('claude-haiku-4-5-20251001');
