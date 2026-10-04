@@ -8,8 +8,10 @@ import type { RelationType } from './types.js';
  * pairs but, by design, never acts on them. This module is the "explicitly
  * gated pipeline" the design note (docs/2026-07-25-principle-contradicts.md)
  * leaves room for: an LLM committee re-judges each pair and a bounded set of
- * actions is taken ONLY under --apply, every action appended to an archive
- * so a person can reverse it.
+ * actions is taken ONLY under --apply. Every action is written to the
+ * `relation_resolution_log` table in the SAME transaction as the change (so a
+ * change can never exist without its record) and mirrored, best-effort, to a
+ * JSONL file a person can read without the DB.
  *
  * Why it exists (measured 2026-10-05, 40 random active pairs): the relation
  * extractor labels many UNRELATED fact pairs as CONTRADICTS ("HTML explain
@@ -51,6 +53,14 @@ export declare const DEFAULT_BATCH_SIZE = 8;
 export declare const DEFAULT_VOTES = 3;
 /** Resolution is cheap per pair but the verdict shapes the graph: default to a stronger model than extraction. */
 export declare const DEFAULT_RESOLVE_MODEL = "sonnet";
+/**
+ * The judge sees each fact up to this many characters. A fact longer than this is
+ * never RETIRED on the strength of a verdict about a truncated view (planAction keeps
+ * it for a human); edge-only actions still apply because they are reversible.
+ */
+export declare const JUDGE_FACT_TEXT_LIMIT = 2000;
+/** Idempotent; called only when a run may write (dry-run leaves the schema alone). */
+export declare function ensureResolutionLog(db: Database.Database): void;
 export declare function buildResolvePrompt(pairs: ConflictPair[]): {
     system: string;
     user: string;
@@ -116,6 +126,8 @@ export interface ResolveSummary {
     unparseableBatches: number;
     planned: Record<PlannedAction['kind'], number>;
     applied: Record<string, number>;
+    /** JSONL mirror writes that failed; the DB log row is still there for each. */
+    archiveErrors: number;
     pairs: ResolvedPair[];
     archivePath: string;
 }

@@ -157,6 +157,35 @@ CREATE TABLE ontology_relations (
 );
 ```
 
+### `relation_resolution_log`
+
+Audit trail of `memory-bank resolve --apply` (created lazily on the first apply
+run; dry-run never touches the schema). One row per change — an edge deleted,
+an edge retyped, or a redundant fact retired — written in the SAME transaction
+as the change, so a change can never exist without its record. Each row keeps
+the before-state (edge type/endpoints/reasoning, both fact texts), the
+committee verdict and confidence, and for retirements the loser/survivor ids.
+`<index-dir>/relation-resolution.jsonl` is a best-effort mirror of these rows
+for reading without the DB; the table is the source of truth.
+
+```sql
+CREATE TABLE relation_resolution_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL,
+  action TEXT NOT NULL,                 -- delete | retype | deactivate
+  relation_id TEXT NOT NULL,
+  relation_type_before TEXT NOT NULL,
+  relation_type_after TEXT,
+  source_fact_id TEXT NOT NULL, target_fact_id TEXT NOT NULL,
+  source_after TEXT, target_after TEXT, -- retype may swap direction
+  source_fact TEXT NOT NULL, target_fact TEXT NOT NULL,
+  reasoning_before TEXT,
+  verdict TEXT NOT NULL, confidence REAL NOT NULL, judge_reasoning TEXT,
+  deactivated_fact_id TEXT, survivor_fact_id TEXT,
+  note TEXT
+);
+```
+
 ### `extraction_log`
 
 Idempotency marker: which sessions already went through fact extraction.

@@ -291,6 +291,87 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('writes the audit row in the same transaction; a failing JSONL mirror never loses the record', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'unrelated one');
+      const b = mkFact(db, 'unrelated two');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'noise');
+      const judge = tableJudge({ 'unrelated one': { verdict: 'UNRELATED', confidence: 0.9 } });
+      const archiveAsDir = path.join(testDir, 'archive-is-a-directory');
+      fs.mkdirSync(archiveAsDir); // appendFileSync onto a directory fails
+
+      const summary = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archiveAsDir });
+
+      expect(summary.applied).toEqual({ deleted: 1 });
+      expect(summary.archiveErrors).toBe(1);
+      expect(relation(db, rel.id)).toBeUndefined();
+      const rows = db.prepare('SELECT action, relation_id, verdict, confidence, source_fact FROM relation_resolution_log').all() as Array<Record<string, unknown>>;
+      expect(rows).toEqual([{ action: 'delete', relation_id: rel.id, verdict: 'UNRELATED', confidence: 0.9, source_fact: 'unrelated one' }]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('dry-run does not create the log table', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'x1');
+      const b = mkFact(db, 'y1');
+      createRelation(db, a, 'CONTRADICTS', b, 'n');
+      await resolveQueue(db, 'CONTRADICTS', { apply: false, limit: 0, judge: tableJudge({ x1: { verdict: 'UNRELATED', confidence: 0.9 } }), archivePath: archive });
+      const t = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='relation_resolution_log'").get();
+      expect(t).toBeUndefined();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('skips a pair whose fact text or confirmation count changed while the judge was thinking', async () => {
+    const db = initDatabase();
+    try {
+      const newer = mkFact(db, 'current claim');
+      const older = mkFact(db, 'stale claim');
+      createRelation(db, newer, 'SUPERSEDES', older, 'dup');
+      const n2 = mkFact(db, 'current claim 2');
+      const o2 = mkFact(db, 'stale claim 2');
+      createRelation(db, n2, 'SUPERSEDES', o2, 'dup');
+      const judge: PairJudge = async (pairs) => {
+        // Another process edits the loser's text in one pair and bumps the loser's confirmation count in the other.
+        db.prepare('UPDATE facts SET fact = ? WHERE id = ?').run('stale claim, now revised with a new requirement', older);
+        db.prepare('UPDATE facts SET consolidated_count = consolidated_count + 1 WHERE id = ?').run(o2);
+        return pairs.map((_, i) => ({ pair_index: i, verdict: 'TARGET_REDUNDANT', confidence: 0.99 }));
+      };
+
+      const summary = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive });
+
+      expect(summary.applied).toEqual({ 'skipped-changed': 2 });
+      expect(active(db, older)).toBe(1);
+      expect(active(db, o2)).toBe(1);
+      expect(db.prepare('SELECT COUNT(*) AS n FROM relation_resolution_log').get()).toEqual({ n: 0 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('never retires a fact longer than the judge could see', async () => {
+    const db = initDatabase();
+    try {
+      const longer = mkFact(db, 'shared prefix. ' + 'x'.repeat(2100));
+      const shorter = mkFact(db, 'shared prefix. short');
+      createRelation(db, shorter, 'SUPERSEDES', longer, 'looks duplicate when truncated');
+      const judge = tableJudge({ 'shared prefix. short': { verdict: 'TARGET_REDUNDANT', confidence: 0.99 } });
+
+      const summary = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive });
+
+      expect(summary.applied).toEqual({});
+      expect(active(db, longer)).toBe(1);
+      expect(summary.pairs[0].reason).toContain('longer than the 2000 characters');
+    } finally {
+      db.close();
+    }
+  });
+
   it('unparseable judge output skips the batch without acting', async () => {
     const db = initDatabase();
     try {
