@@ -112,12 +112,43 @@ const RESOLUTION_LOG_DDL = `CREATE TABLE IF NOT EXISTS relation_resolution_log (
   judge_reasoning TEXT,
   deactivated_fact_id TEXT,
   survivor_fact_id TEXT,
-  note TEXT
+  note TEXT,
+  source_category TEXT,
+  target_category TEXT,
+  source_scope TEXT,
+  target_scope TEXT,
+  source_count INTEGER,
+  target_count INTEGER
 )`;
+
+/** Columns added after the first shape; added idempotently so an older table keeps working. */
+const RESOLUTION_LOG_LATER_COLUMNS: ReadonlyArray<[string, string]> = [
+  ['source_category', 'TEXT'],
+  ['target_category', 'TEXT'],
+  ['source_scope', 'TEXT'],
+  ['target_scope', 'TEXT'],
+  ['source_count', 'INTEGER'],
+  ['target_count', 'INTEGER'],
+];
 
 /** Idempotent; called only when a run may write (dry-run leaves the schema alone). */
 export function ensureResolutionLog(db: Database.Database): void {
   db.exec(RESOLUTION_LOG_DDL);
+  const have = new Set((db.prepare('PRAGMA table_info(relation_resolution_log)').all() as Array<{ name: string }>).map((c) => c.name));
+  for (const [name, type] of RESOLUTION_LOG_LATER_COLUMNS) {
+    if (!have.has(name)) db.exec(`ALTER TABLE relation_resolution_log ADD COLUMN ${name} ${type}`);
+  }
+}
+
+/** Integer CLI option: the whole string must be digits and a safe integer >= min; otherwise null. */
+export function parseIntegerOption(raw: string | undefined, min: number): number | null {
+  if (typeof raw !== 'string' || !/^\d+$/.test(raw.trim())) return null;
+  const n = Number(raw.trim());
+  return Number.isSafeInteger(n) && n >= min ? n : null;
+}
+
+function scopeKey(f: ConflictPair['source']): string {
+  return `${f.scope_type}:${f.scope_project ?? ''}`;
 }
 
 function verdictSet(type: ConflictType): ReadonlySet<string> {
@@ -384,6 +415,12 @@ interface JudgedSnapshot {
   source_fact: string;
   target_fact: string;
   reasoning_before: string | null;
+  source_category: string | null;
+  target_category: string | null;
+  source_scope: string | null;
+  target_scope: string | null;
+  source_count: number | null;
+  target_count: number | null;
 }
 
 /**
@@ -400,20 +437,35 @@ function judgedSnapshots(db: Database.Database, type: ConflictType): Map<string,
   if (!exists) return out;
   const rows = db
     .prepare(
-      `SELECT relation_id, source_fact, target_fact, reasoning_before
+      `SELECT relation_id, source_fact, target_fact, reasoning_before,
+              source_category, target_category, source_scope, target_scope, source_count, target_count
        FROM relation_resolution_log WHERE relation_type_before = ? ORDER BY id ASC`,
     )
     .all(type) as Array<{ relation_id: string } & JudgedSnapshot>;
-  for (const r of rows) out.set(r.relation_id, { source_fact: r.source_fact, target_fact: r.target_fact, reasoning_before: r.reasoning_before });
+  for (const r of rows) {
+    const { relation_id, ...snap } = r;
+    out.set(relation_id, snap);
+  }
   return out;
 }
 
+/**
+ * A pair counts as already judged only while EVERY input the committee and the policy
+ * used is unchanged: both texts, the edge reasoning, both categories, both scopes, and
+ * both confirmation counts (a survivor that gained confirmations may now qualify).
+ */
 function alreadyJudged(pair: ConflictPair, snap: JudgedSnapshot | undefined): boolean {
   return (
     !!snap &&
     snap.source_fact === pair.source.fact &&
     snap.target_fact === pair.target.fact &&
-    (snap.reasoning_before ?? null) === (pair.reasoning ?? null)
+    (snap.reasoning_before ?? null) === (pair.reasoning ?? null) &&
+    snap.source_category === pair.source.category &&
+    snap.target_category === pair.target.category &&
+    snap.source_scope === scopeKey(pair.source) &&
+    snap.target_scope === scopeKey(pair.target) &&
+    snap.source_count === pair.source.consolidated_count &&
+    snap.target_count === pair.target.consolidated_count
   );
 }
 
@@ -423,8 +475,12 @@ export function defaultArchivePath(): string {
 
 interface LogRecord {
   ts: string;
-  /** `keep` rows record a judged pair that stays as it is, so bounded runs can skip it next time. */
-  action: 'delete' | 'retype' | 'deactivate' | 'keep';
+  /**
+   * `keep` rows record a judged pair that stays as it is; `unresolved` rows record a pair
+   * the committee gave no usable verdict for. Both let bounded runs move past the pair
+   * (until its inputs change or --rejudge).
+   */
+  action: 'delete' | 'retype' | 'deactivate' | 'keep' | 'unresolved';
   relation_id: string;
   relation_type_before: string;
   relation_type_after: string | null;
@@ -441,6 +497,27 @@ interface LogRecord {
   deactivated_fact_id: string | null;
   survivor_fact_id: string | null;
   note: string | null;
+  source_category: string;
+  target_category: string;
+  source_scope: string;
+  target_scope: string;
+  source_count: number;
+  target_count: number;
+}
+
+/** The judged-input snapshot every log row carries (what alreadyJudged compares against). */
+function snapshotFields(pair: ConflictPair) {
+  return {
+    source_fact: pair.source.fact,
+    target_fact: pair.target.fact,
+    reasoning_before: pair.reasoning,
+    source_category: pair.source.category,
+    target_category: pair.target.category,
+    source_scope: scopeKey(pair.source),
+    target_scope: scopeKey(pair.target),
+    source_count: pair.source.consolidated_count,
+    target_count: pair.target.consolidated_count,
+  };
 }
 
 /** Inside the mutation transaction: the record commits with the change or not at all. */
@@ -450,12 +527,41 @@ function insertLog(db: Database.Database, rec: LogRecord): void {
        ts, action, relation_id, relation_type_before, relation_type_after,
        source_fact_id, target_fact_id, source_after, target_after,
        source_fact, target_fact, reasoning_before, verdict, confidence, judge_reasoning,
-       deactivated_fact_id, survivor_fact_id, note)
+       deactivated_fact_id, survivor_fact_id, note,
+       source_category, target_category, source_scope, target_scope, source_count, target_count)
      VALUES (@ts, @action, @relation_id, @relation_type_before, @relation_type_after,
        @source_fact_id, @target_fact_id, @source_after, @target_after,
        @source_fact, @target_fact, @reasoning_before, @verdict, @confidence, @judge_reasoning,
-       @deactivated_fact_id, @survivor_fact_id, @note)`,
+       @deactivated_fact_id, @survivor_fact_id, @note,
+       @source_category, @target_category, @source_scope, @target_scope, @source_count, @target_count)`,
   ).run(rec);
+}
+
+/** A pair the committee could not judge: remembered (if unchanged) so a bounded run moves past it. */
+function recordUnresolved(db: Database.Database, pair: ConflictPair, why: string): boolean {
+  const tx = db.transaction((): boolean => {
+    if (!unchanged(db, pair)) return false;
+    insertLog(db, {
+      ts: new Date().toISOString(),
+      action: 'unresolved',
+      relation_id: pair.relationId,
+      relation_type_before: pair.relationType,
+      relation_type_after: pair.relationType,
+      source_fact_id: pair.source.id,
+      target_fact_id: pair.target.id,
+      source_after: null,
+      target_after: null,
+      verdict: 'NONE',
+      confidence: 0,
+      judge_reasoning: null,
+      deactivated_fact_id: null,
+      survivor_fact_id: null,
+      note: why,
+      ...snapshotFields(pair),
+    });
+    return true;
+  });
+  return tx.immediate();
 }
 
 /** Best-effort JSONL mirror of a committed log row. Failure is reported, never fatal. */
@@ -548,15 +654,13 @@ function applyAction(
         target_fact_id: pair.target.id,
         source_after: null,
         target_after: null,
-        source_fact: pair.source.fact,
-        target_fact: pair.target.fact,
-        reasoning_before: pair.reasoning,
         verdict,
         confidence,
         judge_reasoning: judgeReasoning,
         deactivated_fact_id: null,
         survivor_fact_id: null,
         note: action.reason,
+        ...snapshotFields(pair),
       };
       insertLog(db, rec);
       return { result: undefined, record: null }; // keep rows are not mirrored: nothing changed
@@ -580,15 +684,13 @@ function applyAction(
       target_fact_id: pair.target.id,
       source_after: null,
       target_after: null,
-      source_fact: pair.source.fact,
-      target_fact: pair.target.fact,
-      reasoning_before: live.reasoning,
       verdict,
       confidence,
       judge_reasoning: judgeReasoning,
       deactivated_fact_id: null,
       survivor_fact_id: null,
       note: null,
+      ...snapshotFields(pair),
     };
 
     if (action.kind === 'delete') {
@@ -678,12 +780,14 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
       if (!allowed.has(v.verdict)) continue;
       best.set(v.pair_index, v);
     }
-    const answered = new Set(
-      verdicts
-        .filter((v) => isFindingObject(v) && Number.isInteger(v.pair_index) && v.pair_index >= 0 && v.pair_index < batch.length)
-        .map((v) => v.pair_index),
-    ).size;
-    summary.spoiledPairs += answered - best.size;
+    // Every pair in the batch was put to the committee; one without a usable verdict (no
+    // consensus, self-contradiction, bad confidence, off-vocabulary) is spoiled. Under
+    // --apply it is remembered as unresolved so a bounded run does not stall on it.
+    for (let idx = 0; idx < batch.length; idx++) {
+      if (best.has(idx)) continue;
+      summary.spoiledPairs++;
+      if (opts.apply) recordUnresolved(db, batch[idx], 'no usable committee verdict');
+    }
     for (const [idx, v] of best) {
       const pair = batch[idx];
       summary.judged++;

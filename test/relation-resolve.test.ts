@@ -9,6 +9,7 @@ import { createRelation } from '../src/ontology-db.js';
 import { listActiveConflicts } from '../src/consistency.js';
 import {
   committeePairJudge,
+  parseIntegerOption,
   planAction,
   resolveModelId,
   resolveQueue,
@@ -688,6 +689,75 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     } finally {
       db.close();
     }
+  });
+
+  it('a kept pair is re-examined when a confirmation count, category, or scope changes', async () => {
+    const db = initDatabase();
+    try {
+      const newer = mkFact(db, 'newer claim', { confirmed: 1 });
+      const older = mkFact(db, 'older claim', { confirmed: 3 }); // better confirmed: kept by policy
+      createRelation(db, newer, 'SUPERSEDES', older, 'dup');
+      const judge = tableJudge({ 'newer claim': { verdict: 'TARGET_REDUNDANT', confidence: 0.95 } });
+
+      const first = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive });
+      expect(first.planned.keep).toBe(1);
+      expect((await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive })).examined).toBe(0);
+
+      // The survivor gains confirmations: the policy outcome can change, so the pair is new again.
+      db.prepare('UPDATE facts SET consolidated_count = 5 WHERE id = ?').run(newer);
+      const third = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive });
+      expect(third.examined).toBe(1);
+      expect(third.applied).toEqual({ deactivated: 1 });
+      expect(active(db, older)).toBe(0);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('a pair with no usable committee verdict is counted as spoiled and, under apply, remembered so bounded runs move on', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'stuck one');
+      const b = mkFact(db, 'stuck two');
+      createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const c = mkFact(db, 'noise one');
+      const d = mkFact(db, 'noise two');
+      const noise = createRelation(db, c, 'CONTRADICTS', d, 'n');
+      // Three votes, three different verdicts for the stuck pair → no consensus; the noise pair is clear.
+      let call = 0;
+      const base: PairJudge = async (pairs) =>
+        pairs.map((p, i) => {
+          if (p.source.fact === 'noise one') return { pair_index: i, verdict: 'UNRELATED', confidence: 0.95 };
+          const cycle = ['TRUE_CONFLICT', 'UNRELATED', 'RELATED_NOT_CONFLICTING'];
+          return { pair_index: i, verdict: cycle[call++ % 3], confidence: 0.9 };
+        });
+      const judge = committeePairJudge(base, 3, () => 0);
+
+      const first = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 1, judge, votes: 1, archivePath: archive });
+      const second = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 1, judge, votes: 1, archivePath: archive });
+
+      expect(first.spoiledPairs + second.spoiledPairs).toBe(1);
+      expect(first.judged + second.judged).toBe(1);
+      expect(relation(db, noise.id)).toBeUndefined();
+      const log = db.prepare('SELECT action FROM relation_resolution_log ORDER BY id').all() as Array<{ action: string }>;
+      expect(log.map((l) => l.action).sort()).toEqual(['delete', 'unresolved']);
+      const third = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 1, judge, votes: 1, archivePath: archive });
+      expect(third.examined).toBe(0); // the unresolved pair no longer stalls the queue
+      expect(third.previouslyJudged).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('parseIntegerOption accepts only whole-string safe integers', () => {
+    expect(parseIntegerOption('0', 0)).toBe(0);
+    expect(parseIntegerOption(' 200 ', 0)).toBe(200);
+    expect(parseIntegerOption('0.5', 0)).toBeNull();
+    expect(parseIntegerOption('1e3', 1)).toBeNull();
+    expect(parseIntegerOption('-1', 0)).toBeNull();
+    expect(parseIntegerOption('0', 1)).toBeNull();
+    expect(parseIntegerOption(undefined, 0)).toBeNull();
+    expect(parseIntegerOption('99999999999999999999', 0)).toBeNull();
   });
 
   it('resolveModelId maps SDK aliases to full ids and passes full ids through', () => {

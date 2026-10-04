@@ -22,7 +22,7 @@
  *   --json        machine-readable summary
  */
 import { initDatabase } from './db.js';
-import { DEFAULT_BATCH_SIZE, DEFAULT_RESOLVE_MODEL, DEFAULT_VOTES, formatResolveSummary, resolveModelId, resolveQueue, } from './relation-resolve.js';
+import { DEFAULT_BATCH_SIZE, DEFAULT_RESOLVE_MODEL, DEFAULT_VOTES, formatResolveSummary, parseIntegerOption, resolveModelId, resolveQueue, } from './relation-resolve.js';
 const USAGE = 'Usage: memory-bank resolve <contradicts|supersedes> [--apply] [--limit N] [--rejudge] [--batch-size N] [--votes K] [--model M] [--json]';
 function parseArgs(argv) {
     const opts = {
@@ -37,9 +37,11 @@ function parseArgs(argv) {
     };
     let typeGiven = false;
     const numeric = (name, raw, min) => {
-        const n = parseInt(raw ?? '', 10);
-        if (!Number.isFinite(n) || n < min) {
-            console.error(`${name}: expected an integer >= ${min}`);
+        // Whole-string integer only: "0.5" or "1e3" must not silently become 0 or 1 (a --limit of
+        // 0 means "everything", so a lenient parse would drop the cost bound the user asked for).
+        const n = parseIntegerOption(raw, min);
+        if (n === null) {
+            console.error(`${name}: expected a whole number >= ${min}, got ${raw ?? '(nothing)'}`);
             process.exit(3);
         }
         return n;

@@ -68,6 +68,8 @@ export declare function resolveModelId(name: string): string;
 export declare const JUDGE_FACT_TEXT_LIMIT = 2000;
 /** Idempotent; called only when a run may write (dry-run leaves the schema alone). */
 export declare function ensureResolutionLog(db: Database.Database): void;
+/** Integer CLI option: the whole string must be digits and a safe integer >= min; otherwise null. */
+export declare function parseIntegerOption(raw: string | undefined, min: number): number | null;
 export declare function buildResolvePrompt(pairs: ConflictPair[]): {
     system: string;
     user: string;

@@ -182,9 +182,18 @@ CREATE TABLE relation_resolution_log (
   reasoning_before TEXT,
   verdict TEXT NOT NULL, confidence REAL NOT NULL, judge_reasoning TEXT,
   deactivated_fact_id TEXT, survivor_fact_id TEXT,
-  note TEXT
+  note TEXT,
+  -- judged-input snapshot: a later bounded run skips the pair only while all of these still match
+  source_category TEXT, target_category TEXT,
+  source_scope TEXT, target_scope TEXT,       -- "<scope_type>:<scope_project or empty>"
+  source_count INTEGER, target_count INTEGER  -- consolidated_count at judging time
 );
 ```
+
+`action` is one of `delete | retype | deactivate | keep | unresolved`; `keep` and
+`unresolved` rows record no change, only that the pair was judged (or could not be),
+so `memory-bank resolve --limit N` walks the queue instead of re-paying for the same
+newest pairs (`--rejudge` ignores them).
 
 ### `extraction_log`
 
