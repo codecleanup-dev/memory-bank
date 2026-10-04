@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.12.0] - 2026-10-05
+
+_consistency 큐의 게이트된 정리. 설계 노트: `docs/2026-10-05-relation-resolution.md`._
+
+### Added
+- **`memory-bank resolve <contradicts|supersedes>`** (`src/relation-resolve.ts`, `-cli.ts`): 활성-활성
+  CONTRADICTS/SUPERSEDES 쌍을 LLM 위원회(기본 3표·과반·중앙값, 기본 모델 `sonnet`)로 재판정하고
+  dry-run 기본으로 계획만 보인다. `--apply` 에서만 행동하며 모든 변경은
+  `<index-dir>/relation-resolution.jsonl` 에 변경 전 상태와 함께 기록된다.
+  - CONTRADICTS: 팩트는 건드리지 않는다. UNRELATED → 간선 삭제, RELATED_NOT_CONFLICTING → INFLUENCES,
+    중복 모양 → SUPERSEDES 로 재분류, TRUE_CONFLICT 는 큐에 남긴다.
+  - SUPERSEDES: 위원회 ≥ 0.9, 같은 scope, 패자가 더 많이 확인되지 않았을 때만 패자를 `is_active=0` 으로
+    내리고 `fact_revisions` 에 남긴다. BOTH_VALID → INFLUENCES, UNRELATED → 삭제.
+  - 행동 직전 간선·팩트를 다시 읽어 스캔 때와 다르면 건너뛴다. 판정 불가 배치는 건너뛰고 집계한다.
+- **관계 추출 same_question 게이트** (`detectRelationBetween`): CONTRADICTS/SUPERSEDES 는 응답의
+  `same_question` 이 `true` 일 때만 저장한다. 프롬프트도 "같은 질문에 다른 답" 조건을 명시한다.
+  측정(2026-10-05, 활성 40쌍 표본): 기존 CONTRADICTS 라벨의 약 3/4 이 서로 무관한 쌍이었다.
+
+### Tests
+- `test/relation-resolve.test.ts` 12건(dry-run 불변, 삭제·재분류·중복 간선, 비활성화 양방향, 세 가드,
+  판정 불가, 경쟁 변경 건너뛰기, 위원회 과반, 정책 임계값), `test/relation-detect-gate.test.ts` 4건.
+
 ## [1.11.0] - 2026-08-03
 
 _Fork release: true merge of upstream v1.5.0 (`1c8e465..18762b6`, 34 commits) —

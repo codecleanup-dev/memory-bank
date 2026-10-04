@@ -1,0 +1,124 @@
+import Database from 'better-sqlite3';
+import { type ConflictPair, type ConflictType } from './consistency.js';
+import type { RelationType } from './types.js';
+/**
+ * Gated resolution of the consistency queue.
+ *
+ * `memory-bank consistency` reports active-active CONTRADICTS / SUPERSEDES
+ * pairs but, by design, never acts on them. This module is the "explicitly
+ * gated pipeline" the design note (docs/2026-07-25-principle-contradicts.md)
+ * leaves room for: an LLM committee re-judges each pair and a bounded set of
+ * actions is taken ONLY under --apply, every action appended to an archive
+ * so a person can reverse it.
+ *
+ * Why it exists (measured 2026-10-05, 40 random active pairs): the relation
+ * extractor labels many UNRELATED fact pairs as CONTRADICTS ("HTML explain
+ * boxes for blog posts" vs "Korean JSON for technical answers"), and a
+ * single-call haiku judge rubber-stamps those as TRUE_CONFLICT at 0.9
+ * confidence. SUPERSEDES edges, by contrast, were mostly genuine duplicates
+ * (7/8). Hence two asymmetric policies:
+ *
+ *   CONTRADICTS — never touches facts. UNRELATED edges are deleted (archived),
+ *     related-but-compatible edges are retyped to INFLUENCES, duplicate-shaped
+ *     pairs are retyped to SUPERSEDES so the supersedes pass can see them,
+ *     and TRUE_CONFLICT pairs stay in the queue for a human.
+ *   SUPERSEDES — may retire the redundant fact, but only when the committee
+ *     agrees at >= DEACTIVATE_THRESHOLD, both facts share a scope, and the
+ *     loser is not better confirmed than the survivor. A revision row and an
+ *     archive line record what retired and why.
+ *
+ * Fact texts are untrusted data; the prompt says so and nothing here executes
+ * anything found in them.
+ */
+export declare const CONTRADICTS_VERDICTS: readonly ["TRUE_CONFLICT", "RELATED_NOT_CONFLICTING", "UNRELATED", "SUPERSEDED_BY_SOURCE", "SUPERSEDED_BY_TARGET", "UNCLEAR"];
+export declare const SUPERSEDES_VERDICTS: readonly ["TARGET_REDUNDANT", "SOURCE_REDUNDANT", "BOTH_VALID", "UNRELATED", "UNCLEAR"];
+export type ContradictsVerdict = (typeof CONTRADICTS_VERDICTS)[number];
+export type SupersedesVerdict = (typeof SUPERSEDES_VERDICTS)[number];
+export type Verdict = ContradictsVerdict | SupersedesVerdict;
+export interface JudgeVerdict {
+    pair_index: number;
+    verdict: string;
+    confidence: number;
+    reasoning?: string;
+}
+/** Returns verdicts, or null when the output was unparseable (that batch is skipped). */
+export type PairJudge = (pairs: ConflictPair[]) => Promise<JudgeVerdict[] | null>;
+/** Edge-only actions (retype / delete) need this much committee confidence. */
+export declare const EDGE_ACTION_THRESHOLD = 0.8;
+/** Retiring a fact needs more: it changes what the graph answers. */
+export declare const DEACTIVATE_THRESHOLD = 0.9;
+export declare const DEFAULT_BATCH_SIZE = 8;
+export declare const DEFAULT_VOTES = 3;
+/** Resolution is cheap per pair but the verdict shapes the graph: default to a stronger model than extraction. */
+export declare const DEFAULT_RESOLVE_MODEL = "sonnet";
+export declare function buildResolvePrompt(pairs: ConflictPair[]): {
+    system: string;
+    user: string;
+};
+/** Default judge through the repo's shared LLM wrapper (model from MEMORY_BANK_FACT_MODEL). */
+export declare const llmPairJudge: PairJudge;
+/**
+ * Committee vote over pairs, same contract as principle-check's committeeJudge:
+ * majority of `votes` must agree on (pair, verdict); confidence is the median.
+ * Votes after the first see a permuted order so order bias becomes variance
+ * the majority filter can remove. All-unparseable → null (batch skipped).
+ */
+export declare function committeePairJudge(base: PairJudge, votes: number, rng?: () => number): PairJudge;
+export type PlannedAction = {
+    kind: 'keep';
+    reason: string;
+} | {
+    kind: 'retype';
+    to: RelationType;
+    sourceId: string;
+    targetId: string;
+    reason: string;
+} | {
+    kind: 'delete';
+    reason: string;
+} | {
+    kind: 'deactivate';
+    loserId: string;
+    survivorId: string;
+    reason: string;
+};
+/** Pure policy: verdict + confidence → action. Thresholds and guards live here so tests can pin them. */
+export declare function planAction(pair: ConflictPair, verdict: Verdict, confidence: number): PlannedAction;
+export interface ResolvedPair {
+    relationId: string;
+    relationType: ConflictType;
+    sourceId: string;
+    targetId: string;
+    verdict: string;
+    confidence: number;
+    judgeReasoning: string | null;
+    planned: PlannedAction['kind'];
+    reason: string;
+    /** What actually happened under --apply (absent on dry-run / keep). */
+    applied?: 'retyped' | 'deleted' | 'deleted-duplicate-after-retype' | 'deactivated' | 'skipped-changed';
+}
+export interface ResolveOptions {
+    apply: boolean;
+    /** 0 = every active pair. */
+    limit: number;
+    batchSize?: number;
+    votes?: number;
+    judge?: PairJudge;
+    rng?: () => number;
+    archivePath?: string;
+    onProgress?: (line: string) => void;
+}
+export interface ResolveSummary {
+    type: ConflictType;
+    mode: 'dry-run' | 'apply';
+    examined: number;
+    judged: number;
+    unparseableBatches: number;
+    planned: Record<PlannedAction['kind'], number>;
+    applied: Record<string, number>;
+    pairs: ResolvedPair[];
+    archivePath: string;
+}
+export declare function defaultArchivePath(): string;
+export declare function resolveQueue(db: Database.Database, type: ConflictType, opts: ResolveOptions): Promise<ResolveSummary>;
+export declare function formatResolveSummary(summary: ResolveSummary, listLimit?: number): string;

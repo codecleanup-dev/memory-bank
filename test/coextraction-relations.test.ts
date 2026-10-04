@@ -114,6 +114,7 @@ describe('co-extraction relation channel', () => {
     (parseJsonResponse as Mock).mockReturnValue({
       has_relation: true,
       relation_type: 'CONTRADICTS',
+      same_question: true, // conflict-shaped types need the same-question assertion (2026-10-05 gate)
       reasoning: 'later evidence conflicts',
     });
     await detectCoExtractionRelations(db, [a, b]);
