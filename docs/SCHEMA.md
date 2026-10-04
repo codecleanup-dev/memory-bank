@@ -191,9 +191,11 @@ CREATE TABLE relation_resolution_log (
 ```
 
 `action` is one of `delete | retype | deactivate | keep | unresolved`; `keep` and
-`unresolved` rows record no change, only that the pair was judged (or could not be),
-so `memory-bank resolve --limit N` walks the queue instead of re-paying for the same
-newest pairs (`--rejudge` ignores them).
+`unresolved` rows record no change, only that the pair was judged (or could not be:
+no committee consensus, or a reverse SUPERSEDES edge already exists), so
+`memory-bank resolve --limit N` walks the queue instead of re-paying for the same
+newest pairs (`--rejudge` ignores them). A dry run against an older-shaped table reads
+the missing snapshot columns as NULL and leaves the shape alone.
 
 ### `extraction_log`
 

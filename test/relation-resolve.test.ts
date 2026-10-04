@@ -433,8 +433,65 @@ describe('relation resolve (gated consistency queue resolution)', () => {
 
       expect(call).toBe(3);
       expect(summary.judged).toBe(1);
-      // median of the two agreeing votes (same upper-median rule as principle-check's committee)
-      expect(summary.pairs[0]).toMatchObject({ relationId: rel.id, verdict: 'UNRELATED', confidence: 0.95, planned: 'delete' });
+      // lower median of the two agreeing votes: the committee is as sure as its less-confident half
+      expect(summary.pairs[0]).toMatchObject({ relationId: rel.id, verdict: 'UNRELATED', confidence: 0.82, planned: 'delete' });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('one very confident vote cannot carry a doubtful agreeing vote past the retirement threshold', async () => {
+    const db = initDatabase();
+    try {
+      const newer = mkFact(db, 'newer');
+      const older = mkFact(db, 'older');
+      createRelation(db, newer, 'SUPERSEDES', older, 'dup');
+      const votes: JudgeVerdict[][] = [
+        [{ pair_index: 0, verdict: 'TARGET_REDUNDANT', confidence: 0.1 }],
+        [{ pair_index: 0, verdict: 'TARGET_REDUNDANT', confidence: 0.99 }],
+        [{ pair_index: 0, verdict: 'BOTH_VALID', confidence: 0.99 }],
+      ];
+      let call = 0;
+      const base: PairJudge = async () => votes[call++] ?? null;
+      const judge = committeePairJudge(base, 3, () => 0);
+
+      const summary = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, votes: 1, archivePath: archive });
+
+      expect(summary.pairs[0]).toMatchObject({ verdict: 'TARGET_REDUNDANT', confidence: 0.1, planned: 'keep' });
+      expect(summary.applied).toEqual({});
+      expect(active(db, older)).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('a dry run tolerates an older-shaped log table and re-judges pairs whose snapshot columns are missing', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'alpha');
+      const b = mkFact(db, 'beta');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      db.exec(`CREATE TABLE relation_resolution_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, action TEXT NOT NULL,
+        relation_id TEXT NOT NULL, relation_type_before TEXT NOT NULL, relation_type_after TEXT,
+        source_fact_id TEXT NOT NULL, target_fact_id TEXT NOT NULL, source_after TEXT, target_after TEXT,
+        source_fact TEXT NOT NULL, target_fact TEXT NOT NULL, reasoning_before TEXT,
+        verdict TEXT NOT NULL, confidence REAL NOT NULL, judge_reasoning TEXT,
+        deactivated_fact_id TEXT, survivor_fact_id TEXT, note TEXT)`);
+      db.prepare(
+        `INSERT INTO relation_resolution_log (ts, action, relation_id, relation_type_before, relation_type_after,
+           source_fact_id, target_fact_id, source_fact, target_fact, reasoning_before, verdict, confidence)
+         VALUES ('t', 'keep', ?, 'CONTRADICTS', 'CONTRADICTS', ?, ?, 'alpha', 'beta', 'n', 'TRUE_CONFLICT', 0.9)`,
+      ).run(rel.id, a, b);
+      const judge = tableJudge({ alpha: { verdict: 'UNRELATED', confidence: 0.95 } });
+
+      const summary = await resolveQueue(db, 'CONTRADICTS', { apply: false, limit: 0, judge, archivePath: archive });
+
+      expect(summary.examined).toBe(1); // snapshot incomplete → judged again
+      expect(summary.planned.delete).toBe(1);
+      const cols = (db.prepare('PRAGMA table_info(relation_resolution_log)').all() as Array<{ name: string }>).length;
+      expect(cols).toBe(19); // dry run left the old shape alone
+      expect(relation(db, rel.id)).toBeDefined();
     } finally {
       db.close();
     }
@@ -685,7 +742,14 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       expect(summary.applied).toEqual({ 'skipped-conflicting-edge': 1 });
       expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS');
       expect(db.prepare("SELECT COUNT(*) AS n FROM ontology_relations WHERE relation_type = 'SUPERSEDES'").get()).toEqual({ n: 1 });
-      expect(db.prepare('SELECT COUNT(*) AS n FROM relation_resolution_log').get()).toEqual({ n: 0 });
+      // Remembered as unresolved (nothing changed), so a bounded run does not stall on this pair.
+      const log = db.prepare('SELECT action, note FROM relation_resolution_log').all() as Array<{ action: string; note: string }>;
+      expect(log).toHaveLength(1);
+      expect(log[0].action).toBe('unresolved');
+      expect(log[0].note).toContain('skipped-conflicting-edge');
+      const again = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      expect(again.examined).toBe(0);
+      expect(again.previouslyJudged).toBe(1);
     } finally {
       db.close();
     }

@@ -291,8 +291,11 @@ export function committeePairJudge(base: PairJudge, votes: number, rng: () => nu
     const agreed: JudgeVerdict[] = [];
     for (const { finding, confidences } of tally.values()) {
       if (confidences.length < majority) continue;
+      // Lower median: with an even number of agreeing votes the committee is only as sure as
+      // its less-confident half. The upper middle would let one 0.99 vote carry a 0.1 vote
+      // past the retirement threshold.
       const sorted = [...confidences].sort((a, b) => a - b);
-      agreed.push({ ...finding, confidence: sorted[Math.floor(sorted.length / 2)] });
+      agreed.push({ ...finding, confidence: sorted[Math.floor((sorted.length - 1) / 2)] });
     }
     return agreed;
   };
@@ -435,10 +438,14 @@ function judgedSnapshots(db: Database.Database, type: ConflictType): Map<string,
   const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'relation_resolution_log'").get();
   const out = new Map<string, JudgedSnapshot>();
   if (!exists) return out;
+  // A dry run never migrates the table, so an older-shaped log may lack the later snapshot
+  // columns. Read those as NULL: the snapshot then fails to match and the pair is judged
+  // again, which is the conservative outcome.
+  const have = new Set((db.prepare('PRAGMA table_info(relation_resolution_log)').all() as Array<{ name: string }>).map((c) => c.name));
+  const later = RESOLUTION_LOG_LATER_COLUMNS.map(([name]) => (have.has(name) ? name : `NULL AS ${name}`)).join(', ');
   const rows = db
     .prepare(
-      `SELECT relation_id, source_fact, target_fact, reasoning_before,
-              source_category, target_category, source_scope, target_scope, source_count, target_count
+      `SELECT relation_id, source_fact, target_fact, reasoning_before, ${later}
        FROM relation_resolution_log WHERE relation_type_before = ? ORDER BY id ASC`,
     )
     .all(type) as Array<{ relation_id: string } & JudgedSnapshot>;
@@ -703,6 +710,14 @@ function applyAction(
       // Do not create a bidirectional supersedes pair and do not drop the original edge:
       // the graph has two contradicting claims about direction and a human must pick.
       if (action.to === 'SUPERSEDES' && relationExistsBetween(db, action.targetId, action.sourceId, 'SUPERSEDES')) {
+        // Remembered as unresolved so a bounded run moves past it; the reverse edge is not
+        // part of the snapshot, so if a human later removes it, --rejudge brings the pair back.
+        insertLog(db, {
+          ...base,
+          action: 'unresolved',
+          relation_type_after: pair.relationType,
+          note: 'skipped-conflicting-edge: a SUPERSEDES edge already points the other way; a human picks the direction',
+        });
         return { result: 'skipped-conflicting-edge', record: null };
       }
       // The (source, type, target) triple is unique: if the retyped edge already exists the
