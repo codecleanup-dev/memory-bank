@@ -20,9 +20,11 @@ const scenarios: Array<{
   errors?: string[];
 }> = [];
 let queryCalls = 0;
+let lastQueryOptions: Record<string, unknown> | undefined;
 
 vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
-  query: (_args: unknown) => {
+  query: (args: unknown) => {
+    lastQueryOptions = (args as { options?: Record<string, unknown> } | undefined)?.options;
     const scenario = scenarios[Math.min(queryCalls, scenarios.length - 1)];
     queryCalls++;
     return {
@@ -52,6 +54,7 @@ async function llm() {
 beforeEach(() => {
   scenarios.length = 0;
   queryCalls = 0;
+  lastQueryOptions = undefined;
   process.env.MEMORY_BANK_LLM_RETRY_BASE_MS = '0'; // 테스트에서 백오프 대기 없음
   delete process.env.ANTHROPIC_API_KEY;            // Anthropic SDK 폴백 비활성 (구독 경로만)
   delete process.env.MEMORY_BANK_API_TOKEN;
@@ -62,6 +65,13 @@ afterEach(() => {
 });
 
 describe('callHaiku 재시도/복구', () => {
+  it('AC0: 한 턴짜리 텍스트 분류 호출은 도구 없이(tools: []) 보낸다 — 도구 호출로 턴을 써 버린 error_max_turns 차단', async () => {
+    const { callHaiku } = await llm();
+    scenarios.push({ result: '{"ok":true}' });
+    await callHaiku('sys', 'user');
+    expect(lastQueryOptions).toMatchObject({ maxTurns: 1, tools: [], settingSources: [] });
+  });
+
   it('AC1: 빈 응답을 재시도하고, 재시도가 성공하면 결과를 반환한다', async () => {
     const { callHaiku } = await llm();
     scenarios.push({ result: '' }, { result: '{"ok":true}' });
