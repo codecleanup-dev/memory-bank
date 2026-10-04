@@ -19,7 +19,7 @@
 | CONTRADICTS | 없음 | UNRELATED → 삭제(아카이브), RELATED_NOT_CONFLICTING → INFLUENCES, 중복 모양 → SUPERSEDES 로 재분류 | TRUE_CONFLICT 는 큐에 남긴다 |
 | SUPERSEDES | 위원회 ≥ 0.9, 같은 scope, 패자가 더 많이 확인되지 않았을 때만 패자 `is_active=0` + `fact_revisions` 기록 | BOTH_VALID → INFLUENCES, UNRELATED → 삭제 | dry-run 목록을 보고 `--apply` 를 내리는 것 |
 
-- 판정은 `principle-check` 와 같은 위원회(기본 3표, 과반, 중앙값 confidence, 표마다 순서 섞기). 기본 모델은 추출보다 강한 `sonnet` (`--model` 로 변경).
+- 판정은 `principle-check` 와 같은 위원회(기본 3표, 과반, 중앙값 confidence, 표마다 순서 섞기). 기본 모델은 추출보다 강한 `sonnet` (`--model` 로 변경). 표 하나가 같은 쌍에 서로 다른 판정을 내면 그 쌍에 대해 무효표이고, confidence 가 [0, 1] 의 유한수가 아닌 항목은 집계에서 뺀다(보정하지 않는다). 단일 판정이 한 쌍에 두 판정을 내면 그 쌍은 행동 없이 넘어간다.
 - 모든 변경은 `relation_resolution_log` 테이블에 변경 전 상태(간선 행, 두 팩트 원문, 판정)와 함께 **같은 트랜잭션으로** 기록된다. 기록 없는 변경은 생길 수 없다. `<index-dir>/relation-resolution.jsonl` 은 그 행의 best-effort 미러이고, 미러 쓰기 실패는 집계만 한다. 되돌리기는 이 기록으로 사람이 한다. 간선 재분류의 reasoning 에도 `was <type>: <원문>` 을 남긴다.
 - 행동은 `BEGIN IMMEDIATE` 트랜잭션 안에서 간선과 두 팩트를 다시 읽고, 판정에 쓴 필드(본문·카테고리·scope·확인 횟수·활성 여부)가 스캔 때와 전부 같을 때만 수행한다. 하나라도 다르면 `skipped-changed`. 쓰기 락을 먼저 잡으므로 재확인과 변경 사이에 다른 프로세스가 끼어들 수 없다.
 - 판정기는 팩트를 2,000자까지 본다. 그보다 긴 팩트는 잘린 시야로 판정된 것이므로 퇴역시키지 않는다(간선 변경은 되돌릴 수 있어 허용).

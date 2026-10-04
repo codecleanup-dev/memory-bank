@@ -157,6 +157,34 @@ export function buildResolvePrompt(pairs: ConflictPair[]): { system: string; use
   return { system, user };
 }
 
+/** A usable confidence is a finite number in [0, 1]; anything else is an invalid finding, never clamped. */
+export function validConfidence(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? value : null;
+}
+
+/**
+ * One voice per pair per vote: a vote that names two different verdicts for the same
+ * pair has contradicted itself and is spoiled for that pair (it must not count toward
+ * both majorities). Entries with an out-of-range index or confidence are dropped.
+ */
+export function cleanVote(vote: JudgeVerdict[], pairCount: number): JudgeVerdict[] {
+  const byPair = new Map<number, JudgeVerdict[]>();
+  for (const f of vote) {
+    if (!Number.isInteger(f.pair_index) || f.pair_index < 0 || f.pair_index >= pairCount) continue;
+    if (typeof f.verdict !== 'string' || validConfidence(f.confidence) === null) continue;
+    const list = byPair.get(f.pair_index) ?? [];
+    list.push({ ...f, verdict: f.verdict.toUpperCase() });
+    byPair.set(f.pair_index, list);
+  }
+  const clean: JudgeVerdict[] = [];
+  for (const list of byPair.values()) {
+    const distinct = new Set(list.map((f) => f.verdict));
+    if (distinct.size !== 1) continue; // self-contradicting vote for this pair: spoiled
+    clean.push(list[0]);
+  }
+  return clean;
+}
+
 /** Default judge through the repo's shared LLM wrapper (model from MEMORY_BANK_FACT_MODEL). */
 export const llmPairJudge: PairJudge = async (pairs) => {
   const { system, user } = buildResolvePrompt(pairs);
@@ -193,26 +221,19 @@ export function committeePairJudge(base: PairJudge, votes: number, rng: () => nu
         perVote.push(null);
         continue;
       }
-      perVote.push(
-        vote.map((f) =>
-          Number.isInteger(f.pair_index) && f.pair_index >= 0 && f.pair_index < perm.length
-            ? { ...f, pair_index: perm[f.pair_index] }
-            : f,
-        ),
-      );
+      // Validate in the permuted frame (indexes are checked against the batch size), then
+      // map back to the caller's order. cleanVote already dropped invalid confidences and
+      // self-contradicting entries, so the tally below sees one voice per pair per vote.
+      perVote.push(cleanVote(vote, perm.length).map((f) => ({ ...f, pair_index: perm[f.pair_index] })));
     }
     if (perVote.every((v) => v === null)) return null;
     const tally = new Map<string, { finding: JudgeVerdict; confidences: number[] }>();
     for (const vote of perVote) {
       if (!Array.isArray(vote)) continue;
-      const seen = new Set<string>();
       for (const f of vote) {
-        if (!Number.isInteger(f.pair_index) || typeof f.verdict !== 'string') continue;
-        const key = `${f.pair_index}\x1f${f.verdict.toUpperCase()}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
+        const key = `${f.pair_index}\x1f${f.verdict}`;
         const entry = tally.get(key) ?? { finding: f, confidences: [] };
-        entry.confidences.push(typeof f.confidence === 'number' ? f.confidence : 0);
+        entry.confidences.push(f.confidence);
         tally.set(key, entry);
       }
     }
@@ -323,6 +344,8 @@ export interface ResolveSummary {
   applied: Record<string, number>;
   /** JSONL mirror writes that failed; the DB log row is still there for each. */
   archiveErrors: number;
+  /** Pairs the judge answered for but with no usable verdict (self-contradiction, bad confidence, off-vocabulary). */
+  spoiledPairs: number;
   pairs: ResolvedPair[];
   archivePath: string;
 }
@@ -522,6 +545,7 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
     planned: { keep: 0, retype: 0, delete: 0, deactivate: 0 },
     applied: {},
     archiveErrors: 0,
+    spoiledPairs: 0,
     pairs: [],
     archivePath,
   };
@@ -533,16 +557,18 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
       opts.onProgress?.(`batch ${start / batchSize + 1}: unparseable judge output, skipped`);
       continue;
     }
-    // One verdict per pair: keep the highest-confidence valid verdict when the judge repeats an index.
+    // One verdict per pair. cleanVote drops invalid indexes/confidences and any pair the
+    // judge contradicted itself on (two different verdicts for one pair → no verdict, never
+    // "the higher-confidence one"). Off-vocabulary verdicts are dropped here.
     const best = new Map<number, JudgeVerdict>();
-    for (const v of verdicts) {
-      if (!Number.isInteger(v.pair_index) || v.pair_index < 0 || v.pair_index >= batch.length) continue;
-      const name = String(v.verdict ?? '').toUpperCase();
-      if (!allowed.has(name)) continue;
-      const conf = typeof v.confidence === 'number' && Number.isFinite(v.confidence) ? Math.max(0, Math.min(1, v.confidence)) : 0;
-      const prev = best.get(v.pair_index);
-      if (!prev || conf > prev.confidence) best.set(v.pair_index, { ...v, verdict: name, confidence: conf });
+    for (const v of cleanVote(verdicts, batch.length)) {
+      if (!allowed.has(v.verdict)) continue;
+      best.set(v.pair_index, v);
     }
+    const answered = new Set(
+      verdicts.filter((v) => Number.isInteger(v.pair_index) && v.pair_index >= 0 && v.pair_index < batch.length).map((v) => v.pair_index),
+    ).size;
+    summary.spoiledPairs += answered - best.size;
     for (const [idx, v] of best) {
       const pair = batch[idx];
       summary.judged++;
@@ -582,6 +608,7 @@ export function formatResolveSummary(summary: ResolveSummary, listLimit: number 
   out += `| Pairs examined | ${summary.examined} |\n`;
   out += `| Pairs judged | ${summary.judged} |\n`;
   out += `| Unparseable batches | ${summary.unparseableBatches} |\n`;
+  out += `| Spoiled pairs (no usable verdict) | ${summary.spoiledPairs} |\n`;
   for (const [k, n] of Object.entries(summary.planned)) out += `| Planned: ${k} | ${n} |\n`;
   for (const [k, n] of Object.entries(summary.applied)) out += `| Applied: ${k} | ${n} |\n`;
   out += `| Log | table relation_resolution_log (same transaction as each change) |\n`;

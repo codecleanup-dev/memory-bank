@@ -438,6 +438,74 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('a vote that contradicts itself on a pair counts for neither verdict', async () => {
+    const db = initDatabase();
+    try {
+      const newer = mkFact(db, 'n');
+      const older = mkFact(db, 'o');
+      createRelation(db, newer, 'SUPERSEDES', older, 'dup');
+      const votes: JudgeVerdict[][] = [
+        [{ pair_index: 0, verdict: 'TARGET_REDUNDANT', confidence: 0.99 }, { pair_index: 0, verdict: 'BOTH_VALID', confidence: 0.99 }],
+        [{ pair_index: 0, verdict: 'TARGET_REDUNDANT', confidence: 0.99 }],
+        [{ pair_index: 0, verdict: 'BOTH_VALID', confidence: 0.99 }],
+      ];
+      let call = 0;
+      const judge = committeePairJudge(async () => votes[call++] ?? null, 3, () => 0);
+
+      const summary = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, votes: 1, archivePath: archive });
+
+      expect(summary.judged).toBe(0);
+      expect(summary.applied).toEqual({});
+      expect(active(db, older)).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('out-of-range confidences are excluded from the tally instead of clamped', async () => {
+    const db = initDatabase();
+    try {
+      const newer = mkFact(db, 'n2');
+      const older = mkFact(db, 'o2');
+      createRelation(db, newer, 'SUPERSEDES', older, 'dup');
+      const votes: JudgeVerdict[][] = [
+        [{ pair_index: 0, verdict: 'TARGET_REDUNDANT', confidence: 0.1 }],
+        [{ pair_index: 0, verdict: 'TARGET_REDUNDANT', confidence: 90 }],
+        [{ pair_index: 0, verdict: 'BOTH_VALID', confidence: 0.99 }],
+      ];
+      let call = 0;
+      const judge = committeePairJudge(async () => votes[call++] ?? null, 3, () => 0);
+
+      const summary = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, votes: 1, archivePath: archive });
+
+      expect(summary.judged).toBe(0); // 0.1 is the only valid TARGET_REDUNDANT vote: no majority
+      expect(active(db, older)).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('a single judge that returns two verdicts for one pair yields no action', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'c1');
+      const b = mkFact(db, 'c2');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const judge: PairJudge = async () => [
+        { pair_index: 0, verdict: 'UNRELATED', confidence: 0.95 },
+        { pair_index: 0, verdict: 'TRUE_CONFLICT', confidence: 0.9 },
+      ];
+
+      const summary = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+
+      expect(summary.judged).toBe(0);
+      expect(summary.spoiledPairs).toBe(1);
+      expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS');
+    } finally {
+      db.close();
+    }
+  });
+
   it('planAction is a pure policy: thresholds pin the edge/deactivate asymmetry', () => {
     const slim = (id: string, fact: string, confirmed = 1, scope: [string, string | null] = ['global', null]) => ({
       id, fact, category: 'decision', scope_type: scope[0], scope_project: scope[1], consolidated_count: confirmed, created_at: '2026-10-01T00:00:00Z',

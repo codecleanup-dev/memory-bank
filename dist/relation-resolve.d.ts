@@ -65,6 +65,14 @@ export declare function buildResolvePrompt(pairs: ConflictPair[]): {
     system: string;
     user: string;
 };
+/** A usable confidence is a finite number in [0, 1]; anything else is an invalid finding, never clamped. */
+export declare function validConfidence(value: unknown): number | null;
+/**
+ * One voice per pair per vote: a vote that names two different verdicts for the same
+ * pair has contradicted itself and is spoiled for that pair (it must not count toward
+ * both majorities). Entries with an out-of-range index or confidence are dropped.
+ */
+export declare function cleanVote(vote: JudgeVerdict[], pairCount: number): JudgeVerdict[];
 /** Default judge through the repo's shared LLM wrapper (model from MEMORY_BANK_FACT_MODEL). */
 export declare const llmPairJudge: PairJudge;
 /**
@@ -128,6 +136,8 @@ export interface ResolveSummary {
     applied: Record<string, number>;
     /** JSONL mirror writes that failed; the DB log row is still there for each. */
     archiveErrors: number;
+    /** Pairs the judge answered for but with no usable verdict (self-contradiction, bad confidence, off-vocabulary). */
+    spoiledPairs: number;
     pairs: ResolvedPair[];
     archivePath: string;
 }
