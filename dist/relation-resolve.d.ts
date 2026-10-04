@@ -54,6 +54,13 @@ export declare const DEFAULT_VOTES = 3;
 /** Resolution is cheap per pair but the verdict shapes the graph: default to a stronger model than extraction. */
 export declare const DEFAULT_RESOLVE_MODEL = "sonnet";
 /**
+ * Agent SDK aliases → full model ids. The shared LLM wrapper hands MEMORY_BANK_FACT_MODEL
+ * to the Agent SDK first (aliases fine) and, when that path fails, to the direct
+ * Anthropic API (aliases rejected). Resolving before export keeps both paths valid.
+ */
+export declare const MODEL_ALIASES: Readonly<Record<string, string>>;
+export declare function resolveModelId(name: string): string;
+/**
  * The judge sees each fact up to this many characters. A fact longer than this is
  * never RETIRED on the strength of a verdict about a truncated view (planAction keeps
  * it for a human); edge-only actions still apply because they are reversible.

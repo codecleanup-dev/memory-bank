@@ -10,6 +10,7 @@ import { listActiveConflicts } from '../src/consistency.js';
 import {
   committeePairJudge,
   planAction,
+  resolveModelId,
   resolveQueue,
   type JudgeVerdict,
   type PairJudge,
@@ -533,6 +534,14 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     } finally {
       db.close();
     }
+  });
+
+  it('resolveModelId maps SDK aliases to full ids and passes full ids through', () => {
+    expect(resolveModelId('sonnet')).toBe('claude-sonnet-5');
+    expect(resolveModelId(' Haiku ')).toBe('claude-haiku-4-5-20251001');
+    expect(resolveModelId('opus')).toBe('claude-opus-5-5');
+    expect(resolveModelId('claude-sonnet-5')).toBe('claude-sonnet-5');
+    expect(resolveModelId('my-proxy-model')).toBe('my-proxy-model');
   });
 
   it('planAction is a pure policy: thresholds pin the edge/deactivate asymmetry', () => {

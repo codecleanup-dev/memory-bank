@@ -16,11 +16,12 @@
  *   --limit N     pairs per run (default 200; 0 = all)
  *   --batch-size  pairs per LLM call (default 8, max 20)
  *   --votes K     committee size (default 3; 1 = single call)
- *   --model M     judge model (default sonnet; sets MEMORY_BANK_FACT_MODEL for this run)
+ *   --model M     judge model (default sonnet; aliases haiku|sonnet|opus resolve to full ids;
+ *                 sets MEMORY_BANK_FACT_MODEL for this run)
  *   --json        machine-readable summary
  */
 import { initDatabase } from './db.js';
-import { DEFAULT_BATCH_SIZE, DEFAULT_RESOLVE_MODEL, DEFAULT_VOTES, formatResolveSummary, resolveQueue, } from './relation-resolve.js';
+import { DEFAULT_BATCH_SIZE, DEFAULT_RESOLVE_MODEL, DEFAULT_VOTES, formatResolveSummary, resolveModelId, resolveQueue, } from './relation-resolve.js';
 const USAGE = 'Usage: memory-bank resolve <contradicts|supersedes> [--apply] [--limit N] [--batch-size N] [--votes K] [--model M] [--json]';
 function parseArgs(argv) {
     const opts = {
@@ -82,7 +83,10 @@ function parseArgs(argv) {
 }
 async function main() {
     const opts = parseArgs(process.argv.slice(2));
-    // The shared LLM wrapper reads the model from this variable; scope the override to this process.
+    // The shared LLM wrapper reads the model from this variable; scope the override to this
+    // process and export a FULL model id so the direct-API fallback (which rejects SDK
+    // aliases such as "sonnet") keeps working.
+    opts.model = resolveModelId(opts.model);
     process.env.MEMORY_BANK_FACT_MODEL = opts.model;
     const db = initDatabase();
     try {
