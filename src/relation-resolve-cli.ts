@@ -16,16 +16,20 @@
  *   --limit N     pairs per run (default 200; 0 = all); pairs an earlier --apply run judged are skipped
  *   --rejudge     include pairs an earlier run already judged
  *   --batch-size  pairs per LLM call (default 8, max 20)
- *   --votes K     committee size (default 3; 1 = single call)
+ *   --votes K     committee size (default 3, max 5; 1 = single call)
  *   --model M     judge model (default sonnet; aliases haiku|sonnet|opus resolve to full ids;
  *                 sets MEMORY_BANK_FACT_MODEL for this run)
  *   --json        machine-readable summary
+ *
+ * The dry run opens the database READ-ONLY: initDatabase() runs migrations and repairs
+ * (duplicate edge removal, scope fixes) that would change the graph before it is judged.
  */
-import { initDatabase } from './db.js';
+import { initDatabase, openDatabaseReadonly } from './db.js';
 import {
   DEFAULT_BATCH_SIZE,
   DEFAULT_RESOLVE_MODEL,
   DEFAULT_VOTES,
+  MAX_VOTES,
   formatResolveSummary,
   parseIntegerOption,
   resolveModelId,
@@ -34,7 +38,7 @@ import {
 import type { ConflictType } from './consistency.js';
 
 const USAGE =
-  'Usage: memory-bank resolve <contradicts|supersedes> [--apply] [--limit N] [--rejudge] [--batch-size N] [--votes K] [--model M] [--json]';
+  'Usage: memory-bank resolve <contradicts|supersedes> [--apply] [--limit N] [--rejudge] [--batch-size N (1-20)] [--votes K (1-5)] [--model M] [--json]';
 
 interface Opts {
   type: ConflictType;
@@ -59,12 +63,14 @@ function parseArgs(argv: string[]): Opts {
     json: false,
   };
   let typeGiven = false;
-  const numeric = (name: string, raw: string | undefined, min: number): number => {
+  const numeric = (name: string, raw: string | undefined, min: number, max = Number.MAX_SAFE_INTEGER): number => {
     // Whole-string integer only: "0.5" or "1e3" must not silently become 0 or 1 (a --limit of
     // 0 means "everything", so a lenient parse would drop the cost bound the user asked for).
+    // Out-of-range values are rejected, never clamped: a run must do what it reports.
     const n = parseIntegerOption(raw, min);
-    if (n === null) {
-      console.error(`${name}: expected a whole number >= ${min}, got ${raw ?? '(nothing)'}`);
+    if (n === null || n > max) {
+      const range = max === Number.MAX_SAFE_INTEGER ? `>= ${min}` : `between ${min} and ${max}`;
+      console.error(`${name}: expected a whole number ${range}, got ${raw ?? '(nothing)'}`);
       process.exit(3);
     }
     return n;
@@ -78,8 +84,8 @@ function parseArgs(argv: string[]): Opts {
     else if (arg === '--rejudge') opts.rejudge = true;
     else if (arg === '--json') opts.json = true;
     else if (arg === '--limit') opts.limit = numeric('--limit', argv[++i], 0);
-    else if (arg === '--batch-size') opts.batchSize = numeric('--batch-size', argv[++i], 1);
-    else if (arg === '--votes') opts.votes = numeric('--votes', argv[++i], 1);
+    else if (arg === '--batch-size') opts.batchSize = numeric('--batch-size', argv[++i], 1, 20);
+    else if (arg === '--votes') opts.votes = numeric('--votes', argv[++i], 1, MAX_VOTES);
     else if (arg === '--model') {
       const m = argv[++i];
       if (!m || m.startsWith('-')) {
@@ -109,7 +115,19 @@ async function main(): Promise<void> {
   // aliases such as "sonnet") keeps working.
   opts.model = resolveModelId(opts.model);
   process.env.MEMORY_BANK_FACT_MODEL = opts.model;
-  const db = initDatabase();
+  // Dry run: read-only connection, so "nothing changed" is enforced by SQLite itself and the
+  // startup migrations/repairs in initDatabase() cannot touch the graph before it is judged.
+  let db;
+  if (opts.apply) {
+    db = initDatabase();
+  } else {
+    try {
+      db = openDatabaseReadonly();
+    } catch (error) {
+      console.error(`resolve: cannot open the database read-only (${error instanceof Error ? error.message : error}); run any indexing command first`);
+      process.exit(1);
+    }
+  }
   try {
     const summary = await resolveQueue(db, opts.type, {
       apply: opts.apply,

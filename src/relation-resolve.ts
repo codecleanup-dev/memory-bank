@@ -247,14 +247,17 @@ export const llmPairJudge: PairJudge = async (pairs) => {
   return Array.isArray(parsed) ? parsed : null;
 };
 
+/** Largest committee the judge runs; the CLI rejects anything above instead of silently clamping. */
+export const MAX_VOTES = 5;
+
 /**
  * Committee vote over pairs, same contract as principle-check's committeeJudge:
- * majority of `votes` must agree on (pair, verdict); confidence is the median.
+ * majority of `votes` must agree on (pair, verdict); confidence is the lower median.
  * Votes after the first see a permuted order so order bias becomes variance
  * the majority filter can remove. All-unparseable → null (batch skipped).
  */
 export function committeePairJudge(base: PairJudge, votes: number, rng: () => number = Math.random): PairJudge {
-  const voteCount = Math.max(1, Math.min(5, Math.floor(votes)));
+  const voteCount = Math.max(1, Math.min(MAX_VOTES, Math.floor(votes)));
   if (voteCount === 1) return base;
   const majority = Math.floor(voteCount / 2) + 1;
   return async (pairs) => {

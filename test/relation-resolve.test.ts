@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import Database from 'better-sqlite3';
-import { initDatabase } from '../src/db.js';
+import { initDatabase, openDatabaseReadonly } from '../src/db.js';
 import { insertFact } from '../src/fact-db.js';
 import { createRelation } from '../src/ontology-db.js';
 import { listActiveConflicts } from '../src/consistency.js';
@@ -377,6 +377,34 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       expect(summary.pairs[0].reason).toContain('longer than the 2000 characters');
     } finally {
       db.close();
+    }
+  });
+
+  it('a dry run completes on a read-only connection, and an apply on that connection fails instead of writing', async () => {
+    const setup = initDatabase();
+    const a = mkFact(setup, 'ro one');
+    const b = mkFact(setup, 'ro two');
+    const rel = createRelation(setup, a, 'CONTRADICTS', b, 'n');
+    setup.close();
+    const judge = tableJudge({ 'ro one': { verdict: 'UNRELATED', confidence: 0.95 } });
+
+    const ro = openDatabaseReadonly();
+    try {
+      expect(ro.readonly).toBe(true);
+      const summary = await resolveQueue(ro, 'CONTRADICTS', { apply: false, limit: 0, judge, archivePath: archive });
+      expect(summary.examined).toBe(1);
+      expect(summary.planned.delete).toBe(1);
+      // SQLite, not our discipline, is what guarantees the dry run changed nothing.
+      await expect(resolveQueue(ro, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive })).rejects.toThrow(/readonly/i);
+    } finally {
+      ro.close();
+    }
+    const check = initDatabase();
+    try {
+      expect(relation(check, rel.id)?.relation_type).toBe('CONTRADICTS');
+      expect(check.prepare("SELECT 1 FROM sqlite_master WHERE name = 'relation_resolution_log'").get()).toBeUndefined();
+    } finally {
+      check.close();
     }
   });
 

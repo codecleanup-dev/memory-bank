@@ -26,6 +26,13 @@ export declare function l2DistanceToSimilarity(distance: number): number;
 export declare function migrateSchema(db: Database.Database): void;
 export declare function migrateRelationTypeVocabulary(db: Database.Database): void;
 export declare function migrateFactsCategoryVocabulary(db: Database.Database): void;
+/**
+ * Read-only connection for commands that must not change anything (the `resolve` dry run).
+ * initDatabase() also runs migrations and repairs (duplicate ontology_relations removal,
+ * scope_project fixes); a dry run opened through it could alter the graph before judging it.
+ * Throws if the database file does not exist.
+ */
+export declare function openDatabaseReadonly(): Database.Database;
 export declare function initDatabase(): Database.Database;
 export declare function insertExchange(db: Database.Database, exchange: ConversationExchange, embedding: number[], _toolNames?: string[]): void;
 export declare function getAllExchanges(db: Database.Database): Array<{

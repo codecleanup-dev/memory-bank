@@ -86,9 +86,11 @@ export declare function validConfidence(value: unknown): number | null;
 export declare function cleanVote(vote: JudgeVerdict[], pairCount: number): JudgeVerdict[];
 /** Default judge through the repo's shared LLM wrapper (model from MEMORY_BANK_FACT_MODEL). */
 export declare const llmPairJudge: PairJudge;
+/** Largest committee the judge runs; the CLI rejects anything above instead of silently clamping. */
+export declare const MAX_VOTES = 5;
 /**
  * Committee vote over pairs, same contract as principle-check's committeeJudge:
- * majority of `votes` must agree on (pair, verdict); confidence is the median.
+ * majority of `votes` must agree on (pair, verdict); confidence is the lower median.
  * Votes after the first see a permuted order so order bias becomes variance
  * the majority filter can remove. All-unparseable → null (batch skipped).
  */
