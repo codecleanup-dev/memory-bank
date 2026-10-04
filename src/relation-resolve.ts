@@ -862,8 +862,9 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
       summary.unparseableBatches++;
       opts.onProgress?.(`batch ${start / batchSize + 1}: unparseable judge output, skipped`);
       // Remembered under --apply so a bounded run does not re-select the same batch forever;
-      // --rejudge brings these pairs back once the judge output is usable again.
-      if (opts.apply) for (const p of batch) recordUnresolved(db, p, 'unparseable judge output');
+      // --rejudge brings these pairs back once the judge output is usable again. Only when
+      // every vote actually arrived: a missing vote might have been the readable one.
+      if (opts.apply && batchVoteErrors === 0) for (const p of batch) recordUnresolved(db, p, 'unparseable judge output');
       continue;
     }
     // One verdict per pair. cleanVote drops invalid indexes/confidences and any pair the

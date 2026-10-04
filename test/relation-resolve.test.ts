@@ -998,6 +998,34 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('a failed vote mixed with unreadable votes is not remembered either: the pair is picked up again after recovery', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'mixed one');
+      const b = mkFact(db, 'mixed two');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      let call = 0;
+      // votes=3: one call throws, the other two return unparseable output → committee null.
+      const base: PairJudge = async () => {
+        call++;
+        if (call === 1) throw new Error('timeout');
+        return null;
+      };
+
+      const summary = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge: base, votes: 3, archivePath: archive });
+
+      expect(summary.judgeFailures).toBe(1);
+      expect(summary.unparseableBatches).toBe(1);
+      expect((db.prepare('SELECT COUNT(*) AS n FROM relation_resolution_log').get() as { n: number }).n).toBe(0);
+      const healthy: PairJudge = async (pairs) => pairs.map((_, i) => ({ pair_index: i, verdict: 'UNRELATED', confidence: 0.95 }));
+      const again = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge: healthy, votes: 3, archivePath: archive });
+      expect(again.examined).toBe(1);
+      expect(relation(db, rel.id)).toBeUndefined();
+    } finally {
+      db.close();
+    }
+  });
+
   it('with a single vote a throwing judge is also survived', async () => {
     const db = initDatabase();
     try {
