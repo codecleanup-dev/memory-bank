@@ -880,6 +880,83 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('a vote whose call throws is a missing vote: the remaining majority still decides and the run continues', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'first');
+      const b = mkFact(db, 'second');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      let call = 0;
+      const base: PairJudge = async (pairs) => {
+        call++;
+        if (call === 2) throw new Error('LLM returned an empty response (attempt 3/3)');
+        return pairs.map((_, i) => ({ pair_index: i, verdict: 'UNRELATED', confidence: 0.95 }));
+      };
+      const errors: string[] = [];
+      const judge = committeePairJudge(base, 3, () => 0, (e) => errors.push(e instanceof Error ? e.message : String(e)));
+
+      const summary = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, votes: 1, archivePath: archive });
+
+      expect(call).toBe(3);
+      expect(errors).toHaveLength(1);
+      expect(summary.judged).toBe(1);
+      expect(summary.applied).toEqual({ deleted: 1 });
+      expect(relation(db, rel.id)).toBeUndefined();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('a batch where every vote fails is left for a later run: no abort, no unresolved row, later pairs still judged', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'newest pair one');
+      const b = mkFact(db, 'newest pair two');
+      createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const c = mkFact(db, 'older pair one');
+      const d = mkFact(db, 'older pair two');
+      const older = createRelation(db, c, 'CONTRADICTS', d, 'n');
+      // The judge fails for any batch containing the newest pair and answers normally otherwise.
+      const judge: PairJudge = async (pairs) => {
+        if (pairs.some((p) => p.source.fact === 'newest pair one')) throw new Error('service unavailable');
+        return pairs.map((_, i) => ({ pair_index: i, verdict: 'UNRELATED', confidence: 0.95 }));
+      };
+
+      const summary = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, votes: 3, batchSize: 1, archivePath: archive });
+
+      expect(summary.judgeFailures).toBe(3);
+      expect(summary.unavailableBatches).toBe(1);
+      expect(summary.unparseableBatches).toBe(0);
+      expect(summary.judged).toBe(1);
+      expect(relation(db, older.id)).toBeUndefined();
+      const log = db.prepare('SELECT action FROM relation_resolution_log').all() as Array<{ action: string }>;
+      expect(log.map((l) => l.action)).toEqual(['delete']); // the unavailable batch left nothing behind
+      // The untouched pair is picked up again by the next run.
+      const again = await resolveQueue(db, 'CONTRADICTS', { apply: false, limit: 0, judge, votes: 1, archivePath: archive });
+      expect(again.examined).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('with a single vote a throwing judge is also survived', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'lone one');
+      const b = mkFact(db, 'lone two');
+      createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const judge: PairJudge = async () => {
+        throw new Error('boom');
+      };
+      const summary = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, votes: 1, archivePath: archive });
+      expect(summary.judgeFailures).toBe(1);
+      expect(summary.unavailableBatches).toBe(1);
+      expect((db.prepare('SELECT COUNT(*) AS n FROM relation_resolution_log').get() as { n: number }).n).toBe(0);
+    } finally {
+      db.close();
+    }
+  });
+
   it('parseIntegerOption accepts only whole-string safe integers', () => {
     expect(parseIntegerOption('0', 0)).toBe(0);
     expect(parseIntegerOption(' 200 ', 0)).toBe(200);

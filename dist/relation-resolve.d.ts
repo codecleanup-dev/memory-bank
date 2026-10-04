@@ -94,7 +94,7 @@ export declare const MAX_VOTES = 5;
  * Votes after the first see a permuted order so order bias becomes variance
  * the majority filter can remove. All-unparseable → null (batch skipped).
  */
-export declare function committeePairJudge(base: PairJudge, votes: number, rng?: () => number): PairJudge;
+export declare function committeePairJudge(base: PairJudge, votes: number, rng?: () => number, onVoteError?: (error: unknown) => void): PairJudge;
 export type PlannedAction = {
     kind: 'keep';
     reason: string;
@@ -158,6 +158,10 @@ export interface ResolveSummary {
     spoiledPairs: number;
     /** Active pairs left out because an earlier --apply run already judged them (see `rejudge`). */
     previouslyJudged: number;
+    /** Votes the model never delivered (retries exhausted, transport error); each counts as a missing vote. */
+    judgeFailures: number;
+    /** Batches where EVERY vote failed; left for a later run (never recorded as unresolved). */
+    unavailableBatches: number;
     pairs: ResolvedPair[];
     archivePath: string;
 }

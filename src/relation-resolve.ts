@@ -256,9 +256,25 @@ export const MAX_VOTES = 5;
  * Votes after the first see a permuted order so order bias becomes variance
  * the majority filter can remove. All-unparseable → null (batch skipped).
  */
-export function committeePairJudge(base: PairJudge, votes: number, rng: () => number = Math.random): PairJudge {
+export function committeePairJudge(
+  base: PairJudge,
+  votes: number,
+  rng: () => number = Math.random,
+  onVoteError?: (error: unknown) => void,
+): PairJudge {
   const voteCount = Math.max(1, Math.min(MAX_VOTES, Math.floor(votes)));
-  if (voteCount === 1) return base;
+  // A vote the model never delivered (retries exhausted, transport error) is a MISSING vote,
+  // not a reason to abort the whole run: the committee counts it as unparseable and the batch
+  // continues with the votes it has. The caller learns about it through onVoteError.
+  const castVote = async (subset: ConflictPair[]): Promise<JudgeVerdict[] | null> => {
+    try {
+      return await base(subset);
+    } catch (error) {
+      onVoteError?.(error);
+      return null;
+    }
+  };
+  if (voteCount === 1) return castVote;
   const majority = Math.floor(voteCount / 2) + 1;
   return async (pairs) => {
     const perVote: Array<JudgeVerdict[] | null> = [];
@@ -270,7 +286,7 @@ export function committeePairJudge(base: PairJudge, votes: number, rng: () => nu
           [perm[i], perm[j]] = [perm[j], perm[i]];
         }
       }
-      const vote = await base(perm.map((idx) => pairs[idx]));
+      const vote = await castVote(perm.map((idx) => pairs[idx]));
       if (!Array.isArray(vote)) {
         perVote.push(null);
         continue;
@@ -413,6 +429,10 @@ export interface ResolveSummary {
   spoiledPairs: number;
   /** Active pairs left out because an earlier --apply run already judged them (see `rejudge`). */
   previouslyJudged: number;
+  /** Votes the model never delivered (retries exhausted, transport error); each counts as a missing vote. */
+  judgeFailures: number;
+  /** Batches where EVERY vote failed; left for a later run (never recorded as unresolved). */
+  unavailableBatches: number;
   pairs: ResolvedPair[];
   archivePath: string;
 }
@@ -789,7 +809,15 @@ function applyAction(
 
 export async function resolveQueue(db: Database.Database, type: ConflictType, opts: ResolveOptions): Promise<ResolveSummary> {
   const batchSize = Math.max(1, Math.min(20, Math.floor(opts.batchSize ?? DEFAULT_BATCH_SIZE)));
-  const judge = committeePairJudge(opts.judge ?? llmPairJudge, opts.votes ?? (opts.judge ? 1 : DEFAULT_VOTES), opts.rng);
+  const voteCount = Math.max(1, Math.min(MAX_VOTES, Math.floor(opts.votes ?? (opts.judge ? 1 : DEFAULT_VOTES))));
+  // Per-batch count of votes the model never delivered, so an all-failed batch can be told
+  // apart from a batch the model answered with garbage.
+  let batchVoteErrors = 0;
+  const judge = committeePairJudge(opts.judge ?? llmPairJudge, voteCount, opts.rng, (error) => {
+    batchVoteErrors++;
+    summary.judgeFailures++;
+    opts.onProgress?.(`judge vote failed: ${error instanceof Error ? error.message : String(error)}`.slice(0, 300));
+  });
   const archivePath = opts.archivePath ?? defaultArchivePath();
   const allowed = verdictSet(type);
   if (opts.apply) ensureResolutionLog(db);
@@ -810,13 +838,23 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
     archiveErrors: 0,
     spoiledPairs: 0,
     previouslyJudged: allPairs.length - fresh.length,
+    judgeFailures: 0,
+    unavailableBatches: 0,
     pairs: [],
     archivePath,
   };
   for (let start = 0; start < pairs.length; start += batchSize) {
     const batch = pairs.slice(start, start + batchSize);
+    batchVoteErrors = 0;
     const verdicts = await judge(batch);
     if (verdicts === null) {
+      if (batchVoteErrors >= voteCount) {
+        // Every vote failed to arrive: the judge was unavailable, the pairs were never seen.
+        // Nothing is recorded, so the next run picks them up again.
+        summary.unavailableBatches++;
+        opts.onProgress?.(`batch ${start / batchSize + 1}: judge unavailable (${batchVoteErrors} vote error(s)), left for a later run`);
+        continue;
+      }
       summary.unparseableBatches++;
       opts.onProgress?.(`batch ${start / batchSize + 1}: unparseable judge output, skipped`);
       // Remembered under --apply so a bounded run does not re-select the same batch forever;
@@ -880,6 +918,8 @@ export function formatResolveSummary(summary: ResolveSummary, listLimit: number 
   out += `| Pairs judged | ${summary.judged} |\n`;
   out += `| Unparseable batches | ${summary.unparseableBatches} |\n`;
   out += `| Spoiled pairs (no usable verdict) | ${summary.spoiledPairs} |\n`;
+  out += `| Judge votes that never arrived | ${summary.judgeFailures} |\n`;
+  out += `| Batches left for a later run (judge unavailable) | ${summary.unavailableBatches} |\n`;
   out += `| Skipped: judged by an earlier run | ${summary.previouslyJudged} |\n`;
   for (const [k, n] of Object.entries(summary.planned)) out += `| Planned: ${k} | ${n} |\n`;
   for (const [k, n] of Object.entries(summary.applied)) out += `| Applied: ${k} | ${n} |\n`;
