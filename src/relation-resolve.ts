@@ -349,6 +349,11 @@ export interface ResolveOptions {
   apply: boolean;
   /** 0 = every active pair. */
   limit: number;
+  /**
+   * Re-judge pairs that an earlier --apply run already judged (kept or acted on). Off by
+   * default so a bounded run walks the queue instead of re-paying for the same newest pairs.
+   */
+  rejudge?: boolean;
   batchSize?: number;
   votes?: number;
   judge?: PairJudge;
@@ -369,8 +374,18 @@ export interface ResolveSummary {
   archiveErrors: number;
   /** Pairs the judge answered for but with no usable verdict (self-contradiction, bad confidence, off-vocabulary). */
   spoiledPairs: number;
+  /** Active pairs left out because an earlier --apply run already judged them (see `rejudge`). */
+  previouslyJudged: number;
   pairs: ResolvedPair[];
   archivePath: string;
+}
+
+/** Relation ids an earlier --apply run has already judged (any action, `keep` included). */
+function judgedRelationIds(db: Database.Database): Set<string> {
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'relation_resolution_log'").get();
+  if (!exists) return new Set();
+  const rows = db.prepare('SELECT DISTINCT relation_id FROM relation_resolution_log').all() as Array<{ relation_id: string }>;
+  return new Set(rows.map((r) => r.relation_id));
 }
 
 export function defaultArchivePath(): string {
@@ -379,7 +394,8 @@ export function defaultArchivePath(): string {
 
 interface LogRecord {
   ts: string;
-  action: 'delete' | 'retype' | 'deactivate';
+  /** `keep` rows record a judged pair that stays as it is, so bounded runs can skip it next time. */
+  action: 'delete' | 'retype' | 'deactivate' | 'keep';
   relation_id: string;
   relation_type_before: string;
   relation_type_after: string | null;
@@ -487,7 +503,32 @@ function applyAction(
   confidence: number,
   judgeReasoning: string | null,
 ): Applied {
-  if (action.kind === 'keep') return { result: undefined, record: null };
+  if (action.kind === 'keep') {
+    // No mutation, but remember the verdict so a later bounded run does not re-pay for it.
+    const stamp = new Date().toISOString();
+    const rec: LogRecord = {
+      ts: stamp,
+      action: 'keep',
+      relation_id: pair.relationId,
+      relation_type_before: pair.relationType,
+      relation_type_after: pair.relationType,
+      source_fact_id: pair.source.id,
+      target_fact_id: pair.target.id,
+      source_after: null,
+      target_after: null,
+      source_fact: pair.source.fact,
+      target_fact: pair.target.fact,
+      reasoning_before: pair.reasoning,
+      verdict,
+      confidence,
+      judge_reasoning: judgeReasoning,
+      deactivated_fact_id: null,
+      survivor_fact_id: null,
+      note: action.reason,
+    };
+    insertLog(db, rec);
+    return { result: undefined, record: null }; // keep rows are not mirrored: nothing changed
+  }
   // BEGIN IMMEDIATE takes the write lock before the re-check, so no other writer can
   // slip a change in between "still unchanged" and the mutation.
   const tx = db.transaction((): Applied => {
@@ -561,7 +602,12 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
   const archivePath = opts.archivePath ?? defaultArchivePath();
   const allowed = verdictSet(type);
   if (opts.apply) ensureResolutionLog(db);
-  const pairs = listActiveConflicts(db, type, opts.limit > 0 ? opts.limit : 1_000_000);
+  // Fetch the whole active queue, drop what an earlier apply run already judged (unless
+  // --rejudge), then take the bounded slice — so repeated bounded runs make progress.
+  const judged = opts.rejudge ? new Set<string>() : judgedRelationIds(db);
+  const allPairs = listActiveConflicts(db, type, 1_000_000);
+  const fresh = allPairs.filter((p) => !judged.has(p.relationId));
+  const pairs = opts.limit > 0 ? fresh.slice(0, opts.limit) : fresh;
   const summary: ResolveSummary = {
     type,
     mode: opts.apply ? 'apply' : 'dry-run',
@@ -572,6 +618,7 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
     applied: {},
     archiveErrors: 0,
     spoiledPairs: 0,
+    previouslyJudged: allPairs.length - fresh.length,
     pairs: [],
     archivePath,
   };
@@ -613,7 +660,7 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
         planned: action.kind,
         reason: action.reason,
       };
-      if (opts.apply && action.kind !== 'keep') {
+      if (opts.apply) {
         const { result, record } = applyAction(db, pair, action, v.verdict, v.confidence, resolved.judgeReasoning);
         if (result) {
           resolved.applied = result;
@@ -637,6 +684,7 @@ export function formatResolveSummary(summary: ResolveSummary, listLimit: number 
   out += `| Pairs judged | ${summary.judged} |\n`;
   out += `| Unparseable batches | ${summary.unparseableBatches} |\n`;
   out += `| Spoiled pairs (no usable verdict) | ${summary.spoiledPairs} |\n`;
+  out += `| Skipped: judged by an earlier run | ${summary.previouslyJudged} |\n`;
   for (const [k, n] of Object.entries(summary.planned)) out += `| Planned: ${k} | ${n} |\n`;
   for (const [k, n] of Object.entries(summary.applied)) out += `| Applied: ${k} | ${n} |\n`;
   out += `| Log | table relation_resolution_log (same transaction as each change) |\n`;

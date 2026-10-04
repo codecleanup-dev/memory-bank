@@ -576,6 +576,43 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('bounded apply runs walk the queue: already-judged pairs are skipped unless rejudge is set', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'kept one');
+      const b = mkFact(db, 'kept two');
+      const kept = createRelation(db, a, 'CONTRADICTS', b, 'real');
+      const c = mkFact(db, 'noise one');
+      const d = mkFact(db, 'noise two');
+      const noise = createRelation(db, c, 'CONTRADICTS', d, 'noise');
+      const judge = tableJudge({
+        'kept one': { verdict: 'TRUE_CONFLICT', confidence: 0.95 },
+        'noise one': { verdict: 'UNRELATED', confidence: 0.95 },
+      });
+
+      const first = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 1, judge, archivePath: archive });
+      const second = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 1, judge, archivePath: archive });
+
+      expect(first.judged + second.judged).toBe(2);
+      expect(second.previouslyJudged).toBe(1);
+      expect(new Set([first.pairs[0].relationId, second.pairs[0].relationId])).toEqual(new Set([kept.id, noise.id]));
+      expect(relation(db, kept.id)?.relation_type).toBe('CONTRADICTS');
+      expect(relation(db, noise.id)).toBeUndefined();
+      const log = db.prepare('SELECT action, relation_id FROM relation_resolution_log ORDER BY id').all() as Array<{ action: string; relation_id: string }>;
+      expect(log.map((l) => l.action).sort()).toEqual(['delete', 'keep']);
+
+      // A third bounded run has nothing left; --rejudge brings the kept pair back.
+      const third = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 1, judge, archivePath: archive });
+      expect(third.examined).toBe(0);
+      expect(third.previouslyJudged).toBe(1);
+      const again = await resolveQueue(db, 'CONTRADICTS', { apply: false, limit: 1, rejudge: true, judge, archivePath: archive });
+      expect(again.examined).toBe(1);
+      expect(again.pairs[0].relationId).toBe(kept.id);
+    } finally {
+      db.close();
+    }
+  });
+
   it('resolveModelId maps SDK aliases to full ids and passes full ids through', () => {
     expect(resolveModelId('sonnet')).toBe('claude-sonnet-5');
     expect(resolveModelId(' Haiku ')).toBe('claude-haiku-4-5-20251001');

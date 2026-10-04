@@ -310,6 +310,14 @@ export function planAction(pair, verdict, confidence) {
             return { kind: 'keep', reason: 'unclear' };
     }
 }
+/** Relation ids an earlier --apply run has already judged (any action, `keep` included). */
+function judgedRelationIds(db) {
+    const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'relation_resolution_log'").get();
+    if (!exists)
+        return new Set();
+    const rows = db.prepare('SELECT DISTINCT relation_id FROM relation_resolution_log').all();
+    return new Set(rows.map((r) => r.relation_id));
+}
 export function defaultArchivePath() {
     return path.join(getIndexDir(), 'relation-resolution.jsonl');
 }
@@ -372,8 +380,32 @@ function unchanged(db, pair) {
     return row;
 }
 function applyAction(db, pair, action, verdict, confidence, judgeReasoning) {
-    if (action.kind === 'keep')
-        return { result: undefined, record: null };
+    if (action.kind === 'keep') {
+        // No mutation, but remember the verdict so a later bounded run does not re-pay for it.
+        const stamp = new Date().toISOString();
+        const rec = {
+            ts: stamp,
+            action: 'keep',
+            relation_id: pair.relationId,
+            relation_type_before: pair.relationType,
+            relation_type_after: pair.relationType,
+            source_fact_id: pair.source.id,
+            target_fact_id: pair.target.id,
+            source_after: null,
+            target_after: null,
+            source_fact: pair.source.fact,
+            target_fact: pair.target.fact,
+            reasoning_before: pair.reasoning,
+            verdict,
+            confidence,
+            judge_reasoning: judgeReasoning,
+            deactivated_fact_id: null,
+            survivor_fact_id: null,
+            note: action.reason,
+        };
+        insertLog(db, rec);
+        return { result: undefined, record: null }; // keep rows are not mirrored: nothing changed
+    }
     // BEGIN IMMEDIATE takes the write lock before the re-check, so no other writer can
     // slip a change in between "still unchanged" and the mutation.
     const tx = db.transaction(() => {
@@ -445,7 +477,12 @@ export async function resolveQueue(db, type, opts) {
     const allowed = verdictSet(type);
     if (opts.apply)
         ensureResolutionLog(db);
-    const pairs = listActiveConflicts(db, type, opts.limit > 0 ? opts.limit : 1_000_000);
+    // Fetch the whole active queue, drop what an earlier apply run already judged (unless
+    // --rejudge), then take the bounded slice — so repeated bounded runs make progress.
+    const judged = opts.rejudge ? new Set() : judgedRelationIds(db);
+    const allPairs = listActiveConflicts(db, type, 1_000_000);
+    const fresh = allPairs.filter((p) => !judged.has(p.relationId));
+    const pairs = opts.limit > 0 ? fresh.slice(0, opts.limit) : fresh;
     const summary = {
         type,
         mode: opts.apply ? 'apply' : 'dry-run',
@@ -456,6 +493,7 @@ export async function resolveQueue(db, type, opts) {
         applied: {},
         archiveErrors: 0,
         spoiledPairs: 0,
+        previouslyJudged: allPairs.length - fresh.length,
         pairs: [],
         archivePath,
     };
@@ -496,7 +534,7 @@ export async function resolveQueue(db, type, opts) {
                 planned: action.kind,
                 reason: action.reason,
             };
-            if (opts.apply && action.kind !== 'keep') {
+            if (opts.apply) {
                 const { result, record } = applyAction(db, pair, action, v.verdict, v.confidence, resolved.judgeReasoning);
                 if (result) {
                     resolved.applied = result;
@@ -518,6 +556,7 @@ export function formatResolveSummary(summary, listLimit = 25) {
     out += `| Pairs judged | ${summary.judged} |\n`;
     out += `| Unparseable batches | ${summary.unparseableBatches} |\n`;
     out += `| Spoiled pairs (no usable verdict) | ${summary.spoiledPairs} |\n`;
+    out += `| Skipped: judged by an earlier run | ${summary.previouslyJudged} |\n`;
     for (const [k, n] of Object.entries(summary.planned))
         out += `| Planned: ${k} | ${n} |\n`;
     for (const [k, n] of Object.entries(summary.applied))

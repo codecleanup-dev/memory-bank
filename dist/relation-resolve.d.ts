@@ -128,6 +128,11 @@ export interface ResolveOptions {
     apply: boolean;
     /** 0 = every active pair. */
     limit: number;
+    /**
+     * Re-judge pairs that an earlier --apply run already judged (kept or acted on). Off by
+     * default so a bounded run walks the queue instead of re-paying for the same newest pairs.
+     */
+    rejudge?: boolean;
     batchSize?: number;
     votes?: number;
     judge?: PairJudge;
@@ -147,6 +152,8 @@ export interface ResolveSummary {
     archiveErrors: number;
     /** Pairs the judge answered for but with no usable verdict (self-contradiction, bad confidence, off-vocabulary). */
     spoiledPairs: number;
+    /** Active pairs left out because an earlier --apply run already judged them (see `rejudge`). */
+    previouslyJudged: number;
     pairs: ResolvedPair[];
     archivePath: string;
 }

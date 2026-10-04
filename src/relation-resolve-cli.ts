@@ -13,7 +13,8 @@
  *                 duplicate-shaped → SUPERSEDES, TRUE_CONFLICT → left for a human
  *   supersedes    may retire the redundant fact (committee ≥ 0.9, same scope,
  *                 not better confirmed); BOTH_VALID → INFLUENCES, UNRELATED → delete
- *   --limit N     pairs per run (default 200; 0 = all)
+ *   --limit N     pairs per run (default 200; 0 = all); pairs an earlier --apply run judged are skipped
+ *   --rejudge     include pairs an earlier run already judged
  *   --batch-size  pairs per LLM call (default 8, max 20)
  *   --votes K     committee size (default 3; 1 = single call)
  *   --model M     judge model (default sonnet; aliases haiku|sonnet|opus resolve to full ids;
@@ -32,12 +33,13 @@ import {
 import type { ConflictType } from './consistency.js';
 
 const USAGE =
-  'Usage: memory-bank resolve <contradicts|supersedes> [--apply] [--limit N] [--batch-size N] [--votes K] [--model M] [--json]';
+  'Usage: memory-bank resolve <contradicts|supersedes> [--apply] [--limit N] [--rejudge] [--batch-size N] [--votes K] [--model M] [--json]';
 
 interface Opts {
   type: ConflictType;
   apply: boolean;
   limit: number;
+  rejudge: boolean;
   batchSize: number;
   votes: number;
   model: string;
@@ -49,6 +51,7 @@ function parseArgs(argv: string[]): Opts {
     type: 'CONTRADICTS',
     apply: false,
     limit: 200,
+    rejudge: false,
     batchSize: DEFAULT_BATCH_SIZE,
     votes: DEFAULT_VOTES,
     model: process.env.MEMORY_BANK_FACT_MODEL || DEFAULT_RESOLVE_MODEL,
@@ -69,6 +72,7 @@ function parseArgs(argv: string[]): Opts {
       opts.type = arg === 'contradicts' ? 'CONTRADICTS' : 'SUPERSEDES';
       typeGiven = true;
     } else if (arg === '--apply') opts.apply = true;
+    else if (arg === '--rejudge') opts.rejudge = true;
     else if (arg === '--json') opts.json = true;
     else if (arg === '--limit') opts.limit = numeric('--limit', argv[++i], 0);
     else if (arg === '--batch-size') opts.batchSize = numeric('--batch-size', argv[++i], 1);
@@ -107,6 +111,7 @@ async function main(): Promise<void> {
     const summary = await resolveQueue(db, opts.type, {
       apply: opts.apply,
       limit: opts.limit,
+      rejudge: opts.rejudge,
       batchSize: opts.batchSize,
       votes: opts.votes,
       onProgress: (line) => console.error(`resolve: ${line}`),
