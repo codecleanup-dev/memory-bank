@@ -149,7 +149,11 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  console.error('resolve failed:', error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+main()
+  // The Agent SDK can leave a child process or transport handle open after the last call;
+  // a finished run must not sit there waiting on it (observed: complete JSON printed, no exit).
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error('resolve failed:', error instanceof Error ? error.message : error);
+    process.exit(1);
+  });

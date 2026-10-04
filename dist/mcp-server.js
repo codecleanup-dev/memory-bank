@@ -26991,6 +26991,11 @@ ${userMessage}`,
         // own SessionStart/End hooks re-spawn sync/backfill workers and every
         // LLM call cascades into more sessions (observed as a proxy flood).
         maxTurns: 1,
+        // No built-in tools at all. With tools available, a stronger model sometimes spends
+        // its single turn on a tool call instead of answering; the run then ends with
+        // `error_max_turns` and no text (measured 2026-10-05: about one sonnet judge vote
+        // in three). A pure text classifier never needs a tool.
+        tools: [],
         settingSources: [],
         cwd: llmWorkdir()
       }

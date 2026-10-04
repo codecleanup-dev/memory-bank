@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.12.2] - 2026-10-05
+
+_1.12.1 이 드러낸 "빈 응답" 의 실제 원인은 `error_max_turns` 였다: 도구가 열린 한 턴 호출에서 sonnet 이 세 번에 한 번쯤
+도구 호출로 턴을 써 버리고 텍스트 없이 끝났다 (2026-10-05 라이브 런 실측, haiku 에서는 드물다)._
+
+### Fixed
+- **`callHaiku`** (`src/llm.ts`): Agent SDK 호출에 `tools: []` 를 넣어 내장 도구를 전부 끈다. 텍스트 분류기는 도구가
+  필요 없고, 도구가 없으면 유일한 턴이 반드시 답변으로 끝난다. 재시도·분류 의미론은 그대로. 라이브 probe
+  (supersedes 8쌍 × 3표 = 24 호출): `error_max_turns` 0건.
+- **`memory-bank resolve`** CLI: 정상 종료 시 `process.exit(0)`. SDK 가 자식 프로세스·전송 핸들을 열어 둔 채 남겨
+  JSON 을 다 찍고도 프로세스가 끝나지 않는 경우가 있었다(3표 probe 가 결과 출력 뒤 9분 넘게 대기).
+
+### Tests
+- `test/llm-retry.test.ts` +1 (query 옵션에 `tools: []`·`maxTurns: 1`·`settingSources: []` 가 함께 실린다).
+
 ## [1.12.1] - 2026-10-05
 
 _resolve 런이 판정 호출 한 번의 실패로 통째로 죽지 않게 한다. 첫 라이브 런(contradicts 62배치·supersedes 35배치)이
