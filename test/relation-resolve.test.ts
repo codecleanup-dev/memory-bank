@@ -506,6 +506,35 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('null or scalar elements in the judge array are ignored, not fatal, and later batches still run', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'first unrelated');
+      const b = mkFact(db, 'first other');
+      const rel1 = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const c = mkFact(db, 'second unrelated');
+      const d = mkFact(db, 'second other');
+      const rel2 = createRelation(db, c, 'CONTRADICTS', d, 'n');
+      let call = 0;
+      // Batch size 1 → two batches. The first answer is garbage-shaped, the second is valid.
+      const judge: PairJudge = async () => {
+        call++;
+        if (call === 1) return [null, 'text', 42, [1, 2]] as unknown as JudgeVerdict[];
+        return [{ pair_index: 0, verdict: 'UNRELATED', confidence: 0.95 }];
+      };
+
+      const summary = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, batchSize: 1, judge, archivePath: archive });
+
+      expect(call).toBe(2);
+      expect(summary.judged).toBe(1);
+      expect(summary.applied).toEqual({ deleted: 1 });
+      // Exactly one of the two edges was deleted (which one depends on queue order).
+      expect([relation(db, rel1.id), relation(db, rel2.id)].filter((r) => r === undefined)).toHaveLength(1);
+    } finally {
+      db.close();
+    }
+  });
+
   it('planAction is a pure policy: thresholds pin the edge/deactivate asymmetry', () => {
     const slim = (id: string, fact: string, confirmed = 1, scope: [string, string | null] = ['global', null]) => ({
       id, fact, category: 'decision', scope_type: scope[0], scope_project: scope[1], consolidated_count: confirmed, created_at: '2026-10-01T00:00:00Z',

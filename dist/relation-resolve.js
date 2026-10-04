@@ -132,6 +132,10 @@ export function buildResolvePrompt(pairs) {
             '[{"pair_index": 0, "verdict": "UNRELATED", "confidence": 0.9, "reasoning": "one line"}]';
     return { system, user };
 }
+/** The model may put null, strings, or nested arrays where an object belongs; only plain objects are findings. */
+export function isFindingObject(value) {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 /** A usable confidence is a finite number in [0, 1]; anything else is an invalid finding, never clamped. */
 export function validConfidence(value) {
     return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? value : null;
@@ -144,6 +148,8 @@ export function validConfidence(value) {
 export function cleanVote(vote, pairCount) {
     const byPair = new Map();
     for (const f of vote) {
+        if (!isFindingObject(f))
+            continue; // a null or scalar element must not throw mid-run
         if (!Number.isInteger(f.pair_index) || f.pair_index < 0 || f.pair_index >= pairCount)
             continue;
         if (typeof f.verdict !== 'string' || validConfidence(f.confidence) === null)
@@ -448,7 +454,9 @@ export async function resolveQueue(db, type, opts) {
                 continue;
             best.set(v.pair_index, v);
         }
-        const answered = new Set(verdicts.filter((v) => Number.isInteger(v.pair_index) && v.pair_index >= 0 && v.pair_index < batch.length).map((v) => v.pair_index)).size;
+        const answered = new Set(verdicts
+            .filter((v) => isFindingObject(v) && Number.isInteger(v.pair_index) && v.pair_index >= 0 && v.pair_index < batch.length)
+            .map((v) => v.pair_index)).size;
         summary.spoiledPairs += answered - best.size;
         for (const [idx, v] of best) {
             const pair = batch[idx];

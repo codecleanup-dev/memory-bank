@@ -65,6 +65,8 @@ export declare function buildResolvePrompt(pairs: ConflictPair[]): {
     system: string;
     user: string;
 };
+/** The model may put null, strings, or nested arrays where an object belongs; only plain objects are findings. */
+export declare function isFindingObject(value: unknown): value is JudgeVerdict;
 /** A usable confidence is a finite number in [0, 1]; anything else is an invalid finding, never clamped. */
 export declare function validConfidence(value: unknown): number | null;
 /**
