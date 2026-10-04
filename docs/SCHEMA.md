@@ -157,6 +157,46 @@ CREATE TABLE ontology_relations (
 );
 ```
 
+### `relation_resolution_log`
+
+Audit trail of `memory-bank resolve --apply` (created lazily on the first apply
+run; dry-run never touches the schema). One row per change — an edge deleted,
+an edge retyped, or a redundant fact retired — written in the SAME transaction
+as the change, so a change can never exist without its record. Each row keeps
+the before-state (edge type/endpoints/reasoning, both fact texts), the
+committee verdict and confidence, and for retirements the loser/survivor ids.
+`<index-dir>/relation-resolution.jsonl` is a best-effort mirror of these rows
+for reading without the DB; the table is the source of truth.
+
+```sql
+CREATE TABLE relation_resolution_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL,
+  action TEXT NOT NULL,                 -- delete | retype | deactivate
+  relation_id TEXT NOT NULL,
+  relation_type_before TEXT NOT NULL,
+  relation_type_after TEXT,
+  source_fact_id TEXT NOT NULL, target_fact_id TEXT NOT NULL,
+  source_after TEXT, target_after TEXT, -- retype may swap direction; deactivate records a corrected edge direction
+  source_fact TEXT NOT NULL, target_fact TEXT NOT NULL,
+  reasoning_before TEXT,
+  verdict TEXT NOT NULL, confidence REAL NOT NULL, judge_reasoning TEXT,
+  deactivated_fact_id TEXT, survivor_fact_id TEXT,
+  note TEXT,
+  -- judged-input snapshot: a later bounded run skips the pair only while all of these still match
+  source_category TEXT, target_category TEXT,
+  source_scope TEXT, target_scope TEXT,       -- "<scope_type>:<scope_project or empty>"
+  source_count INTEGER, target_count INTEGER  -- consolidated_count at judging time
+);
+```
+
+`action` is one of `delete | retype | deactivate | keep | unresolved`; `keep` and
+`unresolved` rows record no change, only that the pair was judged (or could not be:
+no committee consensus, or a reverse SUPERSEDES edge already exists), so
+`memory-bank resolve --limit N` walks the queue instead of re-paying for the same
+newest pairs (`--rejudge` ignores them). A dry run against an older-shaped table reads
+the missing snapshot columns as NULL and leaves the shape alone.
+
 ### `extraction_log`
 
 Idempotency marker: which sessions already went through fact extraction.

@@ -93,7 +93,8 @@ Automatic classification of facts into domain/category hierarchy:
 - `ontology_relations` — Typed relations between facts: `INFLUENCES`, `SUPERSEDES`, `SUPPORTS`, `CONTRADICTS`, `DEPENDS_ON`, `DERIVED_FROM` (single-sourced in `RELATION_TYPES`, DB CHECK generated from it)
 - Classification runs asynchronously after fact insertion via `classifyAndLinkFact()`
 - Relation candidates come from two channels: embedding similarity (≥0.89, top-2) and co-extraction (consecutive facts of one extraction batch, ≤3 probes)
-- Maintenance CLIs: `memory-bank consistency` (active CONTRADICTS/SUPERSEDES resolution queue; `--gate` exits 2) and `memory-bank taxonomy-align` (near-duplicate category merge — report-first, `--apply` for same-domain merges)
+- Maintenance CLIs: `memory-bank consistency` (active CONTRADICTS/SUPERSEDES resolution queue; `--gate` exits 2), `memory-bank resolve <contradicts|supersedes>` (gated LLM-committee resolution of that queue — dry-run by default, `--apply` acts and archives every change to `<index-dir>/relation-resolution.jsonl`; CONTRADICTS never touches facts, SUPERSEDES may retire a redundant fact at committee ≥ 0.9 within one scope) and `memory-bank taxonomy-align` (near-duplicate category merge — report-first, `--apply` for same-domain merges)
+- Relation detection gate: CONTRADICTS/SUPERSEDES are stored only when the detector also answers `same_question: true` (code-enforced, see `detectRelationBetween`)
 
 ### Avatar Responder
 

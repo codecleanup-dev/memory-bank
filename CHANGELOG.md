@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.12.0] - 2026-10-05
+
+_consistency 큐의 게이트된 정리. 설계 노트: `docs/2026-10-05-relation-resolution.md`._
+
+### Added
+- **`memory-bank resolve <contradicts|supersedes>`** (`src/relation-resolve.ts`, `-cli.ts`): 활성-활성
+  CONTRADICTS/SUPERSEDES 쌍을 LLM 위원회(기본 3표·과반·중앙값, 기본 모델 `sonnet`)로 재판정하고
+  dry-run 기본으로 계획만 보인다. `--apply` 에서만 행동하며 모든 변경은 새 테이블
+  `relation_resolution_log` 에 변경 전 상태와 함께 **같은 트랜잭션으로** 기록되고,
+  `<index-dir>/relation-resolution.jsonl` 로 best-effort 미러된다.
+  - CONTRADICTS: 팩트는 건드리지 않는다. UNRELATED → 간선 삭제, RELATED_NOT_CONFLICTING → INFLUENCES,
+    중복 모양 → SUPERSEDES 로 재분류, TRUE_CONFLICT 는 큐에 남긴다.
+  - SUPERSEDES: 위원회 ≥ 0.9, 같은 scope, 패자가 더 많이 확인되지 않았을 때만 패자를 `is_active=0` 으로
+    내리고 `fact_revisions` 에 남긴다. BOTH_VALID → INFLUENCES, UNRELATED → 삭제.
+  - 행동은 `BEGIN IMMEDIATE` 트랜잭션 안에서 간선과 두 팩트의 판정 필드(본문·카테고리·scope·확인 횟수)를
+    다시 비교해 스캔 때와 같을 때만 수행한다. 판정기가 본 2,000자를 넘는 팩트는 퇴역시키지 않는다.
+    판정 불가 배치는 건너뛰고 집계한다.
+- **관계 추출 same_question 게이트** (`detectRelationBetween`): CONTRADICTS/SUPERSEDES 는 응답의
+  `same_question` 이 `true` 일 때만 저장한다. 프롬프트도 "같은 질문에 다른 답" 조건을 명시한다.
+  측정(2026-10-05, 활성 40쌍 표본): 기존 CONTRADICTS 라벨의 약 3/4 이 서로 무관한 쌍이었다.
+
+### Tests
+- `test/relation-resolve.test.ts` 34건(dry-run 불변·읽기 전용 연결에서 완료·로그 테이블 미생성·옛 모양 로그 테이블 허용, 삭제·재분류·중복 간선, 비활성화 양방향과
+  source 퇴역 시 간선 방향 교정(올바른 간선이 있으면 삭제), 파싱 실패 배치의 unresolved 기록,
+  네 가드(scope·확인 횟수·임계값·판정 길이), 같은 트랜잭션 감사 행과 미러 실패 격리, 판정 중 본문·확인 횟수 변경
+  건너뛰기, 판정 불가, 위원회 과반, 자기모순 표 무효, 범위 밖 confidence 제외, 단일 판정의 중복 응답 무효,
+  배열 속 null·스칼라 원소 무시, 모델 별칭 → 전체 id 변환, 자기 참조 간선 보호, 간선 reasoning 변경 건너뛰기,
+  제한 런의 큐 전진(`--rejudge`, 재분류된 간선은 다음 유형 런에 다시 보임, 본문·reasoning·카테고리·scope·확인
+  횟수가 바뀐 쌍은 다시 판정, 변경 중 keep 은 기록 안 함, 합의 실패 쌍과 역방향 충돌 쌍은 unresolved 로 기록해
+  정체 방지), 위원회 하위 중앙값(0.99 한 표가 0.1 표를 퇴역 기준 위로 끌지 못함), 정수 옵션 엄격 파싱, 정책 임계값),
+  `test/relation-detect-gate.test.ts` 4건.
+
 ## [1.11.0] - 2026-08-03
 
 _Fork release: true merge of upstream v1.5.0 (`1c8e465..18762b6`, 34 commits) —

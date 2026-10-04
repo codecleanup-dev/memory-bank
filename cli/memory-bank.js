@@ -44,6 +44,7 @@ COMMANDS:
   stats       Show index statistics
   analyze     Analyze full conversation history (coverage, projects, facts)
   consistency Report knowledge-graph conflicts (active CONTRADICTS/SUPERSEDES pairs, orphans)
+  resolve     Gated resolution of that queue with an LLM committee (dry-run; --apply to act, archived)
   taxonomy-align  Detect/merge near-duplicate ontology categories (report-first; --apply to merge)
   principles  Operating-principles registry + fact↔principle conflict queue (list/add/import/check/resolve)
   surprise-backfill  Measure corpus-relative novelty (E2) for facts predating the surprise column
@@ -95,6 +96,10 @@ async function main() {
 
       case 'consistency':
         await runScript(join(distDir, 'consistency-cli.js'), args);
+        break;
+
+      case 'resolve':
+        await runScript(join(distDir, 'relation-resolve-cli.js'), args);
         break;
 
       case 'taxonomy-align':

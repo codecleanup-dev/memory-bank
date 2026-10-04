@@ -319,6 +319,18 @@ export function migrateFactsCategoryVocabulary(db) {
     }
     console.error('Migrated facts.category: vocabulary normalized, CHECK constraint added.');
 }
+/**
+ * Read-only connection for commands that must not change anything (the `resolve` dry run).
+ * initDatabase() also runs migrations and repairs (duplicate ontology_relations removal,
+ * scope_project fixes); a dry run opened through it could alter the graph before judging it.
+ * Throws if the database file does not exist.
+ */
+export function openDatabaseReadonly() {
+    const db = new Database(getDbPath(), { readonly: true, fileMustExist: true });
+    sqliteVec.load(db);
+    db.pragma('busy_timeout = 5000');
+    return db;
+}
 export function initDatabase() {
     const dbPath = getDbPath();
     // Ensure directory exists
