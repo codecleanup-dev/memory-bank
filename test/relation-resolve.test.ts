@@ -939,6 +939,65 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('when too few votes arrive for a majority the batch is left for a later run, not recorded as unresolved', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'quorum one');
+      const b = mkFact(db, 'quorum two');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      let call = 0;
+      // votes=3: two calls fail, one valid vote arrives → 1 < majority 2.
+      const base: PairJudge = async (pairs) => {
+        call++;
+        if (call !== 2) throw new Error('service unavailable');
+        return pairs.map((_, i) => ({ pair_index: i, verdict: 'UNRELATED', confidence: 0.95 }));
+      };
+      const second = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge: base, votes: 3, archivePath: archive });
+      expect(call).toBe(3);
+      expect(second.judgeFailures).toBe(2);
+      expect(second.unavailableBatches).toBe(1);
+      expect(second.spoiledPairs).toBe(0);
+      expect(second.judged).toBe(0);
+      expect(relation(db, rel.id)).toBeDefined();
+      expect((db.prepare('SELECT COUNT(*) AS n FROM relation_resolution_log').get() as { n: number }).n).toBe(0);
+
+      // Service is back: the pair is picked up again and acted on.
+      const healthy: PairJudge = async (pairs) => pairs.map((_, i) => ({ pair_index: i, verdict: 'UNRELATED', confidence: 0.95 }));
+      const third = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge: healthy, votes: 3, archivePath: archive });
+      expect(third.examined).toBe(1);
+      expect(third.applied).toEqual({ deleted: 1 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('a disagreement with one vote missing is spoiled but not remembered: the missing voice might have decided it', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'partial one');
+      const b = mkFact(db, 'partial two');
+      createRelation(db, a, 'CONTRADICTS', b, 'n');
+      let call = 0;
+      const base: PairJudge = async (pairs) => {
+        call++;
+        if (call === 1) throw new Error('timeout');
+        const verdict = call === 2 ? 'UNRELATED' : 'TRUE_CONFLICT';
+        return pairs.map((_, i) => ({ pair_index: i, verdict, confidence: 0.9 }));
+      };
+
+      const summary = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge: base, votes: 3, archivePath: archive });
+
+      expect(summary.judgeFailures).toBe(1);
+      expect(summary.unavailableBatches).toBe(0); // quorum (2 of 3) was reached, they just disagreed
+      expect(summary.spoiledPairs).toBe(1);
+      expect((db.prepare('SELECT COUNT(*) AS n FROM relation_resolution_log').get() as { n: number }).n).toBe(0);
+      const again = await resolveQueue(db, 'CONTRADICTS', { apply: false, limit: 0, judge: base, votes: 1, archivePath: archive });
+      expect(again.examined).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
   it('with a single vote a throwing judge is also survived', async () => {
     const db = initDatabase();
     try {

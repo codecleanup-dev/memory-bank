@@ -643,8 +643,9 @@ function applyAction(db, pair, action, verdict, confidence, judgeReasoning) {
 export async function resolveQueue(db, type, opts) {
     const batchSize = Math.max(1, Math.min(20, Math.floor(opts.batchSize ?? DEFAULT_BATCH_SIZE)));
     const voteCount = Math.max(1, Math.min(MAX_VOTES, Math.floor(opts.votes ?? (opts.judge ? 1 : DEFAULT_VOTES))));
-    // Per-batch count of votes the model never delivered, so an all-failed batch can be told
-    // apart from a batch the model answered with garbage.
+    const majority = Math.floor(voteCount / 2) + 1;
+    // Per-batch count of votes the model never delivered, so a batch the judge could not
+    // properly see (quorum not reached) can be told apart from one it answered with garbage.
     let batchVoteErrors = 0;
     const judge = committeePairJudge(opts.judge ?? llmPairJudge, voteCount, opts.rng, (error) => {
         batchVoteErrors++;
@@ -681,14 +682,15 @@ export async function resolveQueue(db, type, opts) {
         const batch = pairs.slice(start, start + batchSize);
         batchVoteErrors = 0;
         const verdicts = await judge(batch);
+        if (batchVoteErrors > 0 && voteCount - batchVoteErrors < majority) {
+            // Too few votes arrived for ANY verdict to reach the majority: the judge was
+            // unavailable for this batch, not undecided. Nothing is recorded (no keep, no
+            // unresolved), so the next run picks these pairs up again once the service is back.
+            summary.unavailableBatches++;
+            opts.onProgress?.(`batch ${start / batchSize + 1}: judge unavailable (${batchVoteErrors}/${voteCount} vote(s) failed, quorum ${majority}), left for a later run`);
+            continue;
+        }
         if (verdicts === null) {
-            if (batchVoteErrors >= voteCount) {
-                // Every vote failed to arrive: the judge was unavailable, the pairs were never seen.
-                // Nothing is recorded, so the next run picks them up again.
-                summary.unavailableBatches++;
-                opts.onProgress?.(`batch ${start / batchSize + 1}: judge unavailable (${batchVoteErrors} vote error(s)), left for a later run`);
-                continue;
-            }
             summary.unparseableBatches++;
             opts.onProgress?.(`batch ${start / batchSize + 1}: unparseable judge output, skipped`);
             // Remembered under --apply so a bounded run does not re-select the same batch forever;
@@ -714,7 +716,9 @@ export async function resolveQueue(db, type, opts) {
             if (best.has(idx))
                 continue;
             summary.spoiledPairs++;
-            if (opts.apply)
+            // Only a FULL committee's failure to agree is remembered. If a vote never arrived, the
+            // missing voice might have made the majority, so the pair is left for a later run.
+            if (opts.apply && batchVoteErrors === 0)
                 recordUnresolved(db, batch[idx], 'no usable committee verdict');
         }
         for (const [idx, v] of best) {

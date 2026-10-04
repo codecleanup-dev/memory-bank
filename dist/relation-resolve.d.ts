@@ -160,7 +160,7 @@ export interface ResolveSummary {
     previouslyJudged: number;
     /** Votes the model never delivered (retries exhausted, transport error); each counts as a missing vote. */
     judgeFailures: number;
-    /** Batches where EVERY vote failed; left for a later run (never recorded as unresolved). */
+    /** Batches where too few votes arrived to reach the majority; left for a later run (never recorded). */
     unavailableBatches: number;
     pairs: ResolvedPair[];
     archivePath: string;
