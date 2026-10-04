@@ -152,7 +152,11 @@ async function main(): Promise<void> {
 main()
   // The Agent SDK can leave a child process or transport handle open after the last call;
   // a finished run must not sit there waiting on it (observed: complete JSON printed, no exit).
-  .then(() => process.exit(0))
+  // Everything main() writes is synchronous (better-sqlite3, appendFileSync) except stdout,
+  // which is asynchronous on a pipe on macOS: exit only after the summary has drained.
+  .then(() => {
+    process.stdout.write('', () => process.exit(0));
+  })
   .catch((error) => {
     console.error('resolve failed:', error instanceof Error ? error.message : error);
     process.exit(1);

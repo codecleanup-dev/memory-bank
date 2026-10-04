@@ -54,6 +54,7 @@ async function llm() {
 beforeEach(() => {
   scenarios.length = 0;
   queryCalls = 0;
+  lastQueryOptions = undefined;
   process.env.MEMORY_BANK_LLM_RETRY_BASE_MS = '0'; // 테스트에서 백오프 대기 없음
   delete process.env.ANTHROPIC_API_KEY;            // Anthropic SDK 폴백 비활성 (구독 경로만)
   delete process.env.MEMORY_BANK_API_TOKEN;
