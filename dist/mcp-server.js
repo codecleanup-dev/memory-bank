@@ -27005,7 +27005,17 @@ function backoffMs(attempt) {
   return Math.min(base * Math.pow(3, attempt), MAX_BACKOFF_MS);
 }
 var sleep2 = (ms) => ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve();
-async function callOnce(systemPrompt, userMessage, maxTokens) {
+var DEFAULT_CALL_TIMEOUT_MS = 18e4;
+var MAX_CALL_TIMEOUT_MS = 6e5;
+function callTimeoutMs() {
+  const raw = process.env.MEMORY_BANK_LLM_CALL_TIMEOUT_MS;
+  if (raw != null && /^\d+$/.test(raw.trim())) return Math.max(1, Math.min(MAX_CALL_TIMEOUT_MS, parseInt(raw.trim(), 10)));
+  return DEFAULT_CALL_TIMEOUT_MS;
+}
+function callTimeoutError(ms) {
+  return new Error(`LLM call timeout after ${ms} ms (aborted)`);
+}
+async function callOnceInner(systemPrompt, userMessage, maxTokens, abort, timeoutMs) {
   const model = process.env.MEMORY_BANK_FACT_MODEL || "haiku";
   try {
     for await (const message of query({
@@ -27027,7 +27037,8 @@ ${userMessage}`,
         // in three). A pure text classifier never needs a tool.
         tools: [],
         settingSources: [],
-        cwd: llmWorkdir()
+        cwd: llmWorkdir(),
+        abortController: abort
       }
     })) {
       if (message && typeof message === "object" && "type" in message && message.type === "result") {
@@ -27039,8 +27050,10 @@ ${userMessage}`,
         return m2.result || "";
       }
     }
+    if (abort.signal.aborted) throw callTimeoutError(timeoutMs);
     return "";
   } catch (agentSdkError) {
+    if (abort.signal.aborted) throw callTimeoutError(timeoutMs);
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.MEMORY_BANK_API_TOKEN;
     if (!apiKey) {
       throw agentSdkError;
@@ -27048,14 +27061,42 @@ ${userMessage}`,
     const { default: Anthropic2 } = await Promise.resolve().then(() => (init_sdk(), sdk_exports));
     const baseURL = process.env.MEMORY_BANK_API_BASE_URL;
     const client = new Anthropic2({ apiKey, ...baseURL ? { baseURL } : {} });
-    const response = await client.messages.create({
-      model: process.env.MEMORY_BANK_FACT_MODEL || "claude-haiku-4-5-20251001",
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }]
-    });
+    let response;
+    try {
+      response = await client.messages.create(
+        {
+          model: process.env.MEMORY_BANK_FACT_MODEL || "claude-haiku-4-5-20251001",
+          max_tokens: maxTokens,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userMessage }]
+        },
+        { signal: abort.signal }
+      );
+    } catch (fallbackError) {
+      if (abort.signal.aborted) throw callTimeoutError(timeoutMs);
+      throw fallbackError;
+    }
     const textBlock = response.content.find((b2) => b2.type === "text");
     return textBlock?.text || "";
+  }
+}
+async function callOnce(systemPrompt, userMessage, maxTokens) {
+  const timeoutMs = callTimeoutMs();
+  const abort = new AbortController();
+  let timer;
+  const deadline = new Promise((_2, reject) => {
+    timer = setTimeout(() => {
+      abort.abort();
+      reject(callTimeoutError(timeoutMs));
+    }, timeoutMs);
+  });
+  const work = callOnceInner(systemPrompt, userMessage, maxTokens, abort, timeoutMs);
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    work.catch(() => {
+    });
   }
 }
 async function callHaiku(systemPrompt, userMessage, maxTokens = 2048) {

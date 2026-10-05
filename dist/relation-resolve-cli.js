@@ -15,6 +15,9 @@
  *                 not better confirmed); BOTH_VALID → INFLUENCES, UNRELATED → delete
  *   --limit N     pairs per run (default 200; 0 = all); pairs an earlier --apply run judged are skipped
  *   --rejudge     include pairs an earlier run already judged
+ *   --replan      no model calls: re-run today's policy on verdicts an earlier --apply run recorded as keep
+ *                 (how a threshold change reaches already-judged pairs); honours --apply; --limit bounds
+ *                 the pairs it may change (unchanged keeps do not count); ignores batching/votes
  *   --batch-size  pairs per LLM call (default 8, max 20)
  *   --votes K     committee size (default 3, max 5; 1 = single call)
  *   --model M     judge model (default sonnet; aliases haiku|sonnet|opus resolve to full ids;
@@ -25,14 +28,15 @@
  * (duplicate edge removal, scope fixes) that would change the graph before it is judged.
  */
 import { initDatabase, openDatabaseReadonly } from './db.js';
-import { DEFAULT_BATCH_SIZE, DEFAULT_RESOLVE_MODEL, DEFAULT_VOTES, MAX_VOTES, formatResolveSummary, parseIntegerOption, resolveModelId, resolveQueue, } from './relation-resolve.js';
-const USAGE = 'Usage: memory-bank resolve <contradicts|supersedes> [--apply] [--limit N] [--rejudge] [--batch-size N (1-20)] [--votes K (1-5)] [--model M] [--json]';
+import { DEFAULT_BATCH_SIZE, DEFAULT_RESOLVE_MODEL, DEFAULT_VOTES, MAX_VOTES, formatResolveSummary, parseIntegerOption, replanFromLog, resolveModelId, resolveQueue, } from './relation-resolve.js';
+const USAGE = 'Usage: memory-bank resolve <contradicts|supersedes> [--apply] [--limit N] [--rejudge | --replan] [--batch-size N (1-20)] [--votes K (1-5)] [--model M] [--json]';
 function parseArgs(argv) {
     const opts = {
         type: 'CONTRADICTS',
         apply: false,
         limit: 200,
         rejudge: false,
+        replan: false,
         batchSize: DEFAULT_BATCH_SIZE,
         votes: DEFAULT_VOTES,
         model: process.env.MEMORY_BANK_FACT_MODEL || DEFAULT_RESOLVE_MODEL,
@@ -61,6 +65,8 @@ function parseArgs(argv) {
             opts.apply = true;
         else if (arg === '--rejudge')
             opts.rejudge = true;
+        else if (arg === '--replan')
+            opts.replan = true;
         else if (arg === '--json')
             opts.json = true;
         else if (arg === '--limit')
@@ -90,6 +96,10 @@ function parseArgs(argv) {
         console.error(USAGE);
         process.exit(3);
     }
+    if (opts.replan && opts.rejudge) {
+        console.error('--replan re-uses recorded verdicts; it cannot be combined with --rejudge');
+        process.exit(3);
+    }
     return opts;
 }
 async function main() {
@@ -115,20 +125,23 @@ async function main() {
         }
     }
     try {
-        const summary = await resolveQueue(db, opts.type, {
-            apply: opts.apply,
-            limit: opts.limit,
-            rejudge: opts.rejudge,
-            batchSize: opts.batchSize,
-            votes: opts.votes,
-            onProgress: (line) => console.error(`resolve: ${line}`),
-        });
+        const onProgress = (line) => console.error(`resolve: ${line}`);
+        const summary = opts.replan
+            ? replanFromLog(db, opts.type, { apply: opts.apply, limit: opts.limit, onProgress })
+            : await resolveQueue(db, opts.type, {
+                apply: opts.apply,
+                limit: opts.limit,
+                rejudge: opts.rejudge,
+                batchSize: opts.batchSize,
+                votes: opts.votes,
+                onProgress,
+            });
         if (opts.json) {
-            console.log(JSON.stringify({ ...summary, model: opts.model }, null, 2));
+            console.log(JSON.stringify({ ...summary, model: opts.replan ? null : opts.model }, null, 2));
         }
         else {
             console.log(formatResolveSummary(summary));
-            console.log(`_model: ${opts.model} · votes: ${opts.votes} · batch: ${opts.batchSize}_`);
+            console.log(opts.replan ? '_source: recorded verdicts (no model calls)_' : `_model: ${opts.model} · votes: ${opts.votes} · batch: ${opts.batchSize}_`);
             if (!opts.apply)
                 console.log('\nDry run: nothing changed. Re-run with --apply to act on the plan above.');
         }

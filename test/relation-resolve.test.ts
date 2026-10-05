@@ -11,6 +11,7 @@ import {
   committeePairJudge,
   parseIntegerOption,
   planAction,
+  replanFromLog,
   resolveModelId,
   resolveQueue,
   type JudgeVerdict,
@@ -156,7 +157,7 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       const rel2 = createRelation(db, c, 'CONTRADICTS', d, 'noise');
       const judge = tableJudge({
         'sessions use JWT': { verdict: 'TRUE_CONFLICT', confidence: 0.95 },
-        'logs go to stdout': { verdict: 'UNRELATED', confidence: 0.6 },
+        'logs go to stdout': { verdict: 'UNRELATED', confidence: 0.55 },
       });
 
       const summary = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
@@ -165,7 +166,7 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       expect(summary.applied).toEqual({});
       expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS');
       expect(relation(db, rel2.id)?.relation_type).toBe('CONTRADICTS');
-      expect(summary.pairs.find((p) => p.relationId === rel2.id)?.reason).toContain('< 0.8');
+      expect(summary.pairs.find((p) => p.relationId === rel2.id)?.reason).toContain('< 0.6');
       expect(fs.existsSync(archive)).toBe(false);
     } finally {
       db.close();
@@ -834,6 +835,13 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       expect(first.planned.keep).toBe(1);
       expect((await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive })).examined).toBe(0);
 
+      // A corrected creation date changes the temporal order the judge reasoned about: new pair.
+      db.prepare('UPDATE facts SET created_at = ? WHERE id = ?').run('2020-01-01T00:00:00.000Z', older);
+      const dated = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive });
+      expect(dated.examined).toBe(1);
+      expect(dated.planned.keep).toBe(1); // still better confirmed → kept, and recorded with the new date
+      expect((await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive })).examined).toBe(0);
+
       // The survivor gains confirmations: the policy outcome can change, so the pair is new again.
       db.prepare('UPDATE facts SET consolidated_count = 5 WHERE id = ?').run(newer);
       const third = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive });
@@ -1044,6 +1052,199 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('replan from log: a recorded keep whose verdict now clears the policy is acted on without any model call', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'kept at the old bar');
+      const b = mkFact(db, 'its partner');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const c = mkFact(db, 'true conflict A');
+      const d = mkFact(db, 'true conflict B');
+      const conflict = createRelation(db, c, 'CONTRADICTS', d, 'n');
+      // Simulate the earlier policy: the committee said "related, not conflicting" at 0.7 and the
+      // run recorded keep (the old threshold was 0.8). TRUE_CONFLICT stays for a human either way.
+      const judge = tableJudge({
+        'kept at the old bar': { verdict: 'RELATED_NOT_CONFLICTING', confidence: 0.7 },
+        'true conflict A': { verdict: 'TRUE_CONFLICT', confidence: 0.9 },
+      });
+      // Run with a policy snapshot that keeps 0.7: emulate by recording directly, then replan.
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      // Both pairs are recorded; the 0.7 pair was already retyped by today's policy, so rewind it to a keep row
+      // to model "judged under a stricter policy" without re-running the committee.
+      db.prepare("UPDATE ontology_relations SET relation_type = 'CONTRADICTS', reasoning = 'n' WHERE id = ?").run(rel.id);
+      db.prepare("UPDATE relation_resolution_log SET action = 'keep', relation_type_after = 'CONTRADICTS', source_after = NULL, target_after = NULL, note = 'confidence 0.7 < 0.8', reasoning_before = 'n' WHERE relation_id = ?").run(rel.id);
+      const never: PairJudge = async () => {
+        throw new Error('the replan must not call the judge');
+      };
+
+      const dry = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: false });
+      expect(dry.source).toBe('log');
+      expect(dry.judged).toBe(2);
+      expect(dry.planned).toEqual({ keep: 1, retype: 1, delete: 0, deactivate: 0 });
+      expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS'); // dry run changed nothing
+
+      // A recorded reasoning already at the 300-char cap must not push the provenance tag off the end.
+      db.prepare("UPDATE relation_resolution_log SET judge_reasoning = ? WHERE relation_id = ? AND action = 'keep'").run('r'.repeat(300), rel.id);
+      const applied = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
+      expect(applied.applied).toEqual({ retyped: 1 });
+      expect(relation(db, rel.id)?.relation_type).toBe('INFLUENCES');
+      expect(relation(db, conflict.id)?.relation_type).toBe('CONTRADICTS');
+      const row = db.prepare("SELECT judge_reasoning FROM relation_resolution_log WHERE relation_id = ? AND action = 'retype'").get(rel.id) as { judge_reasoning: string };
+      expect(row.judge_reasoning).toMatch(/ \[replanned from log #\d+\]$/);
+      expect(row.judge_reasoning.length).toBeLessThanOrEqual(300);
+      // Nothing is left to replan: the retyped edge is no longer a CONTRADICTS pair, the conflict stays keep.
+      const again = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
+      expect(again.judged).toBe(1);
+      expect(again.applied).toEqual({});
+      // And the regular judged path was never needed for this.
+      await expect(resolveQueue(db, 'CONTRADICTS', { apply: false, limit: 0, judge: never, votes: 1, archivePath: archive })).resolves.toMatchObject({ examined: 0 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('replan from log skips a pair whose inputs changed since the committee judged it, and ignores rows without a verdict', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'changed since');
+      const b = mkFact(db, 'partner');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const judge = tableJudge({ 'changed since': { verdict: 'UNRELATED', confidence: 0.55 } }); // kept under today's policy
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      // The committee's confidence would clear a lower bar, but the fact text moved on.
+      db.prepare('UPDATE facts SET fact = ? WHERE id = ?').run('changed since (edited)', a);
+      db.prepare('UPDATE relation_resolution_log SET confidence = 0.95 WHERE relation_id = ?').run(rel.id);
+
+      const summary = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
+
+      expect(summary.judged).toBe(0);
+      expect(summary.previouslyJudged).toBe(1);
+      expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS');
+
+      // An unresolved row (no verdict) is never replanned.
+      const c = mkFact(db, 'no verdict one');
+      const d = mkFact(db, 'no verdict two');
+      const stuck = createRelation(db, c, 'CONTRADICTS', d, 'n');
+      const none: PairJudge = async () => null;
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge: none, archivePath: archive });
+      const second = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
+      expect(second.judged).toBe(0);
+      expect(relation(db, stuck.id)?.relation_type).toBe('CONTRADICTS');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('replan bounds the pairs it may change (leading keeps do not eat the limit) and refuses a log row that is no longer the newest judgment', async () => {
+    const db = initDatabase();
+    try {
+      const rels: string[] = [];
+      for (let i = 0; i < 3; i++) {
+        const a = mkFact(db, `replan ${i} a`);
+        const b = mkFact(db, `replan ${i} b`);
+        rels.push(createRelation(db, a, 'CONTRADICTS', b, 'n').id);
+      }
+      // Judged under today's policy as low-confidence keeps, then the recorded confidence is raised
+      // to model "the committee was surer than the old bar required".
+      const judge: PairJudge = async (pairs) => pairs.map((_, i) => ({ pair_index: i, verdict: 'RELATED_NOT_CONFLICTING', confidence: 0.55 }));
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      db.prepare("UPDATE relation_resolution_log SET confidence = 0.7 WHERE action = 'keep'").run();
+      // Newest in queue order: a pair whose recorded verdict stays keep under any policy. It must
+      // not consume the bound on every pass (that would starve the actionable pairs behind it).
+      const ta = mkFact(db, 'true conflict newest a');
+      const tb = mkFact(db, 'true conflict newest b');
+      const newest = createRelation(db, ta, 'CONTRADICTS', tb, 'n');
+      // The queue is ordered by relation created_at DESC with millisecond resolution; pin this
+      // edge to the front so the test is not at the mercy of same-tick ordering.
+      db.prepare('UPDATE ontology_relations SET created_at = ? WHERE id = ?').run('2099-01-01 00:00:00', newest.id);
+      const conflictJudge = tableJudge({ 'true conflict newest a': { verdict: 'TRUE_CONFLICT', confidence: 0.9 } });
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge: conflictJudge, archivePath: archive });
+
+      const one = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true, limit: 1 });
+      expect(one.planned.keep).toBe(1); // the leading TRUE_CONFLICT keep was looked at ...
+      expect(one.applied).toEqual({ retyped: 1 }); // ... and still one actionable pair behind it was changed
+      expect(relation(db, newest.id)?.relation_type).toBe('CONTRADICTS');
+      expect(db.prepare("SELECT COUNT(*) AS n FROM ontology_relations WHERE relation_type = 'INFLUENCES'").get()).toEqual({ n: 1 });
+
+      // A concurrent writer records a newer TRUE_CONFLICT judgment for the next pair between our
+      // read and our write: the stale verdict must not delete or retype that edge.
+      const stale = replanFromLog(db, 'CONTRADICTS', {
+        archivePath: archive,
+        apply: true,
+        limit: 1,
+        beforeApply: (pair) => {
+          db.prepare(
+            `INSERT INTO relation_resolution_log (ts, action, relation_id, relation_type_before, relation_type_after,
+               source_fact_id, target_fact_id, source_fact, target_fact, reasoning_before, verdict, confidence,
+               source_category, target_category, source_scope, target_scope, source_count, target_count)
+             VALUES ('t', 'keep', ?, 'CONTRADICTS', 'CONTRADICTS', ?, ?, ?, ?, ?, 'TRUE_CONFLICT', 0.9,
+               'decision', 'decision', 'global:', 'global:', 1, 1)`,
+          ).run(pair.relationId, pair.source.id, pair.target.id, pair.source.fact, pair.target.fact, pair.reasoning);
+        },
+      });
+      expect(stale.applied).toEqual({ 'skipped-changed': 1 });
+      expect(db.prepare("SELECT COUNT(*) AS n FROM ontology_relations WHERE relation_type = 'INFLUENCES'").get()).toEqual({ n: 1 });
+      // Next replan sees the newer TRUE_CONFLICT row for that pair and leaves it (plus the newest
+      // conflict pair); the third pair is retyped.
+      const rest = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true, limit: 0 });
+      expect(rest.planned.keep).toBe(2);
+      expect(rest.applied).toEqual({ retyped: 1 });
+      expect(db.prepare("SELECT COUNT(*) AS n FROM ontology_relations WHERE relation_type = 'INFLUENCES'").get()).toEqual({ n: 2 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('replan: a fact date corrected right before the write is caught inside the transaction', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'dated a');
+      const b = mkFact(db, 'dated b');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const judge: PairJudge = async (pairs) => pairs.map((_, i) => ({ pair_index: i, verdict: 'UNRELATED', confidence: 0.55 }));
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      db.prepare("UPDATE relation_resolution_log SET confidence = 0.9 WHERE action = 'keep'").run();
+
+      const summary = replanFromLog(db, 'CONTRADICTS', {
+        archivePath: archive,
+        apply: true,
+        beforeApply: () => db.prepare('UPDATE facts SET created_at = ? WHERE id = ?').run('2020-01-01T00:00:00.000Z', a),
+      });
+
+      expect(summary.applied).toEqual({ 'skipped-changed': 1 });
+      expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('replan: a row without fact dates (pre-1.12.3) is reused only while neither fact was touched after it', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'old row a');
+      const b = mkFact(db, 'old row b');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const c = mkFact(db, 'old row c');
+      const d = mkFact(db, 'old row d');
+      const rel2 = createRelation(db, c, 'CONTRADICTS', d, 'n');
+      const judge: PairJudge = async (pairs) => pairs.map((_, i) => ({ pair_index: i, verdict: 'UNRELATED', confidence: 0.55 }));
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      // Model rows written before the date columns existed, with a confidence the new policy acts on.
+      db.prepare("UPDATE relation_resolution_log SET confidence = 0.9, source_created = NULL, target_created = NULL WHERE action = 'keep'").run();
+      // One pair was touched after its row (a date correction through a code path bumps updated_at).
+      db.prepare('UPDATE facts SET created_at = ?, updated_at = ? WHERE id = ?').run('2020-01-01T00:00:00.000Z', '2099-01-01T00:00:00.000Z', c);
+
+      const summary = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
+
+      expect(summary.applied).toEqual({ deleted: 1 });
+      expect(summary.previouslyJudged).toBe(1);
+      expect(relation(db, rel.id)).toBeUndefined();
+      expect(relation(db, rel2.id)?.relation_type).toBe('CONTRADICTS');
+    } finally {
+      db.close();
+    }
+  });
+
   it('parseIntegerOption accepts only whole-string safe integers', () => {
     expect(parseIntegerOption('0', 0)).toBe(0);
     expect(parseIntegerOption(' 200 ', 0)).toBe(200);
@@ -1070,8 +1271,9 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     const pair = (relationType: 'CONTRADICTS' | 'SUPERSEDES') => ({
       relationId: 'r', relationType, reasoning: null, createdAt: '2026-10-01T00:00:00Z', source: slim('s', 'S'), target: slim('t', 'T'),
     });
-    expect(planAction(pair('CONTRADICTS'), 'UNRELATED', 0.8).kind).toBe('delete');
-    expect(planAction(pair('CONTRADICTS'), 'UNRELATED', 0.79).kind).toBe('keep');
+    expect(planAction(pair('CONTRADICTS'), 'UNRELATED', 0.6).kind).toBe('delete');
+    expect(planAction(pair('CONTRADICTS'), 'UNRELATED', 0.59).kind).toBe('keep');
+    expect(planAction(pair('CONTRADICTS'), 'RELATED_NOT_CONFLICTING', 0.6).kind).toBe('retype');
     expect(planAction(pair('CONTRADICTS'), 'TRUE_CONFLICT', 1).kind).toBe('keep');
     expect(planAction(pair('SUPERSEDES'), 'TARGET_REDUNDANT', 0.9)).toMatchObject({ kind: 'deactivate', loserId: 't', survivorId: 's' });
     expect(planAction(pair('SUPERSEDES'), 'TARGET_REDUNDANT', 0.89).kind).toBe('keep');

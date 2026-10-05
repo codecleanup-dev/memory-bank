@@ -65,7 +65,13 @@ export interface JudgeVerdict {
 export type PairJudge = (pairs: ConflictPair[]) => Promise<JudgeVerdict[] | null>;
 
 /** Edge-only actions (retype / delete) need this much committee confidence. */
-export const EDGE_ACTION_THRESHOLD = 0.8;
+/**
+ * Edge actions (delete / retype) are reversible through relation_resolution_log, so they
+ * need less certainty than retiring a fact. 0.8 → 0.6 on 2026-10-05 (Lucy): the sonnet
+ * committee's lower-median confidence for "unrelated / compatible" sat at 0.55–0.75 on
+ * 374 of 459 live pairs, so 0.8 left 80% of the queue untouched.
+ */
+export const EDGE_ACTION_THRESHOLD = 0.6;
 /** Retiring a fact needs more: it changes what the graph answers. */
 export const DEACTIVATE_THRESHOLD = 0.9;
 export const DEFAULT_BATCH_SIZE = 8;
@@ -118,7 +124,9 @@ const RESOLUTION_LOG_DDL = `CREATE TABLE IF NOT EXISTS relation_resolution_log (
   source_scope TEXT,
   target_scope TEXT,
   source_count INTEGER,
-  target_count INTEGER
+  target_count INTEGER,
+  source_created TEXT,
+  target_created TEXT
 )`;
 
 /** Columns added after the first shape; added idempotently so an older table keeps working. */
@@ -129,6 +137,10 @@ const RESOLUTION_LOG_LATER_COLUMNS: ReadonlyArray<[string, string]> = [
   ['target_scope', 'TEXT'],
   ['source_count', 'INTEGER'],
   ['target_count', 'INTEGER'],
+  // The judge sees both facts' dates (temporal order matters for SUPERSEDES); from 1.12.3 the
+  // snapshot carries them so a corrected date invalidates the recorded verdict.
+  ['source_created', 'TEXT'],
+  ['target_created', 'TEXT'],
 ];
 
 /** Idempotent; called only when a run may write (dry-run leaves the schema alone). */
@@ -418,6 +430,8 @@ export interface ResolveOptions {
 export interface ResolveSummary {
   type: ConflictType;
   mode: 'dry-run' | 'apply';
+  /** `judge`: verdicts came from the committee this run; `log`: replanned from recorded verdicts (no model calls). */
+  source: 'judge' | 'log';
   examined: number;
   judged: number;
   unparseableBatches: number;
@@ -447,6 +461,9 @@ interface JudgedSnapshot {
   target_scope: string | null;
   source_count: number | null;
   target_count: number | null;
+  /** NULL on rows written before 1.12.3: then the dates are not compared (nothing to compare against). */
+  source_created: string | null;
+  target_created: string | null;
 }
 
 /**
@@ -495,7 +512,9 @@ function alreadyJudged(pair: ConflictPair, snap: JudgedSnapshot | undefined): bo
     snap.source_scope === scopeKey(pair.source) &&
     snap.target_scope === scopeKey(pair.target) &&
     snap.source_count === pair.source.consolidated_count &&
-    snap.target_count === pair.target.consolidated_count
+    snap.target_count === pair.target.consolidated_count &&
+    (snap.source_created == null || snap.source_created === pair.source.created_at) &&
+    (snap.target_created == null || snap.target_created === pair.target.created_at)
   );
 }
 
@@ -533,6 +552,8 @@ interface LogRecord {
   target_scope: string;
   source_count: number;
   target_count: number;
+  source_created: string;
+  target_created: string;
 }
 
 /** The judged-input snapshot every log row carries (what alreadyJudged compares against). */
@@ -547,6 +568,8 @@ function snapshotFields(pair: ConflictPair) {
     target_scope: scopeKey(pair.target),
     source_count: pair.source.consolidated_count,
     target_count: pair.target.consolidated_count,
+    source_created: pair.source.created_at,
+    target_created: pair.target.created_at,
   };
 }
 
@@ -558,12 +581,14 @@ function insertLog(db: Database.Database, rec: LogRecord): void {
        source_fact_id, target_fact_id, source_after, target_after,
        source_fact, target_fact, reasoning_before, verdict, confidence, judge_reasoning,
        deactivated_fact_id, survivor_fact_id, note,
-       source_category, target_category, source_scope, target_scope, source_count, target_count)
+       source_category, target_category, source_scope, target_scope, source_count, target_count,
+       source_created, target_created)
      VALUES (@ts, @action, @relation_id, @relation_type_before, @relation_type_after,
        @source_fact_id, @target_fact_id, @source_after, @target_after,
        @source_fact, @target_fact, @reasoning_before, @verdict, @confidence, @judge_reasoning,
        @deactivated_fact_id, @survivor_fact_id, @note,
-       @source_category, @target_category, @source_scope, @target_scope, @source_count, @target_count)`,
+       @source_category, @target_category, @source_scope, @target_scope, @source_count, @target_count,
+       @source_created, @target_created)`,
   ).run(rec);
 }
 
@@ -613,6 +638,7 @@ interface LiveFact {
   scope_type: string;
   scope_project: string | null;
   consolidated_count: number;
+  created_at: string;
 }
 
 interface LiveRow {
@@ -639,7 +665,7 @@ function unchanged(db: Database.Database, pair: ConflictPair): LiveRow | null {
   if ((row.reasoning ?? null) !== (pair.reasoning ?? null)) return null;
   const same = (id: string, snap: ConflictPair['source']): boolean => {
     const f = db
-      .prepare(`SELECT is_active, fact, category, scope_type, scope_project, consolidated_count FROM facts WHERE id = ?`)
+      .prepare(`SELECT is_active, fact, category, scope_type, scope_project, consolidated_count, created_at FROM facts WHERE id = ?`)
       .get(id) as LiveFact | undefined;
     return (
       !!f &&
@@ -648,7 +674,9 @@ function unchanged(db: Database.Database, pair: ConflictPair): LiveRow | null {
       f.category === snap.category &&
       f.scope_type === snap.scope_type &&
       (f.scope_project ?? null) === (snap.scope_project ?? null) &&
-      f.consolidated_count === snap.consolidated_count
+      f.consolidated_count === snap.consolidated_count &&
+      // The judge read both dates (temporal order); a corrected date is a different question.
+      f.created_at === snap.created_at
     );
   };
   if (!same(pair.source.id, pair.source) || !same(pair.target.id, pair.target)) return null;
@@ -667,6 +695,8 @@ function applyAction(
   verdict: string,
   confidence: number,
   judgeReasoning: string | null,
+  /** Extra precondition evaluated inside the write transaction (after the pair re-check); false → skipped-changed. */
+  stillValid?: () => boolean,
 ): Applied {
   if (action.kind === 'keep') {
     // No mutation, but remember the verdict so a later bounded run does not re-pay for it.
@@ -702,6 +732,7 @@ function applyAction(
   const tx = db.transaction((): Applied => {
     const live = unchanged(db, pair);
     if (!live) return { result: 'skipped-changed', record: null };
+    if (stillValid && !stillValid()) return { result: 'skipped-changed', record: null };
     const stamp = new Date().toISOString();
     const note = `[resolve ${stamp.slice(0, 10)}] ${verdict} (${confidence}) ${judgeReasoning ?? ''}`.trim();
     const base: LogRecord = {
@@ -831,6 +862,7 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
   const summary: ResolveSummary = {
     type,
     mode: opts.apply ? 'apply' : 'dry-run',
+    source: 'judge',
     examined: pairs.length,
     judged: 0,
     unparseableBatches: 0,
@@ -918,8 +950,165 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
   return summary;
 }
 
+/** One log row read whole: the committee's verdict AND the judged-input snapshot it was made on. */
+interface LatestLogRow extends JudgedSnapshot {
+  id: number;
+  ts: string;
+  action: string;
+  verdict: string;
+  confidence: number;
+  judge_reasoning: string | null;
+}
+
+/**
+ * For a log row written before the snapshot carried fact dates, the only staleness signal
+ * left is facts.updated_at: every code path that changes a fact bumps it, so a fact touched
+ * after the row was written may have changed something the judge read. Both ISO strings.
+ */
+function factsUntouchedSince(db: Database.Database, pair: ConflictPair, ts: string): boolean {
+  const rows = db
+    .prepare('SELECT updated_at FROM facts WHERE id IN (?, ?)')
+    .all(pair.source.id, pair.target.id) as Array<{ updated_at: string | null }>;
+  return rows.length === 2 && rows.every((r) => typeof r.updated_at === 'string' && r.updated_at <= ts);
+}
+
+/**
+ * Latest log row per relation for this type, verdict and snapshot from the SAME row, so a
+ * replan never pairs one row's verdict with another row's inputs. Missing snapshot columns
+ * (older table) read as NULL, which makes the snapshot fail to match → not replanned.
+ */
+function latestLogRows(db: Database.Database, type: ConflictType): Map<string, LatestLogRow> {
+  const out = new Map<string, LatestLogRow>();
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'relation_resolution_log'").get();
+  if (!exists) return out;
+  const have = new Set((db.prepare('PRAGMA table_info(relation_resolution_log)').all() as Array<{ name: string }>).map((c) => c.name));
+  const later = RESOLUTION_LOG_LATER_COLUMNS.map(([name]) => (have.has(name) ? name : `NULL AS ${name}`)).join(', ');
+  const rows = db
+    .prepare(
+      `SELECT id, ts, relation_id, action, verdict, confidence, judge_reasoning,
+              source_fact, target_fact, reasoning_before, ${later}
+       FROM relation_resolution_log WHERE relation_type_before = ? ORDER BY id ASC`,
+    )
+    .all(type) as Array<LatestLogRow & { relation_id: string }>;
+  for (const r of rows) {
+    const { relation_id, ...row } = r;
+    out.set(relation_id, row); // ascending ids: the last write wins
+  }
+  return out;
+}
+
+/** Inside the write transaction: is this row still the newest judgment of the relation? */
+function logRowIsLatest(db: Database.Database, type: ConflictType, relationId: string, rowId: number): boolean {
+  const r = db
+    .prepare('SELECT MAX(id) AS id FROM relation_resolution_log WHERE relation_type_before = ? AND relation_id = ?')
+    .get(type, relationId) as { id: number | null };
+  return r.id === rowId;
+}
+
+export interface ReplanOptions {
+  apply: boolean;
+  /** Pairs the policy may CHANGE this run; 0 = all. Recorded keeps that stay keep do not count (they would stall bounded runs). */
+  limit?: number;
+  archivePath?: string;
+  onProgress?: (line: string) => void;
+  /** Test seam: runs after a pair is planned and before it is applied (models a concurrent writer). */
+  beforeApply?: (pair: ConflictPair) => void;
+}
+
+/**
+ * Re-plan from recorded verdicts: for every active pair whose latest log row is a `keep`
+ * with a committee verdict, and whose judged inputs are still exactly what the committee
+ * saw, run today's policy (thresholds) on the recorded verdict + confidence. No model
+ * calls. This is how a threshold change reaches pairs that were already judged without
+ * paying for a second judgment: the verdict is the same, only the policy moved.
+ */
+export function replanFromLog(db: Database.Database, type: ConflictType, opts: ReplanOptions): ResolveSummary {
+  const archivePath = opts.archivePath ?? defaultArchivePath();
+  const allowed = verdictSet(type);
+  if (opts.apply) ensureResolutionLog(db);
+  const rows = latestLogRows(db, type);
+  const limit = opts.limit ?? 0;
+  const summary: ResolveSummary = {
+    type,
+    mode: opts.apply ? 'apply' : 'dry-run',
+    source: 'log',
+    examined: 0,
+    judged: 0,
+    unparseableBatches: 0,
+    planned: { keep: 0, retype: 0, delete: 0, deactivate: 0 },
+    applied: {},
+    archiveErrors: 0,
+    spoiledPairs: 0,
+    previouslyJudged: 0,
+    judgeFailures: 0,
+    unavailableBatches: 0,
+    pairs: [],
+    archivePath,
+  };
+  // The bound applies to pairs the policy would CHANGE. A recorded keep that stays keep costs
+  // nothing here (no model call) and leaves no new state, so counting it would let a run of
+  // leading keeps exhaust the limit on every pass and never reach the actionable pairs behind.
+  let actionable = 0;
+  for (const pair of listActiveConflicts(db, type, 1_000_000)) {
+    if (limit > 0 && actionable >= limit) break;
+    const logged = rows.get(pair.relationId);
+    // Only a recorded `keep` with a real verdict qualifies: unresolved rows carry no verdict,
+    // and acted-on rows mean the edge is no longer the one that was judged.
+    if (!logged || logged.action !== 'keep' || !allowed.has(logged.verdict)) continue;
+    // The committee's verdict is reusable only while the pair is exactly what it judged
+    // (snapshot and verdict come from the same row). A row without the fact dates (written
+    // before 1.12.3) cannot prove the dates are unchanged; it is reused only if neither fact
+    // has been touched since the row was written.
+    if (!alreadyJudged(pair, logged)) {
+      summary.previouslyJudged++;
+      continue;
+    }
+    if ((logged.source_created == null || logged.target_created == null) && !factsUntouchedSince(db, pair, logged.ts)) {
+      summary.previouslyJudged++;
+      continue;
+    }
+    summary.examined++;
+    summary.judged++;
+    const action = planAction(pair, logged.verdict as Verdict, logged.confidence);
+    summary.planned[action.kind]++;
+    if (action.kind === 'keep') continue; // the policy still says keep: nothing to re-record
+    actionable++;
+    // The provenance tag must survive the 300-char cap: trim the recorded reasoning, never the tag.
+    const tag = ` [replanned from log #${logged.id}]`;
+    const reasoning = `${(logged.judge_reasoning ?? '').slice(0, Math.max(0, 300 - tag.length))}${tag}`.trim();
+    const resolved: ResolvedPair = {
+      relationId: pair.relationId,
+      relationType: type,
+      sourceId: pair.source.id,
+      targetId: pair.target.id,
+      verdict: logged.verdict,
+      confidence: logged.confidence,
+      judgeReasoning: reasoning,
+      planned: action.kind,
+      reason: action.reason,
+    };
+    if (opts.apply) {
+      opts.beforeApply?.(pair);
+      // Inside the write transaction the row we planned from must still be the newest judgment
+      // of this relation: a concurrent re-judgment (say TRUE_CONFLICT) recorded after our read
+      // would otherwise be overridden by a stale verdict.
+      const { result, record } = applyAction(db, pair, action, logged.verdict, logged.confidence, reasoning, () =>
+        logRowIsLatest(db, type, pair.relationId, logged.id),
+      );
+      if (result) {
+        resolved.applied = result;
+        summary.applied[result] = (summary.applied[result] ?? 0) + 1;
+      }
+      if (record && !mirrorArchive(archivePath, record)) summary.archiveErrors++;
+    }
+    summary.pairs.push(resolved);
+  }
+  opts.onProgress?.(`replan: ${summary.judged} recorded verdict(s) re-planned, planned ${JSON.stringify(summary.planned)}`);
+  return summary;
+}
+
 export function formatResolveSummary(summary: ResolveSummary, listLimit: number = 25): string {
-  let out = `# Resolution pass: ${summary.type} (${summary.mode})\n\n`;
+  let out = `# Resolution pass: ${summary.type} (${summary.mode}${summary.source === 'log' ? ', replanned from log' : ''})\n\n`;
   out += `| Metric | Value |\n|--------|-------|\n`;
   out += `| Pairs examined | ${summary.examined} |\n`;
   out += `| Pairs judged | ${summary.judged} |\n`;
@@ -927,7 +1116,7 @@ export function formatResolveSummary(summary: ResolveSummary, listLimit: number 
   out += `| Spoiled pairs (no usable verdict) | ${summary.spoiledPairs} |\n`;
   out += `| Judge votes that never arrived | ${summary.judgeFailures} |\n`;
   out += `| Batches left for a later run (judge unavailable) | ${summary.unavailableBatches} |\n`;
-  out += `| Skipped: judged by an earlier run | ${summary.previouslyJudged} |\n`;
+  out += `| ${summary.source === 'log' ? 'Skipped: pair changed since it was judged' : 'Skipped: judged by an earlier run'} | ${summary.previouslyJudged} |\n`;
   for (const [k, n] of Object.entries(summary.planned)) out += `| Planned: ${k} | ${n} |\n`;
   for (const [k, n] of Object.entries(summary.applied)) out += `| Applied: ${k} | ${n} |\n`;
   out += `| Log | table relation_resolution_log (same transaction as each change) |\n`;
