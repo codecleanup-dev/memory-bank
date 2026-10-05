@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.12.5] - 2026-10-05
+
+_memory 계층 재설계 v1 첫 묶음. v0 실행에서 드러난 구멍 둘(벡터 없는 fact 가 현재 스탬프로 저장돼 재임베딩에서 영구 누락,
+날짜 컷오프가 재색인된 원작자 문서를 놓침)을 막고, upstream 안정성 수정 하나를 cherry-pick 계약대로 손 포팅한다._
+
+### Fixed
+- **벡터 없는 fact 의 스탬프** (`src/fact-db.ts` insertFact): embedding 이 없으면 `embedding_version` 을 현재 모델 버전이 아니라 0 으로
+  찍는다. memory-doc 적재가 모델 로드 실패 시 text-only 로 저장하면서 현재 버전을 찍어, 활성 fact 7,581건(18.6%)이 벡터 검색에
+  보이지 않는데도 `scripts/reembed-worker.js`(embedding_version != current 만 선택)가 영구히 지나쳤다. 이제 다음 재임베딩 런이 집어 간다.
+  hub 쪽은 sync-loop 가 매 사이클 워커를 돌린다(keystone-hub #758).
+- **유산 판별 보강** (`src/heritage.ts`): 날짜 컷오프 외에 "memory-doc 출처 + 원작자 번호 문서(01~10) 제목" 규칙을 더한다.
+  2026-05-17 재색인분 10건이 컷오프 뒤 날짜라 주입됐던 구멍(1.12.4 라이브 검증에서 확인). 원작자를 주제로 삼은 사용자 본인의
+  fact(번호 접두 없음)는 그대로 둔다.
+
+### Changed
+- **백그라운드 동기화 최소 간격** (`src/sync-cooldown.ts`, `src/sync-cli.ts`): upstream `10bec9e` 손 포팅. `--background` 동기화는
+  마지막 성공 동기화가 `MEMORY_BANK_SYNC_MIN_INTERVAL_S`(기본 600, 0=끔) 이내면 건너뛴다. 전경 실행은 막지 않고, 실패한
+  동기화는 기록하지 않으며, 미래 시각 기록은 동기화를 막지 않는다. 기록 파일 `~/.claude/run-locks/memory-bank-sync.last`.
+
+### Tests
+- `test/heritage-doc-rule.test.ts` 신설 7건(문서 규칙 경계·스탬프 0/current), `test/sync-cooldown.test.ts` 신설 4건.
+
 ## [1.12.4] - 2026-10-05
 
 _memory 계층 재설계 v0 (브리프 2026-10-05). 원작자 수입 fact 를 세션 주입에서만 빼고, upstream 추적 계약을 merge 의무에서

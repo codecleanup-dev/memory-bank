@@ -36,7 +36,12 @@ export function insertFact(db, params) {
     // Chokepoint normalization: every caller (extractor, backfill, sync)
     // funnels through here, so out-of-vocabulary LLM output is mapped to the
     // controlled vocabulary instead of tripping the facts.category CHECK.
-    normalizeFactCategory(params.category), params.scope_type, scopeProject, JSON.stringify(params.source_exchange_ids), params.embedding ? Buffer.from(new Float32Array(params.embedding).buffer) : null, now, now, params.coding_agent || 'claude-code', params.fact_kr ?? null, EMBEDDING_VERSION, confidence, surprise, modelSurprise);
+    normalizeFactCategory(params.category), params.scope_type, scopeProject, JSON.stringify(params.source_exchange_ids), params.embedding ? Buffer.from(new Float32Array(params.embedding).buffer) : null, now, now, params.coding_agent || 'claude-code', params.fact_kr ?? null, 
+    // [fork v1, 2026-10-05] No vector → stamp 0, not the current model version. Writers fall
+    // back to text-only rows when the embedding model fails to load (the memory-doc ingest
+    // did: 7,581 active facts, 18.6%, invisible to vector search yet stamped current, so the
+    // resumable reembed-worker, which selects embedding_version != current, never saw them).
+    params.embedding && params.embedding.length > 0 ? EMBEDDING_VERSION : 0, confidence, surprise, modelSurprise);
     // Insert into vector index (atomic DELETE+INSERT via transaction)
     if (params.embedding) {
         const p = vecParamFor(db, 'vec_facts', params.embedding);

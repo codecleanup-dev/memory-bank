@@ -88,7 +88,11 @@ export function insertFact(db: Database.Database, params: InsertFactParams): str
     now,
     params.coding_agent || 'claude-code',
     params.fact_kr ?? null,
-    EMBEDDING_VERSION,
+    // [fork v1, 2026-10-05] No vector → stamp 0, not the current model version. Writers fall
+    // back to text-only rows when the embedding model fails to load (the memory-doc ingest
+    // did: 7,581 active facts, 18.6%, invisible to vector search yet stamped current, so the
+    // resumable reembed-worker, which selects embedding_version != current, never saw them).
+    params.embedding && params.embedding.length > 0 ? EMBEDDING_VERSION : 0,
     confidence,
     surprise,
     modelSurprise,

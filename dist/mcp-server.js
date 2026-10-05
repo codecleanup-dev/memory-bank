@@ -24001,10 +24001,14 @@ function heritageCutoff(env = process.env) {
   if (v2 === "" || v2.toLowerCase() === "off") return null;
   return /^\d{4}-\d{2}-\d{2}$/.test(v2) ? v2 : DEFAULT_HERITAGE_CUTOFF;
 }
+var HERITAGE_DOC_PATTERN = /^(0[1-9]|10)-[a-z0-9-]+ memory\b/;
 function isHeritageFact(fact, cutoff) {
   if (!cutoff) return false;
   const d2 = (fact.created_at ?? "").slice(0, 10);
-  return d2.length === 10 && d2 < cutoff;
+  if (d2.length === 10 && d2 < cutoff) return true;
+  const src = fact.source_exchange_ids;
+  const fromMemoryDoc = Array.isArray(src) && src.some((s) => typeof s === "string" && s.startsWith("memory-doc:"));
+  return fromMemoryDoc && HERITAGE_DOC_PATTERN.test(fact.fact ?? "");
 }
 
 // src/fact-db.ts
