@@ -14,7 +14,8 @@ _간선 행동 임계값 0.8 → 0.6 (Lucy 결정, 2026-10-05) 과, 임계값 �
   오늘의 정책(임계값)을 다시 적용한다. 판정 입력(두 팩트 본문·reasoning·카테고리·scope·확인 횟수)이 기록과 같을 때만
   재사용하고, 변경된 쌍·unresolved 행·이미 행동한 행은 건너뛴다. 판정과 스냅샷은 **같은 로그 행**에서 읽고, 쓰기
   트랜잭션 안에서 그 행이 여전히 그 관계의 최신 판정인지 확인한다(사이에 다른 프로세스가 재판정을 기록했으면
-  `skipped-changed`). `--limit` 을 따른다(기본 200, 0 = 전체). 결과 로그 행의 judge_reasoning 에
+  `skipped-changed`). `--limit` 은 **바꿀 쌍의 수**를 묶는다(기본 200, 0 = 전체; keep 으로 남는 기록은 세지 않아
+  앞쪽 keep 이 제한을 소진하지 않는다). 결과 로그 행의 judge_reasoning 에
   `[replanned from log #id]` 를 남긴다. `--rejudge` 와 함께 쓸 수 없다. 요약에 `source: judge | log`.
 
 ### Fixed

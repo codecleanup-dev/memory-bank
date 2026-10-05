@@ -974,7 +974,7 @@ function logRowIsLatest(db: Database.Database, type: ConflictType, relationId: s
 
 export interface ReplanOptions {
   apply: boolean;
-  /** Candidate pairs considered this run; 0 = all (same meaning as ResolveOptions.limit). */
+  /** Pairs the policy may CHANGE this run; 0 = all. Recorded keeps that stay keep do not count (they would stall bounded runs). */
   limit?: number;
   archivePath?: string;
   onProgress?: (line: string) => void;
@@ -1012,8 +1012,12 @@ export function replanFromLog(db: Database.Database, type: ConflictType, opts: R
     pairs: [],
     archivePath,
   };
+  // The bound applies to pairs the policy would CHANGE. A recorded keep that stays keep costs
+  // nothing here (no model call) and leaves no new state, so counting it would let a run of
+  // leading keeps exhaust the limit on every pass and never reach the actionable pairs behind.
+  let actionable = 0;
   for (const pair of listActiveConflicts(db, type, 1_000_000)) {
-    if (limit > 0 && summary.examined >= limit) break;
+    if (limit > 0 && actionable >= limit) break;
     const logged = rows.get(pair.relationId);
     // Only a recorded `keep` with a real verdict qualifies: unresolved rows carry no verdict,
     // and acted-on rows mean the edge is no longer the one that was judged.
@@ -1029,6 +1033,7 @@ export function replanFromLog(db: Database.Database, type: ConflictType, opts: R
     const action = planAction(pair, logged.verdict as Verdict, logged.confidence);
     summary.planned[action.kind]++;
     if (action.kind === 'keep') continue; // the policy still says keep: nothing to re-record
+    actionable++;
     const reasoning = `${logged.judge_reasoning ?? ''} [replanned from log #${logged.id}]`.trim().slice(0, 300);
     const resolved: ResolvedPair = {
       relationId: pair.relationId,

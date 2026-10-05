@@ -1125,7 +1125,7 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
-  it('replan honours --limit and refuses to act on a log row that is no longer the newest judgment', async () => {
+  it('replan bounds the pairs it may change (leading keeps do not eat the limit) and refuses a log row that is no longer the newest judgment', async () => {
     const db = initDatabase();
     try {
       const rels: string[] = [];
@@ -1139,10 +1139,18 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       const judge: PairJudge = async (pairs) => pairs.map((_, i) => ({ pair_index: i, verdict: 'RELATED_NOT_CONFLICTING', confidence: 0.55 }));
       await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
       db.prepare("UPDATE relation_resolution_log SET confidence = 0.7 WHERE action = 'keep'").run();
+      // Newest in queue order: a pair whose recorded verdict stays keep under any policy. It must
+      // not consume the bound on every pass (that would starve the actionable pairs behind it).
+      const ta = mkFact(db, 'true conflict newest a');
+      const tb = mkFact(db, 'true conflict newest b');
+      const newest = createRelation(db, ta, 'CONTRADICTS', tb, 'n');
+      const conflictJudge = tableJudge({ 'true conflict newest a': { verdict: 'TRUE_CONFLICT', confidence: 0.9 } });
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge: conflictJudge, archivePath: archive });
 
       const one = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true, limit: 1 });
-      expect(one.examined).toBe(1);
-      expect(one.applied).toEqual({ retyped: 1 });
+      expect(one.planned.keep).toBeGreaterThanOrEqual(1); // the TRUE_CONFLICT keep was looked at ...
+      expect(one.applied).toEqual({ retyped: 1 }); // ... and still one actionable pair was changed
+      expect(relation(db, newest.id)?.relation_type).toBe('CONTRADICTS');
       expect(db.prepare("SELECT COUNT(*) AS n FROM ontology_relations WHERE relation_type = 'INFLUENCES'").get()).toEqual({ n: 1 });
 
       // A concurrent writer records a newer TRUE_CONFLICT judgment for the next pair between our
@@ -1163,9 +1171,10 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       });
       expect(stale.applied).toEqual({ 'skipped-changed': 1 });
       expect(db.prepare("SELECT COUNT(*) AS n FROM ontology_relations WHERE relation_type = 'INFLUENCES'").get()).toEqual({ n: 1 });
-      // Next replan sees the newer TRUE_CONFLICT row for that pair and leaves it; the third pair is retyped.
+      // Next replan sees the newer TRUE_CONFLICT row for that pair and leaves it (plus the newest
+      // conflict pair); the third pair is retyped.
       const rest = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true, limit: 0 });
-      expect(rest.planned.keep).toBe(1);
+      expect(rest.planned.keep).toBe(2);
       expect(rest.applied).toEqual({ retyped: 1 });
       expect(db.prepare("SELECT COUNT(*) AS n FROM ontology_relations WHERE relation_type = 'INFLUENCES'").get()).toEqual({ n: 2 });
     } finally {

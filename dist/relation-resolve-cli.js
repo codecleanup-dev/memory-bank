@@ -16,8 +16,8 @@
  *   --limit N     pairs per run (default 200; 0 = all); pairs an earlier --apply run judged are skipped
  *   --rejudge     include pairs an earlier run already judged
  *   --replan      no model calls: re-run today's policy on verdicts an earlier --apply run recorded as keep
- *                 (how a threshold change reaches already-judged pairs); honours --apply and --limit,
- *                 ignores batching/votes
+ *                 (how a threshold change reaches already-judged pairs); honours --apply; --limit bounds
+ *                 the pairs it may change (unchanged keeps do not count); ignores batching/votes
  *   --batch-size  pairs per LLM call (default 8, max 20)
  *   --votes K     committee size (default 3, max 5; 1 = single call)
  *   --model M     judge model (default sonnet; aliases haiku|sonnet|opus resolve to full ids;

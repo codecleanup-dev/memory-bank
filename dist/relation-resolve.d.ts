@@ -177,7 +177,7 @@ export declare function defaultArchivePath(): string;
 export declare function resolveQueue(db: Database.Database, type: ConflictType, opts: ResolveOptions): Promise<ResolveSummary>;
 export interface ReplanOptions {
     apply: boolean;
-    /** Candidate pairs considered this run; 0 = all (same meaning as ResolveOptions.limit). */
+    /** Pairs the policy may CHANGE this run; 0 = all. Recorded keeps that stay keep do not count (they would stall bounded runs). */
     limit?: number;
     archivePath?: string;
     onProgress?: (line: string) => void;

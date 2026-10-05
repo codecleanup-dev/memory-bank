@@ -825,8 +825,12 @@ export function replanFromLog(db, type, opts) {
         pairs: [],
         archivePath,
     };
+    // The bound applies to pairs the policy would CHANGE. A recorded keep that stays keep costs
+    // nothing here (no model call) and leaves no new state, so counting it would let a run of
+    // leading keeps exhaust the limit on every pass and never reach the actionable pairs behind.
+    let actionable = 0;
     for (const pair of listActiveConflicts(db, type, 1_000_000)) {
-        if (limit > 0 && summary.examined >= limit)
+        if (limit > 0 && actionable >= limit)
             break;
         const logged = rows.get(pair.relationId);
         // Only a recorded `keep` with a real verdict qualifies: unresolved rows carry no verdict,
@@ -845,6 +849,7 @@ export function replanFromLog(db, type, opts) {
         summary.planned[action.kind]++;
         if (action.kind === 'keep')
             continue; // the policy still says keep: nothing to re-record
+        actionable++;
         const reasoning = `${logged.judge_reasoning ?? ''} [replanned from log #${logged.id}]`.trim().slice(0, 300);
         const resolved = {
             relationId: pair.relationId,
