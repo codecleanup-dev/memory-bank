@@ -510,7 +510,7 @@ function unchanged(db, pair) {
         return null;
     const same = (id, snap) => {
         const f = db
-            .prepare(`SELECT is_active, fact, category, scope_type, scope_project, consolidated_count FROM facts WHERE id = ?`)
+            .prepare(`SELECT is_active, fact, category, scope_type, scope_project, consolidated_count, created_at FROM facts WHERE id = ?`)
             .get(id);
         return (!!f &&
             f.is_active === 1 &&
@@ -518,7 +518,9 @@ function unchanged(db, pair) {
             f.category === snap.category &&
             f.scope_type === snap.scope_type &&
             (f.scope_project ?? null) === (snap.scope_project ?? null) &&
-            f.consolidated_count === snap.consolidated_count);
+            f.consolidated_count === snap.consolidated_count &&
+            // The judge read both dates (temporal order); a corrected date is a different question.
+            f.created_at === snap.created_at);
     };
     if (!same(pair.source.id, pair.source) || !same(pair.target.id, pair.target))
         return null;
@@ -777,6 +779,17 @@ export async function resolveQueue(db, type, opts) {
     return summary;
 }
 /**
+ * For a log row written before the snapshot carried fact dates, the only staleness signal
+ * left is facts.updated_at: every code path that changes a fact bumps it, so a fact touched
+ * after the row was written may have changed something the judge read. Both ISO strings.
+ */
+function factsUntouchedSince(db, pair, ts) {
+    const rows = db
+        .prepare('SELECT updated_at FROM facts WHERE id IN (?, ?)')
+        .all(pair.source.id, pair.target.id);
+    return rows.length === 2 && rows.every((r) => typeof r.updated_at === 'string' && r.updated_at <= ts);
+}
+/**
  * Latest log row per relation for this type, verdict and snapshot from the SAME row, so a
  * replan never pairs one row's verdict with another row's inputs. Missing snapshot columns
  * (older table) read as NULL, which makes the snapshot fail to match → not replanned.
@@ -789,7 +802,7 @@ function latestLogRows(db, type) {
     const have = new Set(db.prepare('PRAGMA table_info(relation_resolution_log)').all().map((c) => c.name));
     const later = RESOLUTION_LOG_LATER_COLUMNS.map(([name]) => (have.has(name) ? name : `NULL AS ${name}`)).join(', ');
     const rows = db
-        .prepare(`SELECT id, relation_id, action, verdict, confidence, judge_reasoning,
+        .prepare(`SELECT id, ts, relation_id, action, verdict, confidence, judge_reasoning,
               source_fact, target_fact, reasoning_before, ${later}
        FROM relation_resolution_log WHERE relation_type_before = ? ORDER BY id ASC`)
         .all(type);
@@ -850,8 +863,14 @@ export function replanFromLog(db, type, opts) {
         if (!logged || logged.action !== 'keep' || !allowed.has(logged.verdict))
             continue;
         // The committee's verdict is reusable only while the pair is exactly what it judged
-        // (snapshot and verdict come from the same row).
+        // (snapshot and verdict come from the same row). A row without the fact dates (written
+        // before 1.12.3) cannot prove the dates are unchanged; it is reused only if neither fact
+        // has been touched since the row was written.
         if (!alreadyJudged(pair, logged)) {
+            summary.previouslyJudged++;
+            continue;
+        }
+        if ((logged.source_created == null || logged.target_created == null) && !factsUntouchedSince(db, pair, logged.ts)) {
             summary.previouslyJudged++;
             continue;
         }

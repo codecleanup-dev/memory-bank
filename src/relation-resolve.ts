@@ -638,6 +638,7 @@ interface LiveFact {
   scope_type: string;
   scope_project: string | null;
   consolidated_count: number;
+  created_at: string;
 }
 
 interface LiveRow {
@@ -664,7 +665,7 @@ function unchanged(db: Database.Database, pair: ConflictPair): LiveRow | null {
   if ((row.reasoning ?? null) !== (pair.reasoning ?? null)) return null;
   const same = (id: string, snap: ConflictPair['source']): boolean => {
     const f = db
-      .prepare(`SELECT is_active, fact, category, scope_type, scope_project, consolidated_count FROM facts WHERE id = ?`)
+      .prepare(`SELECT is_active, fact, category, scope_type, scope_project, consolidated_count, created_at FROM facts WHERE id = ?`)
       .get(id) as LiveFact | undefined;
     return (
       !!f &&
@@ -673,7 +674,9 @@ function unchanged(db: Database.Database, pair: ConflictPair): LiveRow | null {
       f.category === snap.category &&
       f.scope_type === snap.scope_type &&
       (f.scope_project ?? null) === (snap.scope_project ?? null) &&
-      f.consolidated_count === snap.consolidated_count
+      f.consolidated_count === snap.consolidated_count &&
+      // The judge read both dates (temporal order); a corrected date is a different question.
+      f.created_at === snap.created_at
     );
   };
   if (!same(pair.source.id, pair.source) || !same(pair.target.id, pair.target)) return null;
@@ -950,10 +953,23 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
 /** One log row read whole: the committee's verdict AND the judged-input snapshot it was made on. */
 interface LatestLogRow extends JudgedSnapshot {
   id: number;
+  ts: string;
   action: string;
   verdict: string;
   confidence: number;
   judge_reasoning: string | null;
+}
+
+/**
+ * For a log row written before the snapshot carried fact dates, the only staleness signal
+ * left is facts.updated_at: every code path that changes a fact bumps it, so a fact touched
+ * after the row was written may have changed something the judge read. Both ISO strings.
+ */
+function factsUntouchedSince(db: Database.Database, pair: ConflictPair, ts: string): boolean {
+  const rows = db
+    .prepare('SELECT updated_at FROM facts WHERE id IN (?, ?)')
+    .all(pair.source.id, pair.target.id) as Array<{ updated_at: string | null }>;
+  return rows.length === 2 && rows.every((r) => typeof r.updated_at === 'string' && r.updated_at <= ts);
 }
 
 /**
@@ -969,7 +985,7 @@ function latestLogRows(db: Database.Database, type: ConflictType): Map<string, L
   const later = RESOLUTION_LOG_LATER_COLUMNS.map(([name]) => (have.has(name) ? name : `NULL AS ${name}`)).join(', ');
   const rows = db
     .prepare(
-      `SELECT id, relation_id, action, verdict, confidence, judge_reasoning,
+      `SELECT id, ts, relation_id, action, verdict, confidence, judge_reasoning,
               source_fact, target_fact, reasoning_before, ${later}
        FROM relation_resolution_log WHERE relation_type_before = ? ORDER BY id ASC`,
     )
@@ -1040,8 +1056,14 @@ export function replanFromLog(db: Database.Database, type: ConflictType, opts: R
     // and acted-on rows mean the edge is no longer the one that was judged.
     if (!logged || logged.action !== 'keep' || !allowed.has(logged.verdict)) continue;
     // The committee's verdict is reusable only while the pair is exactly what it judged
-    // (snapshot and verdict come from the same row).
+    // (snapshot and verdict come from the same row). A row without the fact dates (written
+    // before 1.12.3) cannot prove the dates are unchanged; it is reused only if neither fact
+    // has been touched since the row was written.
     if (!alreadyJudged(pair, logged)) {
+      summary.previouslyJudged++;
+      continue;
+    }
+    if ((logged.source_created == null || logged.target_created == null) && !factsUntouchedSince(db, pair, logged.ts)) {
       summary.previouslyJudged++;
       continue;
     }

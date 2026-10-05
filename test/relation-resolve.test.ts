@@ -1195,6 +1195,56 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('replan: a fact date corrected right before the write is caught inside the transaction', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'dated a');
+      const b = mkFact(db, 'dated b');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const judge: PairJudge = async (pairs) => pairs.map((_, i) => ({ pair_index: i, verdict: 'UNRELATED', confidence: 0.55 }));
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      db.prepare("UPDATE relation_resolution_log SET confidence = 0.9 WHERE action = 'keep'").run();
+
+      const summary = replanFromLog(db, 'CONTRADICTS', {
+        archivePath: archive,
+        apply: true,
+        beforeApply: () => db.prepare('UPDATE facts SET created_at = ? WHERE id = ?').run('2020-01-01T00:00:00.000Z', a),
+      });
+
+      expect(summary.applied).toEqual({ 'skipped-changed': 1 });
+      expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('replan: a row without fact dates (pre-1.12.3) is reused only while neither fact was touched after it', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'old row a');
+      const b = mkFact(db, 'old row b');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const c = mkFact(db, 'old row c');
+      const d = mkFact(db, 'old row d');
+      const rel2 = createRelation(db, c, 'CONTRADICTS', d, 'n');
+      const judge: PairJudge = async (pairs) => pairs.map((_, i) => ({ pair_index: i, verdict: 'UNRELATED', confidence: 0.55 }));
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      // Model rows written before the date columns existed, with a confidence the new policy acts on.
+      db.prepare("UPDATE relation_resolution_log SET confidence = 0.9, source_created = NULL, target_created = NULL WHERE action = 'keep'").run();
+      // One pair was touched after its row (a date correction through a code path bumps updated_at).
+      db.prepare('UPDATE facts SET created_at = ?, updated_at = ? WHERE id = ?').run('2020-01-01T00:00:00.000Z', '2099-01-01T00:00:00.000Z', c);
+
+      const summary = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
+
+      expect(summary.applied).toEqual({ deleted: 1 });
+      expect(summary.previouslyJudged).toBe(1);
+      expect(relation(db, rel.id)).toBeUndefined();
+      expect(relation(db, rel2.id)?.relation_type).toBe('CONTRADICTS');
+    } finally {
+      db.close();
+    }
+  });
+
   it('parseIntegerOption accepts only whole-string safe integers', () => {
     expect(parseIntegerOption('0', 0)).toBe(0);
     expect(parseIntegerOption(' 200 ', 0)).toBe(200);
