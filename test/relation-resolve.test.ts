@@ -835,6 +835,13 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       expect(first.planned.keep).toBe(1);
       expect((await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive })).examined).toBe(0);
 
+      // A corrected creation date changes the temporal order the judge reasoned about: new pair.
+      db.prepare('UPDATE facts SET created_at = ? WHERE id = ?').run('2020-01-01T00:00:00.000Z', older);
+      const dated = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive });
+      expect(dated.examined).toBe(1);
+      expect(dated.planned.keep).toBe(1); // still better confirmed → kept, and recorded with the new date
+      expect((await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive })).examined).toBe(0);
+
       // The survivor gains confirmations: the policy outcome can change, so the pair is new again.
       db.prepare('UPDATE facts SET consolidated_count = 5 WHERE id = ?').run(newer);
       const third = await resolveQueue(db, 'SUPERSEDES', { apply: true, limit: 0, judge, archivePath: archive });
@@ -1147,12 +1154,15 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       const ta = mkFact(db, 'true conflict newest a');
       const tb = mkFact(db, 'true conflict newest b');
       const newest = createRelation(db, ta, 'CONTRADICTS', tb, 'n');
+      // The queue is ordered by relation created_at DESC with millisecond resolution; pin this
+      // edge to the front so the test is not at the mercy of same-tick ordering.
+      db.prepare('UPDATE ontology_relations SET created_at = ? WHERE id = ?').run('2099-01-01 00:00:00', newest.id);
       const conflictJudge = tableJudge({ 'true conflict newest a': { verdict: 'TRUE_CONFLICT', confidence: 0.9 } });
       await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge: conflictJudge, archivePath: archive });
 
       const one = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true, limit: 1 });
-      expect(one.planned.keep).toBeGreaterThanOrEqual(1); // the TRUE_CONFLICT keep was looked at ...
-      expect(one.applied).toEqual({ retyped: 1 }); // ... and still one actionable pair was changed
+      expect(one.planned.keep).toBe(1); // the leading TRUE_CONFLICT keep was looked at ...
+      expect(one.applied).toEqual({ retyped: 1 }); // ... and still one actionable pair behind it was changed
       expect(relation(db, newest.id)?.relation_type).toBe('CONTRADICTS');
       expect(db.prepare("SELECT COUNT(*) AS n FROM ontology_relations WHERE relation_type = 'INFLUENCES'").get()).toEqual({ n: 1 });
 

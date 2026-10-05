@@ -26985,11 +26985,8 @@ function callTimeoutMs() {
 function callTimeoutError(ms) {
   return new Error(`LLM call timeout after ${ms} ms (aborted)`);
 }
-async function callOnce(systemPrompt, userMessage, maxTokens) {
+async function callOnceInner(systemPrompt, userMessage, maxTokens, abort, timeoutMs) {
   const model = process.env.MEMORY_BANK_FACT_MODEL || "haiku";
-  const timeoutMs = callTimeoutMs();
-  const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(), timeoutMs);
   try {
     for await (const message of query({
       prompt: `${systemPrompt}
@@ -27051,8 +27048,25 @@ ${userMessage}`,
     }
     const textBlock = response.content.find((b2) => b2.type === "text");
     return textBlock?.text || "";
+  }
+}
+async function callOnce(systemPrompt, userMessage, maxTokens) {
+  const timeoutMs = callTimeoutMs();
+  const abort = new AbortController();
+  let timer;
+  const deadline = new Promise((_2, reject) => {
+    timer = setTimeout(() => {
+      abort.abort();
+      reject(callTimeoutError(timeoutMs));
+    }, timeoutMs);
+  });
+  const work = callOnceInner(systemPrompt, userMessage, maxTokens, abort, timeoutMs);
+  try {
+    return await Promise.race([work, deadline]);
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
+    work.catch(() => {
+    });
   }
 }
 async function callHaiku(systemPrompt, userMessage, maxTokens = 2048) {

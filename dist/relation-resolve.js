@@ -105,7 +105,9 @@ const RESOLUTION_LOG_DDL = `CREATE TABLE IF NOT EXISTS relation_resolution_log (
   source_scope TEXT,
   target_scope TEXT,
   source_count INTEGER,
-  target_count INTEGER
+  target_count INTEGER,
+  source_created TEXT,
+  target_created TEXT
 )`;
 /** Columns added after the first shape; added idempotently so an older table keeps working. */
 const RESOLUTION_LOG_LATER_COLUMNS = [
@@ -115,6 +117,10 @@ const RESOLUTION_LOG_LATER_COLUMNS = [
     ['target_scope', 'TEXT'],
     ['source_count', 'INTEGER'],
     ['target_count', 'INTEGER'],
+    // The judge sees both facts' dates (temporal order matters for SUPERSEDES); from 1.12.3 the
+    // snapshot carries them so a corrected date invalidates the recorded verdict.
+    ['source_created', 'TEXT'],
+    ['target_created', 'TEXT'],
 ];
 /** Idempotent; called only when a run may write (dry-run leaves the schema alone). */
 export function ensureResolutionLog(db) {
@@ -406,7 +412,9 @@ function alreadyJudged(pair, snap) {
         snap.source_scope === scopeKey(pair.source) &&
         snap.target_scope === scopeKey(pair.target) &&
         snap.source_count === pair.source.consolidated_count &&
-        snap.target_count === pair.target.consolidated_count);
+        snap.target_count === pair.target.consolidated_count &&
+        (snap.source_created == null || snap.source_created === pair.source.created_at) &&
+        (snap.target_created == null || snap.target_created === pair.target.created_at));
 }
 export function defaultArchivePath() {
     return path.join(getIndexDir(), 'relation-resolution.jsonl');
@@ -423,6 +431,8 @@ function snapshotFields(pair) {
         target_scope: scopeKey(pair.target),
         source_count: pair.source.consolidated_count,
         target_count: pair.target.consolidated_count,
+        source_created: pair.source.created_at,
+        target_created: pair.target.created_at,
     };
 }
 /** Inside the mutation transaction: the record commits with the change or not at all. */
@@ -432,12 +442,14 @@ function insertLog(db, rec) {
        source_fact_id, target_fact_id, source_after, target_after,
        source_fact, target_fact, reasoning_before, verdict, confidence, judge_reasoning,
        deactivated_fact_id, survivor_fact_id, note,
-       source_category, target_category, source_scope, target_scope, source_count, target_count)
+       source_category, target_category, source_scope, target_scope, source_count, target_count,
+       source_created, target_created)
      VALUES (@ts, @action, @relation_id, @relation_type_before, @relation_type_after,
        @source_fact_id, @target_fact_id, @source_after, @target_after,
        @source_fact, @target_fact, @reasoning_before, @verdict, @confidence, @judge_reasoning,
        @deactivated_fact_id, @survivor_fact_id, @note,
-       @source_category, @target_category, @source_scope, @target_scope, @source_count, @target_count)`).run(rec);
+       @source_category, @target_category, @source_scope, @target_scope, @source_count, @target_count,
+       @source_created, @target_created)`).run(rec);
 }
 /** A pair the committee could not judge: remembered (if unchanged) so a bounded run moves past it. */
 function recordUnresolved(db, pair, why) {

@@ -20,6 +20,8 @@ const scenarios: Array<{
   errors?: string[];
   /** never yields; ends only when the caller's abortController fires (models a hung transport) */
   hang?: boolean;
+  /** never yields and ignores abort entirely (models a child process that keeps stdout open) */
+  deaf?: boolean;
 }> = [];
 let queryCalls = 0;
 let lastQueryOptions: Record<string, unknown> | undefined;
@@ -32,6 +34,10 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
     return {
       async *[Symbol.asyncIterator]() {
         if (scenario?.throws) throw scenario.throws;
+        if (scenario?.deaf) {
+          await new Promise<void>(() => {}); // never settles, abort or not
+          return;
+        }
         if (scenario?.hang) {
           // Behave like the real SDK under abort: stay silent until the signal fires, then stop.
           const signal = (lastQueryOptions?.abortController as AbortController | undefined)?.signal;
@@ -121,6 +127,17 @@ describe('callHaiku 재시도/복구', () => {
     scenarios.push({ hang: true });
     await expect(callHaiku('sys', 'user')).rejects.toThrow(/LLM call timeout after 30 ms/);
     expect(queryCalls).toBe(2);
+  });
+
+  it('AC0e: abort 를 무시하는 전송도 데드라인은 지킨다 (호출자는 예산 안에 timeout 을 받는다)', async () => {
+    const { callHaiku } = await llm();
+    process.env.MEMORY_BANK_LLM_CALL_TIMEOUT_MS = '30';
+    process.env.MEMORY_BANK_LLM_RETRIES = '1';
+    scenarios.push({ deaf: true }, { result: 'second attempt answers' });
+    const started = Date.now();
+    expect(await callHaiku('sys', 'user')).toBe('second attempt answers');
+    expect(queryCalls).toBe(2);
+    expect(Date.now() - started).toBeLessThan(5_000);
   });
 
   it('AC0d: 직접 API 폴백도 같은 per-call 예산 안에서 끊긴다 (느린 폴백이 매달리지 않음)', async () => {

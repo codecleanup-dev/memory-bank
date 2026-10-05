@@ -150,12 +150,13 @@ function callTimeoutMs() {
 function callTimeoutError(ms) {
     return new Error(`LLM call timeout after ${ms} ms (aborted)`);
 }
-/** 단발 호출 — Agent SDK 우선, 실패 시(그리고 키가 있을 때만) Anthropic SDK 폴백. */
-async function callOnce(systemPrompt, userMessage, maxTokens) {
+/**
+ * 단발 호출 — Agent SDK 우선, 실패 시(그리고 키가 있을 때만) Anthropic SDK 폴백.
+ * The deadline is enforced OUTSIDE this function (callOnce races it against a timer), so a
+ * transport that ignores the abort signal still cannot hold the caller past the budget.
+ */
+async function callOnceInner(systemPrompt, userMessage, maxTokens, abort, timeoutMs) {
     const model = process.env.MEMORY_BANK_FACT_MODEL || 'haiku';
-    const timeoutMs = callTimeoutMs();
-    const abort = new AbortController();
-    const timer = setTimeout(() => abort.abort(), timeoutMs);
     // Try Claude Agent SDK first (works inside Claude Code without API key)
     try {
         for await (const message of query({
@@ -234,8 +235,31 @@ async function callOnce(systemPrompt, userMessage, maxTokens) {
         const textBlock = response.content.find((b) => b.type === 'text');
         return textBlock?.text || '';
     }
+}
+/**
+ * One call under a hard wall-clock budget. The timer does two things: it aborts the
+ * transport (cooperative cleanup) AND rejects on its own, so even a transport that ignores
+ * the abort signal (child process keeping stdout open) cannot hold the caller past the
+ * budget. The abandoned work is detached and its eventual outcome ignored.
+ */
+async function callOnce(systemPrompt, userMessage, maxTokens) {
+    const timeoutMs = callTimeoutMs();
+    const abort = new AbortController();
+    let timer;
+    const deadline = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+            abort.abort();
+            reject(callTimeoutError(timeoutMs));
+        }, timeoutMs);
+    });
+    const work = callOnceInner(systemPrompt, userMessage, maxTokens, abort, timeoutMs);
+    try {
+        return await Promise.race([work, deadline]);
+    }
     finally {
-        clearTimeout(timer);
+        if (timer)
+            clearTimeout(timer);
+        work.catch(() => { }); // detached after a timeout: never an unhandled rejection
     }
 }
 /**

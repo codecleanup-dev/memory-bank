@@ -186,7 +186,8 @@ CREATE TABLE relation_resolution_log (
   -- judged-input snapshot: a later bounded run skips the pair only while all of these still match
   source_category TEXT, target_category TEXT,
   source_scope TEXT, target_scope TEXT,       -- "<scope_type>:<scope_project or empty>"
-  source_count INTEGER, target_count INTEGER  -- consolidated_count at judging time
+  source_count INTEGER, target_count INTEGER, -- consolidated_count at judging time
+  source_created TEXT, target_created TEXT    -- facts.created_at at judging time (1.12.3+; NULL before → not compared)
 );
 ```
 
