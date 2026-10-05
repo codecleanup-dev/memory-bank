@@ -215,12 +215,22 @@ async function callOnce(systemPrompt, userMessage, maxTokens) {
         const { default: Anthropic } = await import('@anthropic-ai/sdk');
         const baseURL = process.env.MEMORY_BANK_API_BASE_URL;
         const client = new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) });
-        const response = await client.messages.create({
-            model: process.env.MEMORY_BANK_FACT_MODEL || 'claude-haiku-4-5-20251001',
-            max_tokens: maxTokens,
-            system: systemPrompt,
-            messages: [{ role: 'user', content: userMessage }],
-        });
+        // The same per-call budget covers the fallback: the timer keeps running from the start of
+        // this call and the request carries the abort signal, so a slow fallback cannot hang either.
+        let response;
+        try {
+            response = await client.messages.create({
+                model: process.env.MEMORY_BANK_FACT_MODEL || 'claude-haiku-4-5-20251001',
+                max_tokens: maxTokens,
+                system: systemPrompt,
+                messages: [{ role: 'user', content: userMessage }],
+            }, { signal: abort.signal });
+        }
+        catch (fallbackError) {
+            if (abort.signal.aborted)
+                throw callTimeoutError(timeoutMs);
+            throw fallbackError;
+        }
         const textBlock = response.content.find((b) => b.type === 'text');
         return textBlock?.text || '';
     }

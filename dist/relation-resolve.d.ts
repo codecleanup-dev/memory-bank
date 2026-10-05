@@ -177,8 +177,12 @@ export declare function defaultArchivePath(): string;
 export declare function resolveQueue(db: Database.Database, type: ConflictType, opts: ResolveOptions): Promise<ResolveSummary>;
 export interface ReplanOptions {
     apply: boolean;
+    /** Candidate pairs considered this run; 0 = all (same meaning as ResolveOptions.limit). */
+    limit?: number;
     archivePath?: string;
     onProgress?: (line: string) => void;
+    /** Test seam: runs after a pair is planned and before it is applied (models a concurrent writer). */
+    beforeApply?: (pair: ConflictPair) => void;
 }
 /**
  * Re-plan from recorded verdicts: for every active pair whose latest log row is a `keep`

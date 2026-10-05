@@ -59,6 +59,23 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
   },
 }));
 
+// Direct-API fallback mock: a request that answers only when its abort signal fires
+// (models a slow fallback that must still obey the per-call budget).
+vi.mock('@anthropic-ai/sdk', () => ({
+  default: class {
+    messages = {
+      create: (_params: unknown, opts?: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          const signal = opts?.signal;
+          if (!signal) return; // no signal → hang: the test would time out, which is the point
+          const fail = () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+          if (signal.aborted) return fail();
+          signal.addEventListener('abort', fail, { once: true });
+        }),
+    };
+  },
+}));
+
 async function llm() {
   return await import('../src/llm.js');
 }
@@ -75,6 +92,7 @@ afterEach(() => {
   delete process.env.MEMORY_BANK_LLM_RETRY_BASE_MS;
   delete process.env.MEMORY_BANK_LLM_RETRIES;
   delete process.env.MEMORY_BANK_LLM_CALL_TIMEOUT_MS;
+  delete process.env.ANTHROPIC_API_KEY;
 });
 
 describe('callHaiku 재시도/복구', () => {
@@ -103,6 +121,16 @@ describe('callHaiku 재시도/복구', () => {
     scenarios.push({ hang: true });
     await expect(callHaiku('sys', 'user')).rejects.toThrow(/LLM call timeout after 30 ms/);
     expect(queryCalls).toBe(2);
+  });
+
+  it('AC0d: 직접 API 폴백도 같은 per-call 예산 안에서 끊긴다 (느린 폴백이 매달리지 않음)', async () => {
+    const { callHaiku } = await llm();
+    process.env.ANTHROPIC_API_KEY = 'test-key-for-fallback-path';
+    process.env.MEMORY_BANK_LLM_CALL_TIMEOUT_MS = '30';
+    process.env.MEMORY_BANK_LLM_RETRIES = '0';
+    scenarios.push({ throws: new Error('agent sdk unavailable') }); // forces the fallback
+    await expect(callHaiku('sys', 'user')).rejects.toThrow(/LLM call timeout after 30 ms/);
+    expect(queryCalls).toBe(1);
   });
 
   it('AC1: 빈 응답을 재시도하고, 재시도가 성공하면 결과를 반환한다', async () => {

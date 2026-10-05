@@ -512,7 +512,9 @@ function unchanged(db, pair) {
         return null;
     return row;
 }
-function applyAction(db, pair, action, verdict, confidence, judgeReasoning) {
+function applyAction(db, pair, action, verdict, confidence, judgeReasoning, 
+/** Extra precondition evaluated inside the write transaction (after the pair re-check); false → skipped-changed. */
+stillValid) {
     if (action.kind === 'keep') {
         // No mutation, but remember the verdict so a later bounded run does not re-pay for it.
         // The row is written only if the pair is still what the committee saw; a pair that
@@ -548,6 +550,8 @@ function applyAction(db, pair, action, verdict, confidence, judgeReasoning) {
     const tx = db.transaction(() => {
         const live = unchanged(db, pair);
         if (!live)
+            return { result: 'skipped-changed', record: null };
+        if (stillValid && !stillValid())
             return { result: 'skipped-changed', record: null };
         const stamp = new Date().toISOString();
         const note = `[resolve ${stamp.slice(0, 10)}] ${verdict} (${confidence}) ${judgeReasoning ?? ''}`.trim();
@@ -760,19 +764,35 @@ export async function resolveQueue(db, type, opts) {
     }
     return summary;
 }
-/** Latest log row per relation for this type (any action), with the committee's verdict. */
-function latestLoggedVerdicts(db, type) {
+/**
+ * Latest log row per relation for this type, verdict and snapshot from the SAME row, so a
+ * replan never pairs one row's verdict with another row's inputs. Missing snapshot columns
+ * (older table) read as NULL, which makes the snapshot fail to match → not replanned.
+ */
+function latestLogRows(db, type) {
     const out = new Map();
     const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'relation_resolution_log'").get();
     if (!exists)
         return out;
+    const have = new Set(db.prepare('PRAGMA table_info(relation_resolution_log)').all().map((c) => c.name));
+    const later = RESOLUTION_LOG_LATER_COLUMNS.map(([name]) => (have.has(name) ? name : `NULL AS ${name}`)).join(', ');
     const rows = db
-        .prepare(`SELECT id, relation_id, action, verdict, confidence, judge_reasoning
+        .prepare(`SELECT id, relation_id, action, verdict, confidence, judge_reasoning,
+              source_fact, target_fact, reasoning_before, ${later}
        FROM relation_resolution_log WHERE relation_type_before = ? ORDER BY id ASC`)
         .all(type);
-    for (const r of rows)
-        out.set(r.relation_id, r); // ascending ids: the last write wins
+    for (const r of rows) {
+        const { relation_id, ...row } = r;
+        out.set(relation_id, row); // ascending ids: the last write wins
+    }
     return out;
+}
+/** Inside the write transaction: is this row still the newest judgment of the relation? */
+function logRowIsLatest(db, type, relationId, rowId) {
+    const r = db
+        .prepare('SELECT MAX(id) AS id FROM relation_resolution_log WHERE relation_type_before = ? AND relation_id = ?')
+        .get(type, relationId);
+    return r.id === rowId;
 }
 /**
  * Re-plan from recorded verdicts: for every active pair whose latest log row is a `keep`
@@ -786,8 +806,8 @@ export function replanFromLog(db, type, opts) {
     const allowed = verdictSet(type);
     if (opts.apply)
         ensureResolutionLog(db);
-    const snapshots = judgedSnapshots(db, type);
-    const verdicts = latestLoggedVerdicts(db, type);
+    const rows = latestLogRows(db, type);
+    const limit = opts.limit ?? 0;
     const summary = {
         type,
         mode: opts.apply ? 'apply' : 'dry-run',
@@ -806,13 +826,16 @@ export function replanFromLog(db, type, opts) {
         archivePath,
     };
     for (const pair of listActiveConflicts(db, type, 1_000_000)) {
-        const logged = verdicts.get(pair.relationId);
+        if (limit > 0 && summary.examined >= limit)
+            break;
+        const logged = rows.get(pair.relationId);
         // Only a recorded `keep` with a real verdict qualifies: unresolved rows carry no verdict,
         // and acted-on rows mean the edge is no longer the one that was judged.
         if (!logged || logged.action !== 'keep' || !allowed.has(logged.verdict))
             continue;
-        // The committee's verdict is reusable only while the pair is exactly what it judged.
-        if (!alreadyJudged(pair, snapshots.get(pair.relationId))) {
+        // The committee's verdict is reusable only while the pair is exactly what it judged
+        // (snapshot and verdict come from the same row).
+        if (!alreadyJudged(pair, logged)) {
             summary.previouslyJudged++;
             continue;
         }
@@ -835,7 +858,11 @@ export function replanFromLog(db, type, opts) {
             reason: action.reason,
         };
         if (opts.apply) {
-            const { result, record } = applyAction(db, pair, action, logged.verdict, logged.confidence, reasoning);
+            opts.beforeApply?.(pair);
+            // Inside the write transaction the row we planned from must still be the newest judgment
+            // of this relation: a concurrent re-judgment (say TRUE_CONFLICT) recorded after our read
+            // would otherwise be overridden by a stale verdict.
+            const { result, record } = applyAction(db, pair, action, logged.verdict, logged.confidence, reasoning, () => logRowIsLatest(db, type, pair.relationId, logged.id));
             if (result) {
                 resolved.applied = result;
                 summary.applied[result] = (summary.applied[result] ?? 0) + 1;

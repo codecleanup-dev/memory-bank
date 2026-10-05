@@ -12,19 +12,22 @@ _간선 행동 임계값 0.8 → 0.6 (Lucy 결정, 2026-10-05) 과, 임계값 �
 ### Added
 - **`memory-bank resolve <type> --replan [--apply]`**: 모델 호출 없이, 이전 `--apply` 런이 keep 으로 기록한 위원회 판정에
   오늘의 정책(임계값)을 다시 적용한다. 판정 입력(두 팩트 본문·reasoning·카테고리·scope·확인 횟수)이 기록과 같을 때만
-  재사용하고, 변경된 쌍·unresolved 행·이미 행동한 행은 건너뛴다. 결과 로그 행의 judge_reasoning 에
+  재사용하고, 변경된 쌍·unresolved 행·이미 행동한 행은 건너뛴다. 판정과 스냅샷은 **같은 로그 행**에서 읽고, 쓰기
+  트랜잭션 안에서 그 행이 여전히 그 관계의 최신 판정인지 확인한다(사이에 다른 프로세스가 재판정을 기록했으면
+  `skipped-changed`). `--limit` 을 따른다(기본 200, 0 = 전체). 결과 로그 행의 judge_reasoning 에
   `[replanned from log #id]` 를 남긴다. `--rejudge` 와 함께 쓸 수 없다. 요약에 `source: judge | log`.
 
 ### Fixed
 - **`callHaiku` per-call 타임아웃** (`MEMORY_BANK_LLM_CALL_TIMEOUT_MS`, 기본 180초, 상한 10분): Agent SDK 호출에
   `abortController` 를 넘기고 시간이 지나면 끊어 `timeout` 사유의 transient 에러로 던진다(재시도 → 소진 시 throw →
   위원회에서는 결석 표). 2026-10-05 라이브 런에서 판정 호출 하나가 CPU 0 으로 25분 매달려 136배치 런 전체가 멈춘 실측.
-  타임아웃은 유료 API 폴백으로 넘어가지 않는다.
+  타임아웃은 유료 API 폴백으로 넘어가지 않으며, 폴백 요청 자체도 같은 abort 신호를 받아 같은 예산 안에서 끊긴다.
 
 ### Tests
 - `test/relation-resolve.test.ts` +2 (기록된 keep 판정을 모델 호출 없이 재계획·적용·재실행 멱등, 입력이 바뀐 쌍과
   unresolved 행은 건너뜀), 정책 테스트 임계값 재고정(0.6/0.59, RELATED_NOT_CONFLICTING 0.6 → retype).
-- `test/llm-retry.test.ts` +2 (매달린 호출을 타임아웃으로 끊고 다음 시도가 성공하면 반환, 소진 시 timeout 사유로 throw).
+- `test/llm-retry.test.ts` +3 (매달린 호출을 타임아웃으로 끊고 다음 시도가 성공하면 반환, 소진 시 timeout 사유로 throw,
+  직접 API 폴백도 같은 예산에서 끊김), `test/relation-resolve.test.ts` +1 (replan 의 `--limit` 과 "최신 로그 행" 검증).
 
 ## [1.12.2] - 2026-10-05
 

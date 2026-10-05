@@ -27034,12 +27034,21 @@ ${userMessage}`,
     const { default: Anthropic2 } = await Promise.resolve().then(() => (init_sdk(), sdk_exports));
     const baseURL = process.env.MEMORY_BANK_API_BASE_URL;
     const client = new Anthropic2({ apiKey, ...baseURL ? { baseURL } : {} });
-    const response = await client.messages.create({
-      model: process.env.MEMORY_BANK_FACT_MODEL || "claude-haiku-4-5-20251001",
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }]
-    });
+    let response;
+    try {
+      response = await client.messages.create(
+        {
+          model: process.env.MEMORY_BANK_FACT_MODEL || "claude-haiku-4-5-20251001",
+          max_tokens: maxTokens,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userMessage }]
+        },
+        { signal: abort.signal }
+      );
+    } catch (fallbackError) {
+      if (abort.signal.aborted) throw callTimeoutError(timeoutMs);
+      throw fallbackError;
+    }
     const textBlock = response.content.find((b2) => b2.type === "text");
     return textBlock?.text || "";
   } finally {

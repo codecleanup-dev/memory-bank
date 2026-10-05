@@ -1125,6 +1125,54 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('replan honours --limit and refuses to act on a log row that is no longer the newest judgment', async () => {
+    const db = initDatabase();
+    try {
+      const rels: string[] = [];
+      for (let i = 0; i < 3; i++) {
+        const a = mkFact(db, `replan ${i} a`);
+        const b = mkFact(db, `replan ${i} b`);
+        rels.push(createRelation(db, a, 'CONTRADICTS', b, 'n').id);
+      }
+      // Judged under today's policy as low-confidence keeps, then the recorded confidence is raised
+      // to model "the committee was surer than the old bar required".
+      const judge: PairJudge = async (pairs) => pairs.map((_, i) => ({ pair_index: i, verdict: 'RELATED_NOT_CONFLICTING', confidence: 0.55 }));
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      db.prepare("UPDATE relation_resolution_log SET confidence = 0.7 WHERE action = 'keep'").run();
+
+      const one = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true, limit: 1 });
+      expect(one.examined).toBe(1);
+      expect(one.applied).toEqual({ retyped: 1 });
+      expect(db.prepare("SELECT COUNT(*) AS n FROM ontology_relations WHERE relation_type = 'INFLUENCES'").get()).toEqual({ n: 1 });
+
+      // A concurrent writer records a newer TRUE_CONFLICT judgment for the next pair between our
+      // read and our write: the stale verdict must not delete or retype that edge.
+      const stale = replanFromLog(db, 'CONTRADICTS', {
+        archivePath: archive,
+        apply: true,
+        limit: 1,
+        beforeApply: (pair) => {
+          db.prepare(
+            `INSERT INTO relation_resolution_log (ts, action, relation_id, relation_type_before, relation_type_after,
+               source_fact_id, target_fact_id, source_fact, target_fact, reasoning_before, verdict, confidence,
+               source_category, target_category, source_scope, target_scope, source_count, target_count)
+             VALUES ('t', 'keep', ?, 'CONTRADICTS', 'CONTRADICTS', ?, ?, ?, ?, ?, 'TRUE_CONFLICT', 0.9,
+               'decision', 'decision', 'global:', 'global:', 1, 1)`,
+          ).run(pair.relationId, pair.source.id, pair.target.id, pair.source.fact, pair.target.fact, pair.reasoning);
+        },
+      });
+      expect(stale.applied).toEqual({ 'skipped-changed': 1 });
+      expect(db.prepare("SELECT COUNT(*) AS n FROM ontology_relations WHERE relation_type = 'INFLUENCES'").get()).toEqual({ n: 1 });
+      // Next replan sees the newer TRUE_CONFLICT row for that pair and leaves it; the third pair is retyped.
+      const rest = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true, limit: 0 });
+      expect(rest.planned.keep).toBe(1);
+      expect(rest.applied).toEqual({ retyped: 1 });
+      expect(db.prepare("SELECT COUNT(*) AS n FROM ontology_relations WHERE relation_type = 'INFLUENCES'").get()).toEqual({ n: 2 });
+    } finally {
+      db.close();
+    }
+  });
+
   it('parseIntegerOption accepts only whole-string safe integers', () => {
     expect(parseIntegerOption('0', 0)).toBe(0);
     expect(parseIntegerOption(' 200 ', 0)).toBe(200);
