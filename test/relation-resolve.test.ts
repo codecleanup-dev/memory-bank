@@ -1076,12 +1076,15 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       expect(dry.planned).toEqual({ keep: 1, retype: 1, delete: 0, deactivate: 0 });
       expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS'); // dry run changed nothing
 
+      // A recorded reasoning already at the 300-char cap must not push the provenance tag off the end.
+      db.prepare("UPDATE relation_resolution_log SET judge_reasoning = ? WHERE relation_id = ? AND action = 'keep'").run('r'.repeat(300), rel.id);
       const applied = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
       expect(applied.applied).toEqual({ retyped: 1 });
       expect(relation(db, rel.id)?.relation_type).toBe('INFLUENCES');
       expect(relation(db, conflict.id)?.relation_type).toBe('CONTRADICTS');
       const row = db.prepare("SELECT judge_reasoning FROM relation_resolution_log WHERE relation_id = ? AND action = 'retype'").get(rel.id) as { judge_reasoning: string };
-      expect(row.judge_reasoning).toContain('[replanned from log #');
+      expect(row.judge_reasoning).toMatch(/ \[replanned from log #\d+\]$/);
+      expect(row.judge_reasoning.length).toBeLessThanOrEqual(300);
       // Nothing is left to replan: the retyped edge is no longer a CONTRADICTS pair, the conflict stays keep.
       const again = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
       expect(again.judged).toBe(1);

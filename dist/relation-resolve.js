@@ -850,7 +850,9 @@ export function replanFromLog(db, type, opts) {
         if (action.kind === 'keep')
             continue; // the policy still says keep: nothing to re-record
         actionable++;
-        const reasoning = `${logged.judge_reasoning ?? ''} [replanned from log #${logged.id}]`.trim().slice(0, 300);
+        // The provenance tag must survive the 300-char cap: trim the recorded reasoning, never the tag.
+        const tag = ` [replanned from log #${logged.id}]`;
+        const reasoning = `${(logged.judge_reasoning ?? '').slice(0, Math.max(0, 300 - tag.length))}${tag}`.trim();
         const resolved = {
             relationId: pair.relationId,
             relationType: type,
