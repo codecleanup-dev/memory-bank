@@ -20,6 +20,8 @@ export interface InjectLogEntry {
     surprise_w?: number;
     /** [fork v0-3] 유산 컷오프(heritageCutoff)로 주입 후보에서 제외된 fact 수. 0 이면 필드 생략. */
     heritage_excluded?: number;
+    /** [fork v0-3] 유산이 TOP_K 슬롯을 차지해 한도를 넓혀 재조회한 경우 true (지연 비용 관측). */
+    heritage_refetch?: boolean;
 }
 export declare function getInjectLogPath(): string;
 /**

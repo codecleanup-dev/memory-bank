@@ -25034,6 +25034,24 @@ function isHeritageFact(fact, cutoff) {
   const d2 = (fact.created_at ?? "").slice(0, 10);
   return d2.length === 10 && d2 < cutoff;
 }
+var HERITAGE_REFETCH_FACTOR = 8;
+function selectInjectCandidates(fetch2, topK, cutoff) {
+  const split = (rows) => {
+    const keep = [];
+    let dropped = 0;
+    for (const r of rows) {
+      if (isHeritageFact(r.fact, cutoff)) dropped += 1;
+      else keep.push(r);
+    }
+    return { keep, dropped };
+  };
+  const first = split(fetch2(topK));
+  if (first.dropped === 0 || first.keep.length >= topK) {
+    return { candidates: first.keep, heritageExcluded: first.dropped, refetched: false };
+  }
+  const second = split(fetch2(topK * HERITAGE_REFETCH_FACTOR));
+  return { candidates: second.keep.slice(0, topK), heritageExcluded: second.dropped, refetched: true };
+}
 var NOOP_COMMIT = () => {
 };
 async function computeInjectContextDeferred(userPrompt, project, via, sessionId) {
@@ -25048,12 +25066,15 @@ async function computeInjectContextDeferred(userPrompt, project, via, sessionId)
     const baseline = await queryBaseline(embedding);
     const db = getSearchDb();
     {
-      const candidates = searchSimilarFacts(db, embedding, project, TOP_K, 0);
       const cutoff = heritageCutoff();
-      const heritageExcluded = candidates.filter((r) => isHeritageFact(r.fact, cutoff)).length;
-      const heritageLog = heritageExcluded > 0 ? { heritage_excluded: heritageExcluded } : {};
+      const selected = selectInjectCandidates(
+        (limit) => searchSimilarFacts(db, embedding, project, limit, 0),
+        TOP_K,
+        cutoff
+      );
+      const candidates = selected.candidates;
+      const heritageLog = selected.heritageExcluded > 0 ? { heritage_excluded: selected.heritageExcluded, ...selected.refetched ? { heritage_refetch: true } : {} } : {};
       const results = candidates.filter((r) => {
-        if (isHeritageFact(r.fact, cutoff)) return false;
         const similarity = l2DistanceToSimilarity(r.distance);
         return similarity - baseline >= BASELINE_MARGIN;
       });

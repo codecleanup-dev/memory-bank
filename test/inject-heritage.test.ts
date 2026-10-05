@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { suppressConsole } from './test-utils.js';
-import { DEFAULT_HERITAGE_CUTOFF, heritageCutoff, isHeritageFact } from '../src/inject-core.js';
+import {
+  DEFAULT_HERITAGE_CUTOFF,
+  HERITAGE_REFETCH_FACTOR,
+  heritageCutoff,
+  isHeritageFact,
+  selectInjectCandidates,
+} from '../src/inject-core.js';
 
 suppressConsole();
 
@@ -53,5 +59,65 @@ describe('isHeritageFact', () => {
 
   it('null cutoff (filter disabled) → never heritage', () => {
     expect(isHeritageFact({ created_at: '2026-03-25' }, null)).toBe(false);
+  });
+});
+
+/**
+ * 적대 리뷰 HIGH (2026-10-05): TOP_K 뒤에서 걸러내면 유산이 슬롯을 차지해 바로 다음 순위의
+ * 유효한 fact 가 밀려난다. fetch 를 주입해 그 경로를 고정한다. 순위가 낮을수록 뒤에 온다.
+ */
+describe('selectInjectCandidates (slot-stealing guard)', () => {
+  const cutoff = '2026-05-01';
+  const TOP_K = 5;
+  const heritage = (i: number) => ({ fact: { id: `h${i}`, created_at: '2026-04-01' }, distance: 0.1 + i * 0.01 });
+  const recent = (i: number) => ({ fact: { id: `r${i}`, created_at: '2026-09-01' }, distance: 0.2 + i * 0.01 });
+  // 전체 순위: 유산 5개가 상위, 그 뒤에 최신 fact 6개
+  const ranked = [heritage(0), heritage(1), heritage(2), heritage(3), heritage(4),
+    recent(0), recent(1), recent(2), recent(3), recent(4), recent(5)];
+  const fetchRanked = (calls: number[]) => (limit: number) => { calls.push(limit); return ranked.slice(0, limit); };
+
+  it('top-K all heritage → refetches with a wider limit and returns the next valid facts', () => {
+    const calls: number[] = [];
+    const r = selectInjectCandidates(fetchRanked(calls), TOP_K, cutoff);
+    expect(calls).toEqual([TOP_K, TOP_K * HERITAGE_REFETCH_FACTOR]);
+    expect(r.refetched).toBe(true);
+    expect(r.candidates.map((c) => c.fact.id)).toEqual(['r0', 'r1', 'r2', 'r3', 'r4']); // sliced to TOP_K, order kept
+    expect(r.heritageExcluded).toBe(5);
+  });
+
+  it('partially heritage → refetch fills the slots; the post-filter list never exceeds TOP_K', () => {
+    const calls: number[] = [];
+    const mixed = [recent(0), heritage(0), recent(1), heritage(1), recent(2), recent(3), recent(4), recent(5)];
+    const r = selectInjectCandidates((limit) => { calls.push(limit); return mixed.slice(0, limit); }, TOP_K, cutoff);
+    expect(calls).toEqual([TOP_K, TOP_K * HERITAGE_REFETCH_FACTOR]);
+    expect(r.candidates.map((c) => c.fact.id)).toEqual(['r0', 'r1', 'r2', 'r3', 'r4']);
+    expect(r.heritageExcluded).toBe(2);
+  });
+
+  it('no heritage in the first fetch → single fetch, nothing dropped', () => {
+    const calls: number[] = [];
+    const clean = [recent(0), recent(1), recent(2), recent(3), recent(4), heritage(0)];
+    const r = selectInjectCandidates((limit) => { calls.push(limit); return clean.slice(0, limit); }, TOP_K, cutoff);
+    expect(calls).toEqual([TOP_K]);
+    expect(r.refetched).toBe(false);
+    expect(r.heritageExcluded).toBe(0);
+    expect(r.candidates).toHaveLength(5);
+  });
+
+  it('filter disabled (null cutoff) → heritage is kept and no refetch happens', () => {
+    const calls: number[] = [];
+    const r = selectInjectCandidates(fetchRanked(calls), TOP_K, null);
+    expect(calls).toEqual([TOP_K]);
+    expect(r.candidates.map((c) => c.fact.id)).toEqual(['h0', 'h1', 'h2', 'h3', 'h4']);
+    expect(r.heritageExcluded).toBe(0);
+  });
+
+  it('refetch is bounded to one extra query even when the wider window is still all heritage', () => {
+    const calls: number[] = [];
+    const allHeritage = Array.from({ length: 60 }, (_, i) => heritage(i));
+    const r = selectInjectCandidates((limit) => { calls.push(limit); return allHeritage.slice(0, limit); }, TOP_K, cutoff);
+    expect(calls).toHaveLength(2);
+    expect(r.candidates).toEqual([]);
+    expect(r.heritageExcluded).toBe(TOP_K * HERITAGE_REFETCH_FACTOR);
   });
 });
