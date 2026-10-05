@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.12.4] - 2026-10-05
+
+_memory 계층 재설계 v0 (브리프 2026-10-05). 원작자 수입 fact 를 세션 주입에서만 빼고, upstream 추적 계약을 merge 의무에서
+cherry-pick 으로 바꾼다. 데이터 쪽 v0 항목(추출 백로그 정리·임베딩 백필)은 코드 변경 없이 운영 상태 파일과 DB 에서 처리했다._
+
+### Changed
+- **세션 주입 유산 컷오프** (`src/heritage.ts`, `src/fact-db.ts`, `src/inject-core.ts`): `created_at < 2026-05-01` 인 fact 는
+  UserPromptSubmit 주입 후보와 관계 확장분에서 제외한다. 제외는 `searchSimilarFacts` 의 후보 walk 안(`opts.minCreatedAt`)에서
+  스코프 필터와 같은 자리에서 일어나므로 유산이 TOP_K 슬롯을 차지해 유효한 최신 fact 를 밀어내지 않는다(적대 리뷰 HIGH 반영).
+  이 날짜 이전 fact 는 2026-03~04 cc-sync 도입기에 수입된 원작자 메모리 문서·세션 메모리다.
+  30일 실측: 주입 7,312건 중 38건(0.5%)이 유산이었고 "Hugh의 인지 아키텍처와 자기 모델" 이 3회 들어갔다.
+  검색·search_facts·그래프 도구에는 그대로 남는다. `MEMORY_BANK_INJECT_HERITAGE_CUTOFF` 로 날짜를 옮기거나
+  `off` 로 끈다. 로그에 `heritage_excluded` 가 붙어 효과를 셀 수 있다.
+- **upstream 추적 계약** (`PORT-PLAN.md`): merge-only 에서 "추적 유지 + 안정성 수정 cherry-pick" 으로. 포크 149커밋 대
+  upstream 29커밋으로 갈라져 전체 merge 는 비현실적이고, upstream 의 2026-10-03 안정성 묶음(deps-heal·fact-validity·
+  prompt-gate·sync 최소 간격)은 수정 단위로 가져온다.
+
+### Docs
+- 제외 대상 활성 유산 fact 1,005건의 보관 사본은 저장소 밖 `~/.claude/state/backups/heritage-facts-20261005.md` 에 둔다
+  (196KB 를 리뷰 diff 에 넣지 않기 위해). DB 에서는 지우지 않으므로 사본은 열람 편의용이다.
+
+### Tests
+- `test/inject-heritage.test.ts` 신설: 컷오프 env 해석(기본·override·off·malformed) + 날짜 판정 경계.
+
 ## [1.12.3] - 2026-10-05
 
 _간선 행동 임계값 0.8 → 0.6 (Lucy 결정, 2026-10-05) 과, 임계값 변경을 재판정 없이 적용하는 `--replan`._

@@ -4,6 +4,7 @@
  * (docs/2026-07-25-e2-surprise-ranking-spec.md, soft-to-hard 절차).
  */
 export declare function surpriseWeight(env?: NodeJS.ProcessEnv): number;
+export { DEFAULT_HERITAGE_CUTOFF, heritageCutoff, isHeritageFact } from './heritage.js';
 /**
  * Compute the UserPromptSubmit context block for a prompt: top-K similar
  * facts gated by the probe baseline, expanded with 1-hop ontology relations,

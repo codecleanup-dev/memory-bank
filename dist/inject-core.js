@@ -6,6 +6,7 @@ import { getRelatedFacts } from './ontology-db.js';
 import { detectRepeat, formatRepeatContext } from './repeat-detector.js';
 import { appendInjectLog } from './inject-log.js';
 import { loadLedger, appendLedger } from './inject-ledger.js';
+import { heritageCutoff, isHeritageFact } from './heritage.js';
 const TOP_K = 5;
 // Probe-baseline relevance gate (e5 scores are compressed, so absolute
 // thresholds cannot separate relevant from irrelevant). A fact is injected
@@ -37,6 +38,8 @@ export function surpriseWeight(env = process.env) {
     const raw = parseFloat(env.MEMORY_BANK_INJECT_SURPRISE_WEIGHT ?? '');
     return Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0;
 }
+// [fork v0-3] 유산 컷오프 — 정의는 heritage.ts (fact-db 와 공유). 기존 import 경로를 위해 재수출.
+export { DEFAULT_HERITAGE_CUTOFF, heritageCutoff, isHeritageFact } from './heritage.js';
 const NOOP_COMMIT = () => { };
 export async function computeInjectContext(userPrompt, project, via, sessionId) {
     // 하위호환 래퍼: 전달 확인 채널이 없는 호출자는 즉시 커밋 (기존 의미 유지)
@@ -60,7 +63,15 @@ export async function computeInjectContextDeferred(userPrompt, project, via, ses
         const db = getSearchDb();
         {
             // threshold 0: take top-k by distance, then gate by baseline margin below
-            const candidates = searchSimilarFacts(db, embedding, project, TOP_K, 0);
+            // [fork v0-3] 유산 fact(원작자 수입분)는 주입 후보에서 뺀다. 검색 도구에는 그대로 남는다.
+            // 검색 단계(searchSimilarFacts 의 후보 walk)에서 걸러내므로 유산이 TOP_K 슬롯을
+            // 차지하지 않는다 — 스코프 필터와 같은 자리, 같은 overfetch 풀 (적대 리뷰 HIGH 반영).
+            const cutoff = heritageCutoff();
+            const heritageStats = { heritageSkipped: 0 };
+            const candidates = searchSimilarFacts(db, embedding, project, TOP_K, 0, {
+                minCreatedAt: cutoff, stats: heritageStats,
+            });
+            const heritageLog = heritageStats.heritageSkipped > 0 ? { heritage_excluded: heritageStats.heritageSkipped } : {};
             const results = candidates.filter((r) => {
                 const similarity = l2DistanceToSimilarity(r.distance);
                 return similarity - baseline >= BASELINE_MARGIN;
@@ -69,6 +80,7 @@ export async function computeInjectContextDeferred(userPrompt, project, via, ses
                 appendInjectLog({
                     status: 'no-match', project, prompt_len: userPrompt.length,
                     candidates: candidates.length, injected: 0, duration_ms: Date.now() - t0, via,
+                    ...heritageLog,
                 });
                 return { block: '', commitLedger: NOOP_COMMIT };
             }
@@ -89,6 +101,8 @@ export async function computeInjectContextDeferred(userPrompt, project, via, ses
             for (const { fact } of results.slice(0, 3)) {
                 const related = getRelatedFacts(db, fact.id, 1, 0.6, 0.2, project);
                 for (const { fact: relFact, relation } of related) {
+                    if (isHeritageFact(relFact, cutoff))
+                        continue; // [fork v0-3] 관계 확장분도 같은 기준
                     if (!seenIds.has(relFact.id) && expandedFacts.length < MAX_CONTEXT_FACTS) {
                         seenIds.add(relFact.id);
                         expandedFacts.push({ fact: relFact, note: `[${relation.relation_type}]` });
@@ -105,6 +119,7 @@ export async function computeInjectContextDeferred(userPrompt, project, via, ses
                     status: 'deduped', project, prompt_len: userPrompt.length,
                     candidates: candidates.length, injected: 0, deduped: dedupedCount,
                     duration_ms: Date.now() - t0, via,
+                    ...heritageLog,
                 });
                 return { block: '', commitLedger: NOOP_COMMIT };
             }
@@ -147,6 +162,7 @@ export async function computeInjectContextDeferred(userPrompt, project, via, ses
                 duration_ms: Date.now() - t0, via,
                 surprise: injectedSurprises,
                 ...(w > 0 ? { surprise_w: w } : {}),
+                ...heritageLog,
             });
             // 원장 커밋은 호출자의 전달 확인 뒤로 미룬다 (위 InjectComputation 주석 참조)
             return {

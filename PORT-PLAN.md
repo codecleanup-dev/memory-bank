@@ -43,6 +43,17 @@
 - 마켓플레이스가 브랜치 추적 불가 → **패치는 main에 유지, upstream은 main으로 merge**해 추적.
   rebase·force-push 금지 — 공유 히스토리 보존이 다음 동기화의 전제. PR 병합도 merge commit 전략 고정.
 - 업데이트 알림: `scripts/upstream-watch.sh`(알림 전용, 자동 병합 없음) + 머신 로컬 launchd.
+
+## 결정 (2026-10-05) — upstream 추적 계약: merge-only → 추적 유지 + cherry-pick
+- 배경: merge-base `18762b6`(2026-08-02) 이후 포크 149커밋 대 upstream 29커밋. 포크는 7월 인지 축(원칙·surprise·관계
+  해소·taxonomy, 약 3,340줄)을 더했고 upstream 은 1.4.5~1.7.5 로 다른 길을 갔다. 전체 merge 는 충돌 비용이 가치를 넘는다.
+- 그러나 upstream 은 안정성 수정을 계속 낸다 (2026-10-03 하루 v1.7.0~1.7.5: deps-heal·fact-validity·prompt-gate·데몬
+  프로토콜·소켓 버전 분리·sync 최소 간격). 재설계 브리프(2026-10-05)의 판단 축이 안정성이므로 이 공급은 끊지 않는다.
+- 계약: `upstream` remote 와 `upstream-watch.sh` 는 유지한다. **merge 의무는 해제**하고, 수정 단위로 `git cherry-pick`
+  해 들여온다. 충돌이 포크 변경과 맞물리면 그 수정은 포크 식으로 다시 쓴다(원문 인용 + 출처 커밋 해시를 커밋 본문에).
+  rebase·force-push 금지와 버전 단조 증가는 그대로다.
+- 첫 후보: `10bec9e`(sync 최소 간격) · `877aed2`(fact-validity, 관계 방향) · `238a471`(prompt-gate, 주입 dedup) ·
+  `a85f17f`(deps-heal 포함 독립 검토 반영). 적용 뒤 추출 TERM 종료·수율 지표 변화를 재서 v1-8(추출기 재작성) 범위를 정한다.
   기존 `com.codecleanup.memory-bank-plugin-update` plist는 .bak 폐기 상태 유지.
 
 ## 최종 형태 — 영구 사설 포크 (사용자 결정 2026-07-04: 업스트림 PR 안 함)

@@ -35,6 +35,8 @@ export interface InjectLogEntry {
   surprise?: Array<number | null>;
   /** E2: set only when the surprise ranking weight is active (>0). */
   surprise_w?: number;
+  /** [fork v0-3] 유산 컷오프(heritageCutoff)로 검색 단계에서 건너뛴 fact 수. 0 이면 필드 생략. */
+  heritage_excluded?: number;
 }
 
 export function getInjectLogPath(): string {

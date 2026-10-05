@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { canonicalizeProject } from './project-canon.js';
 import { EMBEDDING_VERSION } from './embeddings.js';
 import { normalizeFactCategory } from './fact-category.js';
+import { isHeritageFact } from './heritage.js';
 import { getVecTableDtype, embeddingToVecBlob, vecParamSql, normalizeVecDistance, l2DistanceToSimilarity } from './db.js';
 /** dtype-aware MATCH/INSERT param for a fact-side vec table: the SQL
  * placeholder (vec_int8(?) wrap for int8) and the correctly-encoded blob.
@@ -228,8 +229,9 @@ export function insertRevision(db, params) {
 export function getRevisions(db, factId) {
     return db.prepare('SELECT * FROM fact_revisions WHERE fact_id = ? ORDER BY created_at DESC').all(factId);
 }
-export function searchSimilarFacts(db, embedding, project, limit = 5, threshold = 0.85) {
+export function searchSimilarFacts(db, embedding, project, limit = 5, threshold = 0.85, opts = {}) {
     const canonProject = project ? canonicalizeProject(db, project) : project;
+    const minCreatedAt = opts.minCreatedAt ?? null;
     // Search both language indexes: the query language is unknown, and
     // multilingual models score same-language pairs far higher than
     // cross-language pairs. Keep the best (smallest) distance per fact id.
@@ -284,6 +286,12 @@ export function searchSimilarFacts(db, embedding, project, limit = 5, threshold 
         // Scope filter: same project or global only
         if (canonProject && fact.scope_type === 'project' && fact.scope_project !== canonProject)
             continue;
+        // [fork v0-3] Heritage cutoff: skipped here, not after truncation, so it never steals a slot.
+        if (isHeritageFact(fact, minCreatedAt)) {
+            if (opts.stats)
+                opts.stats.heritageSkipped += 1;
+            continue;
+        }
         results.push({ fact, distance: vr.distance });
         if (results.length >= limit)
             break;
