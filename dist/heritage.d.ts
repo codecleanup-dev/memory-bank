@@ -21,7 +21,21 @@
  */
 export declare const DEFAULT_HERITAGE_CUTOFF = "2026-05-01";
 export declare function heritageCutoff(env?: NodeJS.ProcessEnv): string | null;
-/** created_at 날짜 접두(YYYY-MM-DD)가 컷오프보다 앞이면 유산. created_at 이 비어 있으면 유산으로 보지 않는다. */
-export declare function isHeritageFact(fact: {
+/**
+ * [fork v1, 2026-10-05] 원작자 표준 문서 시리즈(01~10 번호 접두, "NN-slug memory …" 제목)가
+ * memory-doc 레인으로 다시 색인된 fact 를 잡는다. 날짜 컷오프는 2026-03~04 원본 수입분(783건)만
+ * 잡고, 2026-05-17 처럼 뒤에 다시 색인된 같은 문서(실측 10건)는 놓쳤다. 번호 접두 + memory-doc
+ * 출처 두 조건을 함께 요구해, 원작자를 주제로 다룬 사용자 본인의 fact(hugh-corpus 작업 등, 번호
+ * 접두 없음)는 건드리지 않는다.
+ */
+export declare const HERITAGE_DOC_PATTERN: RegExp;
+export interface HeritageFactLike {
     created_at?: string | null;
-}, cutoff: string | null): boolean;
+    fact?: string | null;
+    source_exchange_ids?: readonly string[] | null;
+}
+/**
+ * 날짜 접두(YYYY-MM-DD)가 컷오프보다 앞이거나, memory-doc 출처의 원작자 번호 문서면 유산.
+ * created_at 이 비어 있으면 날짜 규칙은 적용하지 않는다. 컷오프가 null 이면 두 규칙 모두 꺼진다.
+ */
+export declare function isHeritageFact(fact: HeritageFactLike, cutoff: string | null): boolean;

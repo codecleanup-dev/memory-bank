@@ -5,6 +5,7 @@ import path from 'path';
 import os from 'os';
 import { spawn, execFileSync } from 'child_process';
 import fs from 'fs';
+import { defaultLastSyncFile, shouldSkipBackgroundSync, recordSyncCompletion } from './sync-cooldown.js';
 const args = process.argv.slice(2);
 if (args.includes('--help') || args.includes('-h')) {
     console.log(`
@@ -40,6 +41,13 @@ EXAMPLES:
 const isBackground = args.includes('--background');
 // If background mode, fork the process and exit immediately
 if (isBackground) {
+    // Cooldown (upstream 10bec9e, hand-ported 2026-10-05; see sync-cooldown.ts): skip when the
+    // last successful sync finished less than MEMORY_BANK_SYNC_MIN_INTERVAL_S ago (default 600s).
+    const cooldown = shouldSkipBackgroundSync(defaultLastSyncFile());
+    if (cooldown.skip) {
+        console.log(`Sync skipped - last sync finished ${cooldown.ageS}s ago (min interval ${cooldown.minS}s)`);
+        process.exit(0);
+    }
     const filteredArgs = args.filter(arg => arg !== '--background');
     // Spawn a detached process
     const child = spawn(process.execPath, [
@@ -360,6 +368,13 @@ console.log(`Destination: ${destDir}\n`);
     if (errors.length > 0) {
         console.log(`\n⚠️  Errors: ${errors.length}`);
         errors.forEach(err => console.log(`  ${err.file}: ${err.error}`));
+    }
+    // Stamp the completion so a background sync inside the cooldown window skips (sync-cooldown.ts).
+    try {
+        recordSyncCompletion(defaultLastSyncFile());
+    }
+    catch (e) {
+        console.error(`Could not record sync completion: ${e.message}`);
     }
 })().catch(error => {
     console.error('Error syncing:', error);
