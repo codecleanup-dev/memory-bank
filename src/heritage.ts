@@ -9,7 +9,8 @@
  * graph tools) — only the automatic UserPromptSubmit injection skips them, and it
  * skips them at the search stage (fact-db searchSimilarFacts minCreatedAt) so a
  * heritage row never occupies a top-K slot that a valid recent fact should get.
- * Archive of the affected rows: docs/archive/heritage-facts-20261005.md.
+ * A markdown copy of the affected rows lives outside the repo
+ * (~/.claude/state/backups/heritage-facts-20261005.md); the DB keeps them all.
  *
  * MEMORY_BANK_INJECT_HERITAGE_CUTOFF: ISO date (YYYY-MM-DD) to move the cutoff,
  * '' or 'off' to disable. Unset → DEFAULT_HERITAGE_CUTOFF. Malformed → default

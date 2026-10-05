@@ -18,7 +18,8 @@ cherry-pick 으로 바꾼다. 데이터 쪽 v0 항목(추출 백로그 정리·�
   prompt-gate·sync 최소 간격)은 수정 단위로 가져온다.
 
 ### Docs
-- `docs/archive/heritage-facts-20261005.md`: 제외 대상 활성 유산 fact 1,005건 보관 사본 (DB 에서는 지우지 않는다).
+- 제외 대상 활성 유산 fact 1,005건의 보관 사본은 저장소 밖 `~/.claude/state/backups/heritage-facts-20261005.md` 에 둔다
+  (196KB 를 리뷰 diff 에 넣지 않기 위해). DB 에서는 지우지 않으므로 사본은 열람 편의용이다.
 
 ### Tests
 - `test/inject-heritage.test.ts` 신설: 컷오프 env 해석(기본·override·off·malformed) + 날짜 판정 경계.
