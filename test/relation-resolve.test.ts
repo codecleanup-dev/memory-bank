@@ -1052,6 +1052,41 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('replan re-applies a recorded delete when the same edge comes back (re-imported from a peer), with no model call', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'came back a');
+      const b = mkFact(db, 'came back b');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'peer reasoning');
+      const judge = tableJudge({ 'came back a': { verdict: 'UNRELATED', confidence: 0.95 } });
+      const first = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      expect(first.applied).toEqual({ deleted: 1 });
+      expect(relation(db, rel.id)).toBeUndefined();
+
+      // A peer still had the edge and the import put it back with the same id and reasoning.
+      db.prepare(
+        `INSERT INTO ontology_relations (id, source_fact_id, relation_type, target_fact_id, reasoning, created_at)
+         VALUES (?, ?, 'CONTRADICTS', ?, 'peer reasoning', ?)`,
+      ).run(rel.id, a, b, '2026-10-05 00:00:00');
+      expect(listActiveConflicts(db, 'CONTRADICTS')).toHaveLength(1);
+
+      const never: PairJudge = async () => {
+        throw new Error('replan must not call the judge');
+      };
+      const replan = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
+      expect(replan.judged).toBe(1);
+      expect(replan.applied).toEqual({ deleted: 1 });
+      expect(relation(db, rel.id)).toBeUndefined();
+      const rows = db.prepare("SELECT action, judge_reasoning FROM relation_resolution_log WHERE relation_id = ? ORDER BY id").all(rel.id) as Array<{ action: string; judge_reasoning: string }>;
+      expect(rows.map((r) => r.action)).toEqual(['delete', 'delete']);
+      expect(rows[1].judge_reasoning).toContain('[replanned from log #');
+      // The judged path has nothing left to do either.
+      await expect(resolveQueue(db, 'CONTRADICTS', { apply: false, limit: 0, judge: never, votes: 1, archivePath: archive })).resolves.toMatchObject({ examined: 0 });
+    } finally {
+      db.close();
+    }
+  });
+
   it('replan from log: a recorded keep whose verdict now clears the policy is acted on without any model call', async () => {
     const db = initDatabase();
     try {

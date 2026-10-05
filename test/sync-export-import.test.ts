@@ -145,6 +145,69 @@ describe('sync-export/import', () => {
     expect(result.newRelations).toBe(1);
   });
 
+  it('does not re-insert peer edges this machine already resolved away (tombstones by id and by pair)', async () => {
+    const { getSyncDir } = await import('../src/sync-export.js');
+    const syncDir = getSyncDir();
+    const now = new Date().toISOString();
+    const fact = (id: string, text: string) =>
+      JSON.stringify({
+        id, fact: text, category: 'decision', scope_type: 'global', scope_project: null,
+        source_exchange_ids: '[]', created_at: now, updated_at: now, consolidated_count: 1,
+      }) + '\n';
+    fs.writeFileSync(path.join(syncDir, 'facts.jsonl'), fact('tf-1', 'tomb one') + fact('tf-2', 'tomb two') + fact('tf-3', 'tomb three'));
+    // Facts land first so the log rows can name local ids; then seed what resolve recorded.
+    const { importFromSync } = await import('../src/sync-import.js');
+    const first = await importFromSync();
+    expect(first.newFacts).toBe(3);
+    const { initDatabase } = await import('../src/db.js');
+    const { ensureResolutionLog } = await import('../src/relation-resolve.js');
+    const db = initDatabase();
+    try {
+      ensureResolutionLog(db);
+      const seed = db.prepare(
+        `INSERT INTO relation_resolution_log (ts, action, relation_id, relation_type_before, source_fact_id, target_fact_id,
+           source_fact, target_fact, verdict, confidence)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'UNRELATED', 0.9)`,
+      );
+      // Snapshots must read like the facts do now for the tombstone to hold.
+      seed.run(now, 'delete', 'peer-rel-deleted', 'CONTRADICTS', 'tf-1', 'tf-2', 'tomb one', 'tomb two'); // same id as the peer's copy
+      seed.run(now, 'retype', 'local-rel-retyped', 'CONTRADICTS', 'tf-2', 'tf-3', 'tomb two', 'tomb three'); // peer has the pair under another id
+      // Judged away once, but its latest judgment is a keep: no tombstone.
+      seed.run(now, 'delete', 'rel-later-kept', 'SUPERSEDES', 'tf-1', 'tf-3', 'tomb one', 'tomb three');
+      seed.run(now, 'keep', 'rel-later-kept', 'SUPERSEDES', 'tf-1', 'tf-3', 'tomb one', 'tomb three');
+      // Judged away, but the fact text has moved on since: the judgment no longer applies.
+      seed.run(now, 'delete', 'rel-stale-snapshot', 'CONTRADICTS', 'tf-3', 'tf-1', 'tomb three (old wording)', 'tomb one');
+    } finally {
+      db.close();
+    }
+    fs.writeFileSync(
+      path.join(syncDir, 'ontology-relations.jsonl'),
+      JSON.stringify({ id: 'peer-rel-deleted', source_fact_id: 'tf-1', relation_type: 'CONTRADICTS', target_fact_id: 'tf-2', reasoning: 'r', created_at: now }) + '\n' +
+        // reversed direction, different id: CONTRADICTS is symmetric, still the same judged pair
+        JSON.stringify({ id: 'peer-rel-other-id', source_fact_id: 'tf-3', relation_type: 'CONTRADICTS', target_fact_id: 'tf-2', reasoning: 'r', created_at: now }) + '\n' +
+        // same id as a retyped edge but arriving in its NEW type: welcome
+        JSON.stringify({ id: 'local-rel-retyped', source_fact_id: 'tf-2', relation_type: 'INFLUENCES', target_fact_id: 'tf-3', reasoning: 'r', created_at: now }) + '\n' +
+        // latest local judgment was keep: welcome
+        JSON.stringify({ id: 'rel-later-kept', source_fact_id: 'tf-1', relation_type: 'SUPERSEDES', target_fact_id: 'tf-3', reasoning: 'r', created_at: now }) + '\n' +
+        // tombstone snapshot no longer matches the fact text: welcome
+        JSON.stringify({ id: 'rel-stale-snapshot', source_fact_id: 'tf-3', relation_type: 'CONTRADICTS', target_fact_id: 'tf-1', reasoning: 'r', created_at: now }) + '\n' +
+        // never judged here: must still come in
+        JSON.stringify({ id: 'peer-rel-fresh', source_fact_id: 'tf-1', relation_type: 'INFLUENCES', target_fact_id: 'tf-3', reasoning: 'r', created_at: now }) + '\n',
+    );
+
+    const second = await importFromSync();
+
+    expect(second.skippedTombstoned).toBe(2);
+    expect(second.newRelations).toBe(4);
+    const check = initDatabase();
+    try {
+      const ids = (check.prepare('SELECT id FROM ontology_relations ORDER BY id').all() as Array<{ id: string }>).map((r) => r.id);
+      expect(ids).toEqual(['local-rel-retyped', 'peer-rel-fresh', 'rel-later-kept', 'rel-stale-snapshot']);
+    } finally {
+      check.close();
+    }
+  });
+
   it('should normalize out-of-vocabulary categories from legacy sync files instead of dropping them', async () => {
     // Sync files written by machines that predate the facts.category CHECK
     // can carry 'requirement' / enum-echo / 'null' categories — those rows

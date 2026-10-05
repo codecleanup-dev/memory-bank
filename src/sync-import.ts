@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import type Database from 'better-sqlite3';
 import { initDatabase, getVecTableDtype, embeddingToVecBlob, vecParamSql } from './db.js';
 import { generateEmbedding, initEmbeddings, EMBEDDING_VERSION } from './embeddings.js';
 import { getSyncDir } from './sync-export.js';
@@ -28,9 +29,103 @@ interface SyncFact {
  * Only inserts records that don't already exist (by ID).
  * Generates embeddings for new facts.
  */
-export async function importFromSync(): Promise<{ newFacts: number; newDomains: number; newCategories: number; newRelations: number }> {
+function tripleKey(source: string, target: string, type: string): string {
+  return `${source}\x1f${target}\x1f${type}`;
+}
+
+/** What a resolve judgment saw; a tombstone holds only while the facts still read like this. */
+interface Tombstone {
+  source_fact_id: string;
+  target_fact_id: string;
+  source_fact: string;
+  target_fact: string;
+  source_category: string | null;
+  target_category: string | null;
+  source_scope: string | null;
+  target_scope: string | null;
+  source_count: number | null;
+  target_count: number | null;
+}
+
+interface Tombstones {
+  /** `${relation_id}\x1f${type-before}`: the very edge that was judged away, in the type it had then. */
+  byId: Map<string, Tombstone>;
+  /** `${source}\x1f${target}\x1f${type}` (both directions for CONTRADICTS): the same pair under another id. */
+  byPair: Map<string, Tombstone>;
+}
+
+const TOMBSTONE_SNAPSHOT_COLUMNS = ['source_category', 'target_category', 'source_scope', 'target_scope', 'source_count', 'target_count'];
+
+/**
+ * Local tombstones for peer edges: the LATEST `memory-bank resolve --apply` judgment of an edge
+ * (or of a pair), when that judgment deleted or retyped it. A later keep/unresolved judgment
+ * of the same edge or pair cancels the tombstone. Keyed by id+type-before (so a copy of the
+ * edge in its NEW type after a retype is still welcome) and by (source, target, type-before)
+ * so a peer copy with a different id is caught too. Empty when the log table does not exist.
+ */
+function resolveTombstones(db: Database.Database): Tombstones {
+  const out: Tombstones = { byId: new Map(), byPair: new Map() };
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'relation_resolution_log'").get();
+  if (!exists) return out;
+  const have = new Set((db.prepare('PRAGMA table_info(relation_resolution_log)').all() as Array<{ name: string }>).map((c) => c.name));
+  const snap = TOMBSTONE_SNAPSHOT_COLUMNS.map((c) => (have.has(c) ? c : `NULL AS ${c}`)).join(', ');
+  const rows = db
+    .prepare(
+      `SELECT relation_id, action, relation_type_before, source_fact_id, target_fact_id, source_fact, target_fact, ${snap}
+       FROM relation_resolution_log ORDER BY id ASC`,
+    )
+    .all() as Array<Tombstone & { relation_id: string; action: string; relation_type_before: string }>;
+  for (const r of rows) {
+    const type = r.relation_type_before;
+    const idKey = `${r.relation_id}\x1f${type}`;
+    const pairKeys = [tripleKey(r.source_fact_id, r.target_fact_id, type)];
+    if (type === 'CONTRADICTS') pairKeys.push(tripleKey(r.target_fact_id, r.source_fact_id, type));
+    if (r.action === 'delete' || r.action === 'retype') {
+      const { relation_id: _id, action: _a, relation_type_before: _t, ...tomb } = r;
+      out.byId.set(idKey, tomb);
+      for (const k of pairKeys) out.byPair.set(k, tomb);
+    } else {
+      // The latest word on this edge/pair is not a removal: nothing to block (ascending ids → last wins).
+      out.byId.delete(idKey);
+      for (const k of pairKeys) out.byPair.delete(k);
+    }
+  }
+  return out;
+}
+
+/**
+ * A tombstone blocks only while both facts still read as the judgment saw them. Text always
+ * compares; category/scope/count compare when the row recorded them. A fact that is gone
+ * cannot anchor a valid edge anyway, so a missing fact leaves the tombstone in force.
+ */
+function tombstoneStillValid(db: Database.Database, t: Tombstone): boolean {
+  const same = (id: string, text: string, category: string | null, scope: string | null, count: number | null): boolean => {
+    const f = db
+      .prepare('SELECT fact, category, scope_type, scope_project, consolidated_count FROM facts WHERE id = ?')
+      .get(id) as { fact: string; category: string; scope_type: string; scope_project: string | null; consolidated_count: number } | undefined;
+    if (!f) return true;
+    if (f.fact !== text) return false;
+    if (category != null && f.category !== category) return false;
+    if (scope != null && `${f.scope_type}:${f.scope_project ?? ''}` !== scope) return false;
+    if (count != null && f.consolidated_count !== count) return false;
+    return true;
+  };
+  return (
+    same(t.source_fact_id, t.source_fact, t.source_category, t.source_scope, t.source_count) &&
+    same(t.target_fact_id, t.target_fact, t.target_category, t.target_scope, t.target_count)
+  );
+}
+
+export async function importFromSync(): Promise<{
+  newFacts: number;
+  newDomains: number;
+  newCategories: number;
+  newRelations: number;
+  /** Peer edges not re-inserted because this machine already judged them away (resolve delete/retype). */
+  skippedTombstoned: number;
+}> {
   const syncDir = getSyncDir();
-  const result = { newFacts: 0, newDomains: 0, newCategories: 0, newRelations: 0 };
+  const result = { newFacts: 0, newDomains: 0, newCategories: 0, newRelations: 0, skippedTombstoned: 0 };
 
   // Check if sync files exist
   const factsPath = path.join(syncDir, 'facts.jsonl');
@@ -197,6 +292,9 @@ export async function importFromSync(): Promise<{ newFacts: number; newDomains: 
     const relationsPath = path.join(syncDir, 'ontology-relations.jsonl');
     if (fs.existsSync(relationsPath)) {
       const lines = fs.readFileSync(relationsPath, 'utf-8').split('\n').filter(l => l.trim());
+      // Edges this machine already judged away must not come back from a peer that still has
+      // them (observed 2026-10-05: 226 of 264 resolve-deleted edges re-imported within hours).
+      const tombstones = resolveTombstones(db);
       for (const line of lines) {
         try {
           const r = JSON.parse(line);
@@ -208,6 +306,11 @@ export async function importFromSync(): Promise<{ newFacts: number; newDomains: 
           // Remap can collapse both endpoints onto one fact — a self-loop
           // carries no information.
           if (source === target) continue;
+          const tomb = tombstones.byId.get(`${r.id}\x1f${r.relation_type}`) ?? tombstones.byPair.get(tripleKey(source, target, r.relation_type));
+          if (tomb && tombstoneStillValid(db, tomb)) {
+            result.skippedTombstoned++;
+            continue;
+          }
           // Remap can also land on an edge that already exists locally —
           // same semantics as the extraction channels: symmetric types
           // (SUPPORTS/CONTRADICTS) dedupe in either direction, directional

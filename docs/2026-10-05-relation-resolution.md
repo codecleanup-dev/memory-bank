@@ -35,6 +35,10 @@
 
 적대 리뷰(push 게이트, 2026-10-05) 반영: JSONL 만 쓰던 아카이브를 DB 트랜잭션 로그로 바꿨고, 재확인을 쓰기 트랜잭션 안으로 넣고 비교 필드를 늘렸고, 400자 절단 입력으로 팩트를 퇴역시키던 경로를 막았다.
 
+## 크로스머신 import 와의 관계 (1.12.6)
+
+이 머신에서 지운 간선은 peer 의 export 에 그대로 남아 있어 다음 `importFromSync` 가 되살렸다(실측 226/264). 그래서 import 는 `relation_resolution_log` 의 `delete`·`retype` 행을 tombstone(id 와 (source, target, type-before) 쌍, CONTRADICTS 는 양방향)으로 보고 그 간선을 넣지 않는다. 이미 되살아난 간선은 `--replan` 이 기록된 판정으로 다시 정리한다(keep 뿐 아니라 delete·retype 기록도 재적용). peer 쪽 큐는 그대로이며, 삭제를 peer 로 전파하는 것은 별도 설계다.
+
 ## 상류 수정
 
 관계 추출 프롬프트(`DETECT_RELATION_SYSTEM_PROMPT`)에 "CONTRADICTS/SUPERSEDES 는 두 사실이 같은 질문에 답할 때만" 을 명시하고 응답에 `same_question` 을 요구한다. 코드가 그 필드를 검사해 `true` 가 아닌 CONTRADICTS/SUPERSEDES 는 저장하지 않는다. 프롬프트 문구만 바꾸는 것은 결정론 바닥이 아니므로 코드 게이트를 둔다.
