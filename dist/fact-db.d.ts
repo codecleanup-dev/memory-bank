@@ -66,7 +66,18 @@ export declare function deactivateFact(db: Database.Database, id: string): void;
 export declare function deleteFact(db: Database.Database, id: string): void;
 export declare function insertRevision(db: Database.Database, params: InsertRevisionParams): string;
 export declare function getRevisions(db: Database.Database, factId: string): FactRevision[];
-export declare function searchSimilarFacts(db: Database.Database, embedding: number[], project: string | null, limit?: number, threshold?: number): Array<{
+/**
+ * [fork v0-3] opts.minCreatedAt: created_at 날짜 접두가 이 값보다 앞인 fact 를 후보 walk 에서
+ * 건너뛴다 (세션 주입의 유산 컷오프). 스코프 필터와 같은 자리에서 걸러내므로 limit 슬롯을
+ * 차지하지 않는다. opts.stats 를 주면 건너뛴 수를 heritageSkipped 에 더한다 (관측용).
+ */
+export interface SearchSimilarFactsOpts {
+    minCreatedAt?: string | null;
+    stats?: {
+        heritageSkipped: number;
+    };
+}
+export declare function searchSimilarFacts(db: Database.Database, embedding: number[], project: string | null, limit?: number, threshold?: number, opts?: SearchSimilarFactsOpts): Array<{
     fact: Fact;
     distance: number;
 }>;

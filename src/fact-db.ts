@@ -4,6 +4,7 @@ import type { Fact, FactRevision } from './types.js';
 import { canonicalizeProject } from './project-canon.js';
 import { EMBEDDING_VERSION } from './embeddings.js';
 import { normalizeFactCategory } from './fact-category.js';
+import { isHeritageFact } from './heritage.js';
 import { getVecTableDtype, embeddingToVecBlob, vecParamSql, normalizeVecDistance, l2DistanceToSimilarity } from './db.js';
 
 type FactVecTable = 'vec_facts' | 'vec_facts_kr' | 'vec_categories';
@@ -335,14 +336,26 @@ export function getRevisions(db: Database.Database, factId: string): FactRevisio
   ).all(factId) as FactRevision[];
 }
 
+/**
+ * [fork v0-3] opts.minCreatedAt: created_at 날짜 접두가 이 값보다 앞인 fact 를 후보 walk 에서
+ * 건너뛴다 (세션 주입의 유산 컷오프). 스코프 필터와 같은 자리에서 걸러내므로 limit 슬롯을
+ * 차지하지 않는다. opts.stats 를 주면 건너뛴 수를 heritageSkipped 에 더한다 (관측용).
+ */
+export interface SearchSimilarFactsOpts {
+  minCreatedAt?: string | null;
+  stats?: { heritageSkipped: number };
+}
+
 export function searchSimilarFacts(
   db: Database.Database,
   embedding: number[],
   project: string | null,
   limit: number = 5,
   threshold: number = 0.85,
+  opts: SearchSimilarFactsOpts = {},
 ): Array<{ fact: Fact; distance: number }> {
   const canonProject = project ? canonicalizeProject(db, project) : project;
+  const minCreatedAt = opts.minCreatedAt ?? null;
 
   // Search both language indexes: the query language is unknown, and
   // multilingual models score same-language pairs far higher than
@@ -398,6 +411,11 @@ export function searchSimilarFacts(
     const fact = rowToFact(row);
     // Scope filter: same project or global only
     if (canonProject && fact.scope_type === 'project' && fact.scope_project !== canonProject) continue;
+    // [fork v0-3] Heritage cutoff: skipped here, not after truncation, so it never steals a slot.
+    if (isHeritageFact(fact, minCreatedAt)) {
+      if (opts.stats) opts.stats.heritageSkipped += 1;
+      continue;
+    }
 
     results.push({ fact, distance: vr.distance });
     if (results.length >= limit) break;

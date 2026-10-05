@@ -6,6 +6,7 @@ import { getRelatedFacts } from './ontology-db.js';
 import { detectRepeat, formatRepeatContext } from './repeat-detector.js';
 import { appendInjectLog } from './inject-log.js';
 import { loadLedger, appendLedger } from './inject-ledger.js';
+import { heritageCutoff, isHeritageFact } from './heritage.js';
 const TOP_K = 5;
 // Probe-baseline relevance gate (e5 scores are compressed, so absolute
 // thresholds cannot separate relevant from irrelevant). A fact is injected
@@ -37,65 +38,8 @@ export function surpriseWeight(env = process.env) {
     const raw = parseFloat(env.MEMORY_BANK_INJECT_SURPRISE_WEIGHT ?? '');
     return Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0;
 }
-/**
- * [fork v0-3, 2026-10-05] Heritage cutoff for session injection.
- *
- * Facts created before this date are the original author's memory documents
- * imported during the 2026-03~04 cc-sync intake (the "Hugh standards" series and
- * session-memory imports), not this user's own decisions. Measured 2026-10-05:
- * 38 of 7,312 injected facts in 30 days were heritage, including "Hugh의 인지
- * 아키텍처와 자기 모델" 3x. They stay fully searchable (search / search_facts /
- * graph tools) — only the automatic UserPromptSubmit injection skips them.
- * Archive of the affected rows: docs/archive/heritage-facts-20261005.md.
- *
- * MEMORY_BANK_INJECT_HERITAGE_CUTOFF: ISO date (YYYY-MM-DD) to move the cutoff,
- * '' or 'off' to disable. Unset → DEFAULT_HERITAGE_CUTOFF. Malformed → default
- * (fail-closed toward the measured behaviour, not toward injecting heritage).
- */
-export const DEFAULT_HERITAGE_CUTOFF = '2026-05-01';
-export function heritageCutoff(env = process.env) {
-    const raw = env.MEMORY_BANK_INJECT_HERITAGE_CUTOFF;
-    if (raw === undefined)
-        return DEFAULT_HERITAGE_CUTOFF;
-    const v = raw.trim();
-    if (v === '' || v.toLowerCase() === 'off')
-        return null;
-    return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : DEFAULT_HERITAGE_CUTOFF;
-}
-/** created_at 날짜 접두(YYYY-MM-DD)가 컷오프보다 앞이면 유산. created_at 이 비어 있으면 유산으로 보지 않는다. */
-export function isHeritageFact(fact, cutoff) {
-    if (!cutoff)
-        return false;
-    const d = (fact.created_at ?? '').slice(0, 10);
-    return d.length === 10 && d < cutoff;
-}
-/**
- * 유산을 TOP_K 뒤에서 걸러내면 유산이 검색 슬롯을 차지해, 바로 다음 순위의 유효한 fact 가
- * 후보에 들지 못한다 (적대 리뷰 HIGH, 2026-10-05: 상위 TOP_K 가 전부 유산이면 no-match).
- * 그래서 첫 조회에서 유산이 하나라도 걸러졌고 TOP_K 가 차지 않으면 한도를 넓혀 한 번 더
- * 조회한다. 유산은 활성 fact 의 약 2.5% 라 8배 한도(기본 40)면 실측 분포에서 충분하고,
- * 재조회는 최대 1회로 묶어 지연 상한을 고정한다. 순수 함수 — fetch 를 주입해 시험한다.
- */
-export const HERITAGE_REFETCH_FACTOR = 8;
-export function selectInjectCandidates(fetch, topK, cutoff) {
-    const split = (rows) => {
-        const keep = [];
-        let dropped = 0;
-        for (const r of rows) {
-            if (isHeritageFact(r.fact, cutoff))
-                dropped += 1;
-            else
-                keep.push(r);
-        }
-        return { keep, dropped };
-    };
-    const first = split(fetch(topK));
-    if (first.dropped === 0 || first.keep.length >= topK) {
-        return { candidates: first.keep, heritageExcluded: first.dropped, refetched: false };
-    }
-    const second = split(fetch(topK * HERITAGE_REFETCH_FACTOR));
-    return { candidates: second.keep.slice(0, topK), heritageExcluded: second.dropped, refetched: true };
-}
+// [fork v0-3] 유산 컷오프 — 정의는 heritage.ts (fact-db 와 공유). 기존 import 경로를 위해 재수출.
+export { DEFAULT_HERITAGE_CUTOFF, heritageCutoff, isHeritageFact } from './heritage.js';
 const NOOP_COMMIT = () => { };
 export async function computeInjectContext(userPrompt, project, via, sessionId) {
     // 하위호환 래퍼: 전달 확인 채널이 없는 호출자는 즉시 커밋 (기존 의미 유지)
@@ -120,13 +64,14 @@ export async function computeInjectContextDeferred(userPrompt, project, via, ses
         {
             // threshold 0: take top-k by distance, then gate by baseline margin below
             // [fork v0-3] 유산 fact(원작자 수입분)는 주입 후보에서 뺀다. 검색 도구에는 그대로 남는다.
-            // 걸러낸 뒤 TOP_K 가 차지 않으면 한도를 넓혀 1회 재조회 (selectInjectCandidates 주석).
+            // 검색 단계(searchSimilarFacts 의 후보 walk)에서 걸러내므로 유산이 TOP_K 슬롯을
+            // 차지하지 않는다 — 스코프 필터와 같은 자리, 같은 overfetch 풀 (적대 리뷰 HIGH 반영).
             const cutoff = heritageCutoff();
-            const selected = selectInjectCandidates((limit) => searchSimilarFacts(db, embedding, project, limit, 0), TOP_K, cutoff);
-            const candidates = selected.candidates;
-            const heritageLog = selected.heritageExcluded > 0
-                ? { heritage_excluded: selected.heritageExcluded, ...(selected.refetched ? { heritage_refetch: true } : {}) }
-                : {};
+            const heritageStats = { heritageSkipped: 0 };
+            const candidates = searchSimilarFacts(db, embedding, project, TOP_K, 0, {
+                minCreatedAt: cutoff, stats: heritageStats,
+            });
+            const heritageLog = heritageStats.heritageSkipped > 0 ? { heritage_excluded: heritageStats.heritageSkipped } : {};
             const results = candidates.filter((r) => {
                 const similarity = l2DistanceToSimilarity(r.distance);
                 return similarity - baseline >= BASELINE_MARGIN;

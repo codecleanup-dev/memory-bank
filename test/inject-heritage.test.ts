@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import Database from 'better-sqlite3';
 import { suppressConsole } from './test-utils.js';
-import {
-  DEFAULT_HERITAGE_CUTOFF,
-  HERITAGE_REFETCH_FACTOR,
-  heritageCutoff,
-  isHeritageFact,
-  selectInjectCandidates,
-} from '../src/inject-core.js';
+import { initDatabase } from '../src/db.js';
+import { insertFact, searchSimilarFacts } from '../src/fact-db.js';
+import { DEFAULT_HERITAGE_CUTOFF, heritageCutoff, isHeritageFact } from '../src/inject-core.js';
 
 suppressConsole();
 
@@ -64,60 +64,67 @@ describe('isHeritageFact', () => {
 
 /**
  * 적대 리뷰 HIGH (2026-10-05): TOP_K 뒤에서 걸러내면 유산이 슬롯을 차지해 바로 다음 순위의
- * 유효한 fact 가 밀려난다. fetch 를 주입해 그 경로를 고정한다. 순위가 낮을수록 뒤에 온다.
+ * 유효한 fact 가 밀려난다. 그래서 컷오프는 searchSimilarFacts 의 후보 walk 안에서 적용된다.
+ * 실제 vec 테이블로 고정한다: 유산 5개가 질의와 거리 0 으로 최상위를 차지하고, 최신 fact 3개가
+ * 그 뒤에 온다. limit 3 이면 유산 없이 최신 3개가 전부 나와야 한다.
  */
-describe('selectInjectCandidates (slot-stealing guard)', () => {
+describe('searchSimilarFacts minCreatedAt (search-stage exclusion)', () => {
+  let db: Database.Database;
+  const testDir = path.join(os.tmpdir(), 'inject-heritage-test-' + Date.now());
+  const dbPath = path.join(testDir, 'test.db');
   const cutoff = '2026-05-01';
-  const TOP_K = 5;
-  const heritage = (i: number) => ({ fact: { id: `h${i}`, created_at: '2026-04-01' }, distance: 0.1 + i * 0.01 });
-  const recent = (i: number) => ({ fact: { id: `r${i}`, created_at: '2026-09-01' }, distance: 0.2 + i * 0.01 });
-  // 전체 순위: 유산 5개가 상위, 그 뒤에 최신 fact 6개
-  const ranked = [heritage(0), heritage(1), heritage(2), heritage(3), heritage(4),
-    recent(0), recent(1), recent(2), recent(3), recent(4), recent(5)];
-  const fetchRanked = (calls: number[]) => (limit: number) => { calls.push(limit); return ranked.slice(0, limit); };
 
-  it('top-K all heritage → refetches with a wider limit and returns the next valid facts', () => {
-    const calls: number[] = [];
-    const r = selectInjectCandidates(fetchRanked(calls), TOP_K, cutoff);
-    expect(calls).toEqual([TOP_K, TOP_K * HERITAGE_REFETCH_FACTOR]);
-    expect(r.refetched).toBe(true);
-    expect(r.candidates.map((c) => c.fact.id)).toEqual(['r0', 'r1', 'r2', 'r3', 'r4']); // sliced to TOP_K, order kept
-    expect(r.heritageExcluded).toBe(5);
+  /** Deterministic 384-dim one-hot vectors: identical → distance 0, distinct → √2. */
+  function oneHot(index: number): number[] {
+    const v = new Array(384).fill(0);
+    v[index % 384] = 1;
+    return v;
+  }
+  function insertAt(fact: string, vecIndex: number, createdAt: string): string {
+    const id = insertFact(db, {
+      fact, category: 'decision', scope_type: 'global', scope_project: null,
+      source_exchange_ids: [], embedding: oneHot(vecIndex),
+    });
+    db.prepare('UPDATE facts SET created_at = ? WHERE id = ?').run(createdAt, id);
+    return id;
+  }
+
+  beforeEach(() => {
+    fs.mkdirSync(testDir, { recursive: true });
+    process.env.TEST_DB_PATH = dbPath;
+    db = initDatabase();
+    for (let i = 0; i < 5; i++) insertAt(`heritage ${i}`, 0, '2026-04-0' + (i + 1) + 'T00:00:00.000Z');
+    for (let i = 0; i < 3; i++) insertAt(`recent ${i}`, 1, '2026-09-0' + (i + 1) + 'T00:00:00.000Z');
   });
 
-  it('partially heritage → refetch fills the slots; the post-filter list never exceeds TOP_K', () => {
-    const calls: number[] = [];
-    const mixed = [recent(0), heritage(0), recent(1), heritage(1), recent(2), recent(3), recent(4), recent(5)];
-    const r = selectInjectCandidates((limit) => { calls.push(limit); return mixed.slice(0, limit); }, TOP_K, cutoff);
-    expect(calls).toEqual([TOP_K, TOP_K * HERITAGE_REFETCH_FACTOR]);
-    expect(r.candidates.map((c) => c.fact.id)).toEqual(['r0', 'r1', 'r2', 'r3', 'r4']);
-    expect(r.heritageExcluded).toBe(2);
+  afterEach(() => {
+    db.close();
+    delete process.env.TEST_DB_PATH;
+    fs.rmSync(testDir, { recursive: true, force: true });
   });
 
-  it('no heritage in the first fetch → single fetch, nothing dropped', () => {
-    const calls: number[] = [];
-    const clean = [recent(0), recent(1), recent(2), recent(3), recent(4), heritage(0)];
-    const r = selectInjectCandidates((limit) => { calls.push(limit); return clean.slice(0, limit); }, TOP_K, cutoff);
-    expect(calls).toEqual([TOP_K]);
-    expect(r.refetched).toBe(false);
-    expect(r.heritageExcluded).toBe(0);
-    expect(r.candidates).toHaveLength(5);
+  it('heritage rows ranked above the limit do not consume slots; recent rows fill them', () => {
+    const stats = { heritageSkipped: 0 };
+    const r = searchSimilarFacts(db, oneHot(0), null, 3, 0, { minCreatedAt: cutoff, stats });
+    expect(r.map((x) => x.fact.fact).sort()).toEqual(['recent 0', 'recent 1', 'recent 2']); // 동거리 행의 순서는 미정의 — 집합으로 비교
+    expect(stats.heritageSkipped).toBe(5);
+    expect(r.every((x) => !isHeritageFact(x.fact, cutoff))).toBe(true);
   });
 
-  it('filter disabled (null cutoff) → heritage is kept and no refetch happens', () => {
-    const calls: number[] = [];
-    const r = selectInjectCandidates(fetchRanked(calls), TOP_K, null);
-    expect(calls).toEqual([TOP_K]);
-    expect(r.candidates.map((c) => c.fact.id)).toEqual(['h0', 'h1', 'h2', 'h3', 'h4']);
-    expect(r.heritageExcluded).toBe(0);
+  it('without the option the heritage rows win the slots (baseline behaviour unchanged)', () => {
+    const r = searchSimilarFacts(db, oneHot(0), null, 3, 0);
+    expect(r.map((x) => x.fact.fact).every((f) => f.startsWith('heritage '))).toBe(true); expect(r).toHaveLength(3);
   });
 
-  it('refetch is bounded to one extra query even when the wider window is still all heritage', () => {
-    const calls: number[] = [];
-    const allHeritage = Array.from({ length: 60 }, (_, i) => heritage(i));
-    const r = selectInjectCandidates((limit) => { calls.push(limit); return allHeritage.slice(0, limit); }, TOP_K, cutoff);
-    expect(calls).toHaveLength(2);
-    expect(r.candidates).toEqual([]);
-    expect(r.heritageExcluded).toBe(TOP_K * HERITAGE_REFETCH_FACTOR);
+  it('minCreatedAt null (filter disabled) behaves like the baseline and records nothing', () => {
+    const stats = { heritageSkipped: 0 };
+    const r = searchSimilarFacts(db, oneHot(0), null, 3, 0, { minCreatedAt: null, stats });
+    expect(r.map((x) => x.fact.fact).every((f) => f.startsWith('heritage '))).toBe(true); expect(r).toHaveLength(3);
+    expect(stats.heritageSkipped).toBe(0);
+  });
+
+  it('stats is optional: skipping still works without a counter', () => {
+    const r = searchSimilarFacts(db, oneHot(0), null, 5, 0, { minCreatedAt: cutoff });
+    expect(r.map((x) => x.fact.fact).sort()).toEqual(['recent 0', 'recent 1', 'recent 2']); // 동거리 행의 순서는 미정의 — 집합으로 비교
   });
 });

@@ -23992,6 +23992,21 @@ function initDatabase() {
   return db;
 }
 
+// src/heritage.ts
+var DEFAULT_HERITAGE_CUTOFF = "2026-05-01";
+function heritageCutoff(env = process.env) {
+  const raw = env.MEMORY_BANK_INJECT_HERITAGE_CUTOFF;
+  if (raw === void 0) return DEFAULT_HERITAGE_CUTOFF;
+  const v2 = raw.trim();
+  if (v2 === "" || v2.toLowerCase() === "off") return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(v2) ? v2 : DEFAULT_HERITAGE_CUTOFF;
+}
+function isHeritageFact(fact, cutoff) {
+  if (!cutoff) return false;
+  const d2 = (fact.created_at ?? "").slice(0, 10);
+  return d2.length === 10 && d2 < cutoff;
+}
+
 // src/fact-db.ts
 function vecParamFor(db, table, embedding) {
   const dt = getVecTableDtype(db, table);
@@ -24002,8 +24017,9 @@ function getRevisions(db, factId) {
     "SELECT * FROM fact_revisions WHERE fact_id = ? ORDER BY created_at DESC"
   ).all(factId);
 }
-function searchSimilarFacts(db, embedding, project, limit = 5, threshold = 0.85) {
+function searchSimilarFacts(db, embedding, project, limit = 5, threshold = 0.85, opts = {}) {
   const canonProject = project ? canonicalizeProject(db, project) : project;
+  const minCreatedAt = opts.minCreatedAt ?? null;
   const candidateFetch = Math.max(limit * 2, 50);
   const fetch2 = (table) => {
     try {
@@ -24036,6 +24052,10 @@ function searchSimilarFacts(db, embedding, project, limit = 5, threshold = 0.85)
     if (!row) continue;
     const fact = rowToFact(row);
     if (canonProject && fact.scope_type === "project" && fact.scope_project !== canonProject) continue;
+    if (isHeritageFact(fact, minCreatedAt)) {
+      if (opts.stats) opts.stats.heritageSkipped += 1;
+      continue;
+    }
     results.push({ fact, distance: vr.distance });
     if (results.length >= limit) break;
   }
@@ -25021,37 +25041,6 @@ function surpriseWeight(env = process.env) {
   const raw = parseFloat(env.MEMORY_BANK_INJECT_SURPRISE_WEIGHT ?? "");
   return Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0;
 }
-var DEFAULT_HERITAGE_CUTOFF = "2026-05-01";
-function heritageCutoff(env = process.env) {
-  const raw = env.MEMORY_BANK_INJECT_HERITAGE_CUTOFF;
-  if (raw === void 0) return DEFAULT_HERITAGE_CUTOFF;
-  const v2 = raw.trim();
-  if (v2 === "" || v2.toLowerCase() === "off") return null;
-  return /^\d{4}-\d{2}-\d{2}$/.test(v2) ? v2 : DEFAULT_HERITAGE_CUTOFF;
-}
-function isHeritageFact(fact, cutoff) {
-  if (!cutoff) return false;
-  const d2 = (fact.created_at ?? "").slice(0, 10);
-  return d2.length === 10 && d2 < cutoff;
-}
-var HERITAGE_REFETCH_FACTOR = 8;
-function selectInjectCandidates(fetch2, topK, cutoff) {
-  const split = (rows) => {
-    const keep = [];
-    let dropped = 0;
-    for (const r of rows) {
-      if (isHeritageFact(r.fact, cutoff)) dropped += 1;
-      else keep.push(r);
-    }
-    return { keep, dropped };
-  };
-  const first = split(fetch2(topK));
-  if (first.dropped === 0 || first.keep.length >= topK) {
-    return { candidates: first.keep, heritageExcluded: first.dropped, refetched: false };
-  }
-  const second = split(fetch2(topK * HERITAGE_REFETCH_FACTOR));
-  return { candidates: second.keep.slice(0, topK), heritageExcluded: second.dropped, refetched: true };
-}
 var NOOP_COMMIT = () => {
 };
 async function computeInjectContextDeferred(userPrompt, project, via, sessionId) {
@@ -25067,13 +25056,12 @@ async function computeInjectContextDeferred(userPrompt, project, via, sessionId)
     const db = getSearchDb();
     {
       const cutoff = heritageCutoff();
-      const selected = selectInjectCandidates(
-        (limit) => searchSimilarFacts(db, embedding, project, limit, 0),
-        TOP_K,
-        cutoff
-      );
-      const candidates = selected.candidates;
-      const heritageLog = selected.heritageExcluded > 0 ? { heritage_excluded: selected.heritageExcluded, ...selected.refetched ? { heritage_refetch: true } : {} } : {};
+      const heritageStats = { heritageSkipped: 0 };
+      const candidates = searchSimilarFacts(db, embedding, project, TOP_K, 0, {
+        minCreatedAt: cutoff,
+        stats: heritageStats
+      });
+      const heritageLog = heritageStats.heritageSkipped > 0 ? { heritage_excluded: heritageStats.heritageSkipped } : {};
       const results = candidates.filter((r) => {
         const similarity = l2DistanceToSimilarity(r.distance);
         return similarity - baseline >= BASELINE_MARGIN;
