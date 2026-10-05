@@ -14,28 +14,70 @@ import { relationExistsBetween } from './ontology-db.js';
 function tripleKey(source, target, type) {
     return `${source}\x1f${target}\x1f${type}`;
 }
+const TOMBSTONE_SNAPSHOT_COLUMNS = ['source_category', 'target_category', 'source_scope', 'target_scope', 'source_count', 'target_count'];
 /**
- * Local tombstones for peer edges: every edge `memory-bank resolve --apply` deleted or retyped,
- * keyed by its id AND by (source, target, type-before) so a peer copy with a different id (the
- * same pair extracted independently over there) is caught too. CONTRADICTS is symmetric, so
- * both directions are keyed. Empty when the log table does not exist yet.
+ * Local tombstones for peer edges: the LATEST `memory-bank resolve --apply` judgment of an edge
+ * (or of a pair), when that judgment deleted or retyped it. A later keep/unresolved judgment
+ * of the same edge or pair cancels the tombstone. Keyed by id+type-before (so a copy of the
+ * edge in its NEW type after a retype is still welcome) and by (source, target, type-before)
+ * so a peer copy with a different id is caught too. Empty when the log table does not exist.
  */
 function resolveTombstones(db) {
-    const out = new Set();
+    const out = { byId: new Map(), byPair: new Map() };
     const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'relation_resolution_log'").get();
     if (!exists)
         return out;
+    const have = new Set(db.prepare('PRAGMA table_info(relation_resolution_log)').all().map((c) => c.name));
+    const snap = TOMBSTONE_SNAPSHOT_COLUMNS.map((c) => (have.has(c) ? c : `NULL AS ${c}`)).join(', ');
     const rows = db
-        .prepare(`SELECT relation_id, source_fact_id, target_fact_id, relation_type_before
-       FROM relation_resolution_log WHERE action IN ('delete', 'retype')`)
+        .prepare(`SELECT relation_id, action, relation_type_before, source_fact_id, target_fact_id, source_fact, target_fact, ${snap}
+       FROM relation_resolution_log ORDER BY id ASC`)
         .all();
     for (const r of rows) {
-        out.add(r.relation_id);
-        out.add(tripleKey(r.source_fact_id, r.target_fact_id, r.relation_type_before));
-        if (r.relation_type_before === 'CONTRADICTS')
-            out.add(tripleKey(r.target_fact_id, r.source_fact_id, r.relation_type_before));
+        const type = r.relation_type_before;
+        const idKey = `${r.relation_id}\x1f${type}`;
+        const pairKeys = [tripleKey(r.source_fact_id, r.target_fact_id, type)];
+        if (type === 'CONTRADICTS')
+            pairKeys.push(tripleKey(r.target_fact_id, r.source_fact_id, type));
+        if (r.action === 'delete' || r.action === 'retype') {
+            const { relation_id: _id, action: _a, relation_type_before: _t, ...tomb } = r;
+            out.byId.set(idKey, tomb);
+            for (const k of pairKeys)
+                out.byPair.set(k, tomb);
+        }
+        else {
+            // The latest word on this edge/pair is not a removal: nothing to block (ascending ids → last wins).
+            out.byId.delete(idKey);
+            for (const k of pairKeys)
+                out.byPair.delete(k);
+        }
     }
     return out;
+}
+/**
+ * A tombstone blocks only while both facts still read as the judgment saw them. Text always
+ * compares; category/scope/count compare when the row recorded them. A fact that is gone
+ * cannot anchor a valid edge anyway, so a missing fact leaves the tombstone in force.
+ */
+function tombstoneStillValid(db, t) {
+    const same = (id, text, category, scope, count) => {
+        const f = db
+            .prepare('SELECT fact, category, scope_type, scope_project, consolidated_count FROM facts WHERE id = ?')
+            .get(id);
+        if (!f)
+            return true;
+        if (f.fact !== text)
+            return false;
+        if (category != null && f.category !== category)
+            return false;
+        if (scope != null && `${f.scope_type}:${f.scope_project ?? ''}` !== scope)
+            return false;
+        if (count != null && f.consolidated_count !== count)
+            return false;
+        return true;
+    };
+    return (same(t.source_fact_id, t.source_fact, t.source_category, t.source_scope, t.source_count) &&
+        same(t.target_fact_id, t.target_fact, t.target_category, t.target_scope, t.target_count));
 }
 export async function importFromSync() {
     const syncDir = getSyncDir();
@@ -193,7 +235,8 @@ export async function importFromSync() {
                     // carries no information.
                     if (source === target)
                         continue;
-                    if (tombstones.has(r.id) || tombstones.has(tripleKey(source, target, r.relation_type))) {
+                    const tomb = tombstones.byId.get(`${r.id}\x1f${r.relation_type}`) ?? tombstones.byPair.get(tripleKey(source, target, r.relation_type));
+                    if (tomb && tombstoneStillValid(db, tomb)) {
                         result.skippedTombstoned++;
                         continue;
                     }

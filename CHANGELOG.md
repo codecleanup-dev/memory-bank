@@ -6,14 +6,17 @@ _resolve 가 지운 간선이 크로스머신 import 로 되살아나는 구멍.
 peer(macbookair) export 로 다시 들어왔다(큐 386 → 551). 재분류·퇴역은 기존 id 를 건드리지 않는 import 라 살아남았다._
 
 ### Fixed
-- **`importFromSync`**: 이 머신의 `relation_resolution_log` 에 `delete`·`retype` 로 기록된 간선을 tombstone 으로 보고
-  다시 넣지 않는다. id 로도, (source, target, type-before) 쌍으로도 키잉하므로 peer 가 같은 쌍을 다른 id 로 가지고
-  있어도 걸린다(CONTRADICTS 는 양방향). 결과에 `skippedTombstoned`. 로그 테이블이 없으면 tombstone 없음.
+- **`importFromSync`**: 이 머신의 `relation_resolution_log` 에서 간선(또는 쌍)의 **최신** 판정이 `delete`·`retype` 이면
+  tombstone 으로 보고 다시 넣지 않는다. id+이전 유형으로도(재분류 뒤의 새 유형으로 오는 사본은 받는다), (source, target,
+  type-before) 쌍으로도 키잉하므로 peer 가 같은 쌍을 다른 id 로 가지고 있어도 걸린다(CONTRADICTS 는 양방향). 뒤에 keep·
+  unresolved 판정이 붙으면 tombstone 은 풀리고, 두 팩트가 판정 당시 스냅샷(본문·카테고리·scope·확인 횟수)과 다르게
+  읽히면 적용하지 않는다. 결과에 `skippedTombstoned`. 로그 테이블이 없으면 tombstone 없음.
 - **`memory-bank resolve --replan`**: keep 뿐 아니라 `delete`·`retype` 기록도 재적용 대상이다. 같은 id 의 간선이
   큐에 되살아났고 판정 입력이 기록과 같으면, 기록된 판정에 오늘의 정책을 다시 적용해 정리한다(모델 호출 없음).
 
 ### Tests
-- `test/sync-export-import.test.ts` +1 (id tombstone·역방향 쌍 tombstone 은 건너뛰고 미판정 간선만 들어옴),
+- `test/sync-export-import.test.ts` +1 (id tombstone·역방향 쌍 tombstone 은 건너뛰고, 새 유형의 같은 id·뒤에 keep 이 붙은
+  쌍·본문이 바뀐 쌍·미판정 간선은 들어옴),
   `test/relation-resolve.test.ts` +1 (되살아난 삭제 간선을 replan 이 다시 지움, 판정기 미호출).
 
 ## [1.12.5] - 2026-10-05
