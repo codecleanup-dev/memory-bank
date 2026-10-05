@@ -65,7 +65,13 @@ export interface JudgeVerdict {
 export type PairJudge = (pairs: ConflictPair[]) => Promise<JudgeVerdict[] | null>;
 
 /** Edge-only actions (retype / delete) need this much committee confidence. */
-export const EDGE_ACTION_THRESHOLD = 0.8;
+/**
+ * Edge actions (delete / retype) are reversible through relation_resolution_log, so they
+ * need less certainty than retiring a fact. 0.8 → 0.6 on 2026-10-05 (Lucy): the sonnet
+ * committee's lower-median confidence for "unrelated / compatible" sat at 0.55–0.75 on
+ * 374 of 459 live pairs, so 0.8 left 80% of the queue untouched.
+ */
+export const EDGE_ACTION_THRESHOLD = 0.6;
 /** Retiring a fact needs more: it changes what the graph answers. */
 export const DEACTIVATE_THRESHOLD = 0.9;
 export const DEFAULT_BATCH_SIZE = 8;
@@ -418,6 +424,8 @@ export interface ResolveOptions {
 export interface ResolveSummary {
   type: ConflictType;
   mode: 'dry-run' | 'apply';
+  /** `judge`: verdicts came from the committee this run; `log`: replanned from recorded verdicts (no model calls). */
+  source: 'judge' | 'log';
   examined: number;
   judged: number;
   unparseableBatches: number;
@@ -831,6 +839,7 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
   const summary: ResolveSummary = {
     type,
     mode: opts.apply ? 'apply' : 'dry-run',
+    source: 'judge',
     examined: pairs.length,
     judged: 0,
     unparseableBatches: 0,
@@ -918,8 +927,107 @@ export async function resolveQueue(db: Database.Database, type: ConflictType, op
   return summary;
 }
 
+interface LoggedVerdict {
+  id: number;
+  verdict: string;
+  confidence: number;
+  judge_reasoning: string | null;
+}
+
+/** Latest log row per relation for this type (any action), with the committee's verdict. */
+function latestLoggedVerdicts(db: Database.Database, type: ConflictType): Map<string, LoggedVerdict & { action: string }> {
+  const out = new Map<string, LoggedVerdict & { action: string }>();
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'relation_resolution_log'").get();
+  if (!exists) return out;
+  const rows = db
+    .prepare(
+      `SELECT id, relation_id, action, verdict, confidence, judge_reasoning
+       FROM relation_resolution_log WHERE relation_type_before = ? ORDER BY id ASC`,
+    )
+    .all(type) as Array<LoggedVerdict & { relation_id: string; action: string }>;
+  for (const r of rows) out.set(r.relation_id, r); // ascending ids: the last write wins
+  return out;
+}
+
+export interface ReplanOptions {
+  apply: boolean;
+  archivePath?: string;
+  onProgress?: (line: string) => void;
+}
+
+/**
+ * Re-plan from recorded verdicts: for every active pair whose latest log row is a `keep`
+ * with a committee verdict, and whose judged inputs are still exactly what the committee
+ * saw, run today's policy (thresholds) on the recorded verdict + confidence. No model
+ * calls. This is how a threshold change reaches pairs that were already judged without
+ * paying for a second judgment: the verdict is the same, only the policy moved.
+ */
+export function replanFromLog(db: Database.Database, type: ConflictType, opts: ReplanOptions): ResolveSummary {
+  const archivePath = opts.archivePath ?? defaultArchivePath();
+  const allowed = verdictSet(type);
+  if (opts.apply) ensureResolutionLog(db);
+  const snapshots = judgedSnapshots(db, type);
+  const verdicts = latestLoggedVerdicts(db, type);
+  const summary: ResolveSummary = {
+    type,
+    mode: opts.apply ? 'apply' : 'dry-run',
+    source: 'log',
+    examined: 0,
+    judged: 0,
+    unparseableBatches: 0,
+    planned: { keep: 0, retype: 0, delete: 0, deactivate: 0 },
+    applied: {},
+    archiveErrors: 0,
+    spoiledPairs: 0,
+    previouslyJudged: 0,
+    judgeFailures: 0,
+    unavailableBatches: 0,
+    pairs: [],
+    archivePath,
+  };
+  for (const pair of listActiveConflicts(db, type, 1_000_000)) {
+    const logged = verdicts.get(pair.relationId);
+    // Only a recorded `keep` with a real verdict qualifies: unresolved rows carry no verdict,
+    // and acted-on rows mean the edge is no longer the one that was judged.
+    if (!logged || logged.action !== 'keep' || !allowed.has(logged.verdict)) continue;
+    // The committee's verdict is reusable only while the pair is exactly what it judged.
+    if (!alreadyJudged(pair, snapshots.get(pair.relationId))) {
+      summary.previouslyJudged++;
+      continue;
+    }
+    summary.examined++;
+    summary.judged++;
+    const action = planAction(pair, logged.verdict as Verdict, logged.confidence);
+    summary.planned[action.kind]++;
+    if (action.kind === 'keep') continue; // the policy still says keep: nothing to re-record
+    const reasoning = `${logged.judge_reasoning ?? ''} [replanned from log #${logged.id}]`.trim().slice(0, 300);
+    const resolved: ResolvedPair = {
+      relationId: pair.relationId,
+      relationType: type,
+      sourceId: pair.source.id,
+      targetId: pair.target.id,
+      verdict: logged.verdict,
+      confidence: logged.confidence,
+      judgeReasoning: reasoning,
+      planned: action.kind,
+      reason: action.reason,
+    };
+    if (opts.apply) {
+      const { result, record } = applyAction(db, pair, action, logged.verdict, logged.confidence, reasoning);
+      if (result) {
+        resolved.applied = result;
+        summary.applied[result] = (summary.applied[result] ?? 0) + 1;
+      }
+      if (record && !mirrorArchive(archivePath, record)) summary.archiveErrors++;
+    }
+    summary.pairs.push(resolved);
+  }
+  opts.onProgress?.(`replan: ${summary.judged} recorded verdict(s) re-planned, planned ${JSON.stringify(summary.planned)}`);
+  return summary;
+}
+
 export function formatResolveSummary(summary: ResolveSummary, listLimit: number = 25): string {
-  let out = `# Resolution pass: ${summary.type} (${summary.mode})\n\n`;
+  let out = `# Resolution pass: ${summary.type} (${summary.mode}${summary.source === 'log' ? ', replanned from log' : ''})\n\n`;
   out += `| Metric | Value |\n|--------|-------|\n`;
   out += `| Pairs examined | ${summary.examined} |\n`;
   out += `| Pairs judged | ${summary.judged} |\n`;
@@ -927,7 +1035,7 @@ export function formatResolveSummary(summary: ResolveSummary, listLimit: number 
   out += `| Spoiled pairs (no usable verdict) | ${summary.spoiledPairs} |\n`;
   out += `| Judge votes that never arrived | ${summary.judgeFailures} |\n`;
   out += `| Batches left for a later run (judge unavailable) | ${summary.unavailableBatches} |\n`;
-  out += `| Skipped: judged by an earlier run | ${summary.previouslyJudged} |\n`;
+  out += `| ${summary.source === 'log' ? 'Skipped: pair changed since it was judged' : 'Skipped: judged by an earlier run'} | ${summary.previouslyJudged} |\n`;
   for (const [k, n] of Object.entries(summary.planned)) out += `| Planned: ${k} | ${n} |\n`;
   for (const [k, n] of Object.entries(summary.applied)) out += `| Applied: ${k} | ${n} |\n`;
   out += `| Log | table relation_resolution_log (same transaction as each change) |\n`;

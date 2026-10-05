@@ -11,6 +11,7 @@ import {
   committeePairJudge,
   parseIntegerOption,
   planAction,
+  replanFromLog,
   resolveModelId,
   resolveQueue,
   type JudgeVerdict,
@@ -156,7 +157,7 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       const rel2 = createRelation(db, c, 'CONTRADICTS', d, 'noise');
       const judge = tableJudge({
         'sessions use JWT': { verdict: 'TRUE_CONFLICT', confidence: 0.95 },
-        'logs go to stdout': { verdict: 'UNRELATED', confidence: 0.6 },
+        'logs go to stdout': { verdict: 'UNRELATED', confidence: 0.55 },
       });
 
       const summary = await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
@@ -165,7 +166,7 @@ describe('relation resolve (gated consistency queue resolution)', () => {
       expect(summary.applied).toEqual({});
       expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS');
       expect(relation(db, rel2.id)?.relation_type).toBe('CONTRADICTS');
-      expect(summary.pairs.find((p) => p.relationId === rel2.id)?.reason).toContain('< 0.8');
+      expect(summary.pairs.find((p) => p.relationId === rel2.id)?.reason).toContain('< 0.6');
       expect(fs.existsSync(archive)).toBe(false);
     } finally {
       db.close();
@@ -1044,6 +1045,86 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     }
   });
 
+  it('replan from log: a recorded keep whose verdict now clears the policy is acted on without any model call', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'kept at the old bar');
+      const b = mkFact(db, 'its partner');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const c = mkFact(db, 'true conflict A');
+      const d = mkFact(db, 'true conflict B');
+      const conflict = createRelation(db, c, 'CONTRADICTS', d, 'n');
+      // Simulate the earlier policy: the committee said "related, not conflicting" at 0.7 and the
+      // run recorded keep (the old threshold was 0.8). TRUE_CONFLICT stays for a human either way.
+      const judge = tableJudge({
+        'kept at the old bar': { verdict: 'RELATED_NOT_CONFLICTING', confidence: 0.7 },
+        'true conflict A': { verdict: 'TRUE_CONFLICT', confidence: 0.9 },
+      });
+      // Run with a policy snapshot that keeps 0.7: emulate by recording directly, then replan.
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      // Both pairs are recorded; the 0.7 pair was already retyped by today's policy, so rewind it to a keep row
+      // to model "judged under a stricter policy" without re-running the committee.
+      db.prepare("UPDATE ontology_relations SET relation_type = 'CONTRADICTS', reasoning = 'n' WHERE id = ?").run(rel.id);
+      db.prepare("UPDATE relation_resolution_log SET action = 'keep', relation_type_after = 'CONTRADICTS', source_after = NULL, target_after = NULL, note = 'confidence 0.7 < 0.8', reasoning_before = 'n' WHERE relation_id = ?").run(rel.id);
+      const never: PairJudge = async () => {
+        throw new Error('the replan must not call the judge');
+      };
+
+      const dry = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: false });
+      expect(dry.source).toBe('log');
+      expect(dry.judged).toBe(2);
+      expect(dry.planned).toEqual({ keep: 1, retype: 1, delete: 0, deactivate: 0 });
+      expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS'); // dry run changed nothing
+
+      const applied = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
+      expect(applied.applied).toEqual({ retyped: 1 });
+      expect(relation(db, rel.id)?.relation_type).toBe('INFLUENCES');
+      expect(relation(db, conflict.id)?.relation_type).toBe('CONTRADICTS');
+      const row = db.prepare("SELECT judge_reasoning FROM relation_resolution_log WHERE relation_id = ? AND action = 'retype'").get(rel.id) as { judge_reasoning: string };
+      expect(row.judge_reasoning).toContain('[replanned from log #');
+      // Nothing is left to replan: the retyped edge is no longer a CONTRADICTS pair, the conflict stays keep.
+      const again = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
+      expect(again.judged).toBe(1);
+      expect(again.applied).toEqual({});
+      // And the regular judged path was never needed for this.
+      await expect(resolveQueue(db, 'CONTRADICTS', { apply: false, limit: 0, judge: never, votes: 1, archivePath: archive })).resolves.toMatchObject({ examined: 0 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('replan from log skips a pair whose inputs changed since the committee judged it, and ignores rows without a verdict', async () => {
+    const db = initDatabase();
+    try {
+      const a = mkFact(db, 'changed since');
+      const b = mkFact(db, 'partner');
+      const rel = createRelation(db, a, 'CONTRADICTS', b, 'n');
+      const judge = tableJudge({ 'changed since': { verdict: 'UNRELATED', confidence: 0.55 } }); // kept under today's policy
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge, archivePath: archive });
+      // The committee's confidence would clear a lower bar, but the fact text moved on.
+      db.prepare('UPDATE facts SET fact = ? WHERE id = ?').run('changed since (edited)', a);
+      db.prepare('UPDATE relation_resolution_log SET confidence = 0.95 WHERE relation_id = ?').run(rel.id);
+
+      const summary = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
+
+      expect(summary.judged).toBe(0);
+      expect(summary.previouslyJudged).toBe(1);
+      expect(relation(db, rel.id)?.relation_type).toBe('CONTRADICTS');
+
+      // An unresolved row (no verdict) is never replanned.
+      const c = mkFact(db, 'no verdict one');
+      const d = mkFact(db, 'no verdict two');
+      const stuck = createRelation(db, c, 'CONTRADICTS', d, 'n');
+      const none: PairJudge = async () => null;
+      await resolveQueue(db, 'CONTRADICTS', { apply: true, limit: 0, judge: none, archivePath: archive });
+      const second = replanFromLog(db, 'CONTRADICTS', { archivePath: archive, apply: true });
+      expect(second.judged).toBe(0);
+      expect(relation(db, stuck.id)?.relation_type).toBe('CONTRADICTS');
+    } finally {
+      db.close();
+    }
+  });
+
   it('parseIntegerOption accepts only whole-string safe integers', () => {
     expect(parseIntegerOption('0', 0)).toBe(0);
     expect(parseIntegerOption(' 200 ', 0)).toBe(200);
@@ -1070,8 +1151,9 @@ describe('relation resolve (gated consistency queue resolution)', () => {
     const pair = (relationType: 'CONTRADICTS' | 'SUPERSEDES') => ({
       relationId: 'r', relationType, reasoning: null, createdAt: '2026-10-01T00:00:00Z', source: slim('s', 'S'), target: slim('t', 'T'),
     });
-    expect(planAction(pair('CONTRADICTS'), 'UNRELATED', 0.8).kind).toBe('delete');
-    expect(planAction(pair('CONTRADICTS'), 'UNRELATED', 0.79).kind).toBe('keep');
+    expect(planAction(pair('CONTRADICTS'), 'UNRELATED', 0.6).kind).toBe('delete');
+    expect(planAction(pair('CONTRADICTS'), 'UNRELATED', 0.59).kind).toBe('keep');
+    expect(planAction(pair('CONTRADICTS'), 'RELATED_NOT_CONFLICTING', 0.6).kind).toBe('retype');
     expect(planAction(pair('CONTRADICTS'), 'TRUE_CONFLICT', 1).kind).toBe('keep');
     expect(planAction(pair('SUPERSEDES'), 'TARGET_REDUNDANT', 0.9)).toMatchObject({ kind: 'deactivate', loserId: 't', survivorId: 's' });
     expect(planAction(pair('SUPERSEDES'), 'TARGET_REDUNDANT', 0.89).kind).toBe('keep');

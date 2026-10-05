@@ -46,7 +46,13 @@ export interface JudgeVerdict {
 /** Returns verdicts, or null when the output was unparseable (that batch is skipped). */
 export type PairJudge = (pairs: ConflictPair[]) => Promise<JudgeVerdict[] | null>;
 /** Edge-only actions (retype / delete) need this much committee confidence. */
-export declare const EDGE_ACTION_THRESHOLD = 0.8;
+/**
+ * Edge actions (delete / retype) are reversible through relation_resolution_log, so they
+ * need less certainty than retiring a fact. 0.8 → 0.6 on 2026-10-05 (Lucy): the sonnet
+ * committee's lower-median confidence for "unrelated / compatible" sat at 0.55–0.75 on
+ * 374 of 459 live pairs, so 0.8 left 80% of the queue untouched.
+ */
+export declare const EDGE_ACTION_THRESHOLD = 0.6;
 /** Retiring a fact needs more: it changes what the graph answers. */
 export declare const DEACTIVATE_THRESHOLD = 0.9;
 export declare const DEFAULT_BATCH_SIZE = 8;
@@ -147,6 +153,8 @@ export interface ResolveOptions {
 export interface ResolveSummary {
     type: ConflictType;
     mode: 'dry-run' | 'apply';
+    /** `judge`: verdicts came from the committee this run; `log`: replanned from recorded verdicts (no model calls). */
+    source: 'judge' | 'log';
     examined: number;
     judged: number;
     unparseableBatches: number;
@@ -167,4 +175,17 @@ export interface ResolveSummary {
 }
 export declare function defaultArchivePath(): string;
 export declare function resolveQueue(db: Database.Database, type: ConflictType, opts: ResolveOptions): Promise<ResolveSummary>;
+export interface ReplanOptions {
+    apply: boolean;
+    archivePath?: string;
+    onProgress?: (line: string) => void;
+}
+/**
+ * Re-plan from recorded verdicts: for every active pair whose latest log row is a `keep`
+ * with a committee verdict, and whose judged inputs are still exactly what the committee
+ * saw, run today's policy (thresholds) on the recorded verdict + confidence. No model
+ * calls. This is how a threshold change reaches pairs that were already judged without
+ * paying for a second judgment: the verdict is the same, only the policy moved.
+ */
+export declare function replanFromLog(db: Database.Database, type: ConflictType, opts: ReplanOptions): ResolveSummary;
 export declare function formatResolveSummary(summary: ResolveSummary, listLimit?: number): string;
