@@ -15,9 +15,16 @@ _간선 행동 임계값 0.8 → 0.6 (Lucy 결정, 2026-10-05) 과, 임계값 �
   재사용하고, 변경된 쌍·unresolved 행·이미 행동한 행은 건너뛴다. 결과 로그 행의 judge_reasoning 에
   `[replanned from log #id]` 를 남긴다. `--rejudge` 와 함께 쓸 수 없다. 요약에 `source: judge | log`.
 
+### Fixed
+- **`callHaiku` per-call 타임아웃** (`MEMORY_BANK_LLM_CALL_TIMEOUT_MS`, 기본 180초, 상한 10분): Agent SDK 호출에
+  `abortController` 를 넘기고 시간이 지나면 끊어 `timeout` 사유의 transient 에러로 던진다(재시도 → 소진 시 throw →
+  위원회에서는 결석 표). 2026-10-05 라이브 런에서 판정 호출 하나가 CPU 0 으로 25분 매달려 136배치 런 전체가 멈춘 실측.
+  타임아웃은 유료 API 폴백으로 넘어가지 않는다.
+
 ### Tests
 - `test/relation-resolve.test.ts` +2 (기록된 keep 판정을 모델 호출 없이 재계획·적용·재실행 멱등, 입력이 바뀐 쌍과
   unresolved 행은 건너뜀), 정책 테스트 임계값 재고정(0.6/0.59, RELATED_NOT_CONFLICTING 0.6 → retype).
+- `test/llm-retry.test.ts` +2 (매달린 호출을 타임아웃으로 끊고 다음 시도가 성공하면 반환, 소진 시 timeout 사유로 throw).
 
 ## [1.12.2] - 2026-10-05
 

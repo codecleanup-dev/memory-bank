@@ -26975,8 +26975,21 @@ function backoffMs(attempt) {
   return Math.min(base * Math.pow(3, attempt), MAX_BACKOFF_MS);
 }
 var sleep2 = (ms) => ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve();
+var DEFAULT_CALL_TIMEOUT_MS = 18e4;
+var MAX_CALL_TIMEOUT_MS = 6e5;
+function callTimeoutMs() {
+  const raw = process.env.MEMORY_BANK_LLM_CALL_TIMEOUT_MS;
+  if (raw != null && /^\d+$/.test(raw.trim())) return Math.max(1, Math.min(MAX_CALL_TIMEOUT_MS, parseInt(raw.trim(), 10)));
+  return DEFAULT_CALL_TIMEOUT_MS;
+}
+function callTimeoutError(ms) {
+  return new Error(`LLM call timeout after ${ms} ms (aborted)`);
+}
 async function callOnce(systemPrompt, userMessage, maxTokens) {
   const model = process.env.MEMORY_BANK_FACT_MODEL || "haiku";
+  const timeoutMs = callTimeoutMs();
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), timeoutMs);
   try {
     for await (const message of query({
       prompt: `${systemPrompt}
@@ -26997,7 +27010,8 @@ ${userMessage}`,
         // in three). A pure text classifier never needs a tool.
         tools: [],
         settingSources: [],
-        cwd: llmWorkdir()
+        cwd: llmWorkdir(),
+        abortController: abort
       }
     })) {
       if (message && typeof message === "object" && "type" in message && message.type === "result") {
@@ -27009,8 +27023,10 @@ ${userMessage}`,
         return m2.result || "";
       }
     }
+    if (abort.signal.aborted) throw callTimeoutError(timeoutMs);
     return "";
   } catch (agentSdkError) {
+    if (abort.signal.aborted) throw callTimeoutError(timeoutMs);
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.MEMORY_BANK_API_TOKEN;
     if (!apiKey) {
       throw agentSdkError;
@@ -27026,6 +27042,8 @@ ${userMessage}`,
     });
     const textBlock = response.content.find((b2) => b2.type === "text");
     return textBlock?.text || "";
+  } finally {
+    clearTimeout(timer);
   }
 }
 async function callHaiku(systemPrompt, userMessage, maxTokens = 2048) {

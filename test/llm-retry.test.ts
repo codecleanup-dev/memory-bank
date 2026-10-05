@@ -18,6 +18,8 @@ const scenarios: Array<{
   subtype?: string;
   is_error?: boolean;
   errors?: string[];
+  /** never yields; ends only when the caller's abortController fires (models a hung transport) */
+  hang?: boolean;
 }> = [];
 let queryCalls = 0;
 let lastQueryOptions: Record<string, unknown> | undefined;
@@ -30,6 +32,16 @@ vi.mock('@anthropic-ai/claude-agent-sdk', () => ({
     return {
       async *[Symbol.asyncIterator]() {
         if (scenario?.throws) throw scenario.throws;
+        if (scenario?.hang) {
+          // Behave like the real SDK under abort: stay silent until the signal fires, then stop.
+          const signal = (lastQueryOptions?.abortController as AbortController | undefined)?.signal;
+          await new Promise<void>((resolve) => {
+            if (!signal) return; // no controller → hang forever (the test would time out — that is the point)
+            if (signal.aborted) return resolve();
+            signal.addEventListener('abort', () => resolve(), { once: true });
+          });
+          return;
+        }
         if (scenario?.noResultMessage) return; // 스트림이 result 없이 끝남
         if (scenario?.subtype) {
           yield {
@@ -62,6 +74,7 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env.MEMORY_BANK_LLM_RETRY_BASE_MS;
   delete process.env.MEMORY_BANK_LLM_RETRIES;
+  delete process.env.MEMORY_BANK_LLM_CALL_TIMEOUT_MS;
 });
 
 describe('callHaiku 재시도/복구', () => {
@@ -70,6 +83,26 @@ describe('callHaiku 재시도/복구', () => {
     scenarios.push({ result: '{"ok":true}' });
     await callHaiku('sys', 'user');
     expect(lastQueryOptions).toMatchObject({ maxTurns: 1, tools: [], settingSources: [] });
+  });
+
+  it('AC0b: 응답이 오지 않는 호출은 per-call 타임아웃으로 끊고 transient 로 재시도한다 (매달린 전송이 런을 멈추지 못함)', async () => {
+    const { callHaiku } = await llm();
+    process.env.MEMORY_BANK_LLM_CALL_TIMEOUT_MS = '40';
+    scenarios.push({ hang: true }, { result: 'late but fine' });
+    const started = Date.now();
+    expect(await callHaiku('sys', 'user')).toBe('late but fine');
+    expect(queryCalls).toBe(2);
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(lastQueryOptions?.abortController).toBeInstanceOf(AbortController);
+  });
+
+  it('AC0c: 타임아웃이 재시도까지 소진되면 사유가 timeout 인 에러로 throw 한다', async () => {
+    const { callHaiku } = await llm();
+    process.env.MEMORY_BANK_LLM_CALL_TIMEOUT_MS = '30';
+    process.env.MEMORY_BANK_LLM_RETRIES = '1';
+    scenarios.push({ hang: true });
+    await expect(callHaiku('sys', 'user')).rejects.toThrow(/LLM call timeout after 30 ms/);
+    expect(queryCalls).toBe(2);
   });
 
   it('AC1: 빈 응답을 재시도하고, 재시도가 성공하면 결과를 반환한다', async () => {
