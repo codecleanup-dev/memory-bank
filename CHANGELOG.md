@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.12.6] - 2026-10-05
+
+_resolve 가 지운 간선이 크로스머신 import 로 되살아나는 구멍. 1.12.3 라이브 런에서 삭제 264 중 226 이 몇 시간 안에
+peer(macbookair) export 로 다시 들어왔다(큐 386 → 551). 재분류·퇴역은 기존 id 를 건드리지 않는 import 라 살아남았다._
+
+### Fixed
+- **`importFromSync`**: 이 머신의 `relation_resolution_log` 에 `delete`·`retype` 로 기록된 간선을 tombstone 으로 보고
+  다시 넣지 않는다. id 로도, (source, target, type-before) 쌍으로도 키잉하므로 peer 가 같은 쌍을 다른 id 로 가지고
+  있어도 걸린다(CONTRADICTS 는 양방향). 결과에 `skippedTombstoned`. 로그 테이블이 없으면 tombstone 없음.
+- **`memory-bank resolve --replan`**: keep 뿐 아니라 `delete`·`retype` 기록도 재적용 대상이다. 같은 id 의 간선이
+  큐에 되살아났고 판정 입력이 기록과 같으면, 기록된 판정에 오늘의 정책을 다시 적용해 정리한다(모델 호출 없음).
+
+### Tests
+- `test/sync-export-import.test.ts` +1 (id tombstone·역방향 쌍 tombstone 은 건너뛰고 미판정 간선만 들어옴),
+  `test/relation-resolve.test.ts` +1 (되살아난 삭제 간선을 replan 이 다시 지움, 판정기 미호출).
+
 ## [1.12.5] - 2026-10-05
 
 _memory 계층 재설계 v1 첫 묶음. v0 실행에서 드러난 구멍 둘(벡터 없는 fact 가 현재 스탬프로 저장돼 재임베딩에서 영구 누락,

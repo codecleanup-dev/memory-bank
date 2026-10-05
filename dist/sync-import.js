@@ -11,9 +11,35 @@ import { relationExistsBetween } from './ontology-db.js';
  * Only inserts records that don't already exist (by ID).
  * Generates embeddings for new facts.
  */
+function tripleKey(source, target, type) {
+    return `${source}\x1f${target}\x1f${type}`;
+}
+/**
+ * Local tombstones for peer edges: every edge `memory-bank resolve --apply` deleted or retyped,
+ * keyed by its id AND by (source, target, type-before) so a peer copy with a different id (the
+ * same pair extracted independently over there) is caught too. CONTRADICTS is symmetric, so
+ * both directions are keyed. Empty when the log table does not exist yet.
+ */
+function resolveTombstones(db) {
+    const out = new Set();
+    const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'relation_resolution_log'").get();
+    if (!exists)
+        return out;
+    const rows = db
+        .prepare(`SELECT relation_id, source_fact_id, target_fact_id, relation_type_before
+       FROM relation_resolution_log WHERE action IN ('delete', 'retype')`)
+        .all();
+    for (const r of rows) {
+        out.add(r.relation_id);
+        out.add(tripleKey(r.source_fact_id, r.target_fact_id, r.relation_type_before));
+        if (r.relation_type_before === 'CONTRADICTS')
+            out.add(tripleKey(r.target_fact_id, r.source_fact_id, r.relation_type_before));
+    }
+    return out;
+}
 export async function importFromSync() {
     const syncDir = getSyncDir();
-    const result = { newFacts: 0, newDomains: 0, newCategories: 0, newRelations: 0 };
+    const result = { newFacts: 0, newDomains: 0, newCategories: 0, newRelations: 0, skippedTombstoned: 0 };
     // Check if sync files exist
     const factsPath = path.join(syncDir, 'facts.jsonl');
     if (!fs.existsSync(factsPath)) {
@@ -152,6 +178,9 @@ export async function importFromSync() {
         const relationsPath = path.join(syncDir, 'ontology-relations.jsonl');
         if (fs.existsSync(relationsPath)) {
             const lines = fs.readFileSync(relationsPath, 'utf-8').split('\n').filter(l => l.trim());
+            // Edges this machine already judged away must not come back from a peer that still has
+            // them (observed 2026-10-05: 226 of 264 resolve-deleted edges re-imported within hours).
+            const tombstones = resolveTombstones(db);
             for (const line of lines) {
                 try {
                     const r = JSON.parse(line);
@@ -164,6 +193,10 @@ export async function importFromSync() {
                     // carries no information.
                     if (source === target)
                         continue;
+                    if (tombstones.has(r.id) || tombstones.has(tripleKey(source, target, r.relation_type))) {
+                        result.skippedTombstoned++;
+                        continue;
+                    }
                     // Remap can also land on an edge that already exists locally —
                     // same semantics as the extraction channels: symmetric types
                     // (SUPPORTS/CONTRADICTS) dedupe in either direction, directional

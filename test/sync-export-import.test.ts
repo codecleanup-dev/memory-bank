@@ -145,6 +145,57 @@ describe('sync-export/import', () => {
     expect(result.newRelations).toBe(1);
   });
 
+  it('does not re-insert peer edges this machine already resolved away (tombstones by id and by pair)', async () => {
+    const { getSyncDir } = await import('../src/sync-export.js');
+    const syncDir = getSyncDir();
+    const now = new Date().toISOString();
+    const fact = (id: string, text: string) =>
+      JSON.stringify({
+        id, fact: text, category: 'decision', scope_type: 'global', scope_project: null,
+        source_exchange_ids: '[]', created_at: now, updated_at: now, consolidated_count: 1,
+      }) + '\n';
+    fs.writeFileSync(path.join(syncDir, 'facts.jsonl'), fact('tf-1', 'tomb one') + fact('tf-2', 'tomb two') + fact('tf-3', 'tomb three'));
+    // Facts land first so the log rows can name local ids; then seed what resolve recorded.
+    const { importFromSync } = await import('../src/sync-import.js');
+    const first = await importFromSync();
+    expect(first.newFacts).toBe(3);
+    const { initDatabase } = await import('../src/db.js');
+    const { ensureResolutionLog } = await import('../src/relation-resolve.js');
+    const db = initDatabase();
+    try {
+      ensureResolutionLog(db);
+      const seed = db.prepare(
+        `INSERT INTO relation_resolution_log (ts, action, relation_id, relation_type_before, source_fact_id, target_fact_id,
+           source_fact, target_fact, verdict, confidence)
+         VALUES (?, ?, ?, ?, ?, ?, 'x', 'y', 'UNRELATED', 0.9)`,
+      );
+      seed.run(now, 'delete', 'peer-rel-deleted', 'CONTRADICTS', 'tf-1', 'tf-2'); // same id as the peer's copy
+      seed.run(now, 'retype', 'local-rel-retyped', 'CONTRADICTS', 'tf-2', 'tf-3'); // peer has the pair under another id
+    } finally {
+      db.close();
+    }
+    fs.writeFileSync(
+      path.join(syncDir, 'ontology-relations.jsonl'),
+      JSON.stringify({ id: 'peer-rel-deleted', source_fact_id: 'tf-1', relation_type: 'CONTRADICTS', target_fact_id: 'tf-2', reasoning: 'r', created_at: now }) + '\n' +
+        // reversed direction, different id: CONTRADICTS is symmetric, still the same judged pair
+        JSON.stringify({ id: 'peer-rel-other-id', source_fact_id: 'tf-3', relation_type: 'CONTRADICTS', target_fact_id: 'tf-2', reasoning: 'r', created_at: now }) + '\n' +
+        // never judged here: must still come in
+        JSON.stringify({ id: 'peer-rel-fresh', source_fact_id: 'tf-1', relation_type: 'INFLUENCES', target_fact_id: 'tf-3', reasoning: 'r', created_at: now }) + '\n',
+    );
+
+    const second = await importFromSync();
+
+    expect(second.newRelations).toBe(1);
+    expect(second.skippedTombstoned).toBe(2);
+    const check = initDatabase();
+    try {
+      const ids = (check.prepare('SELECT id FROM ontology_relations ORDER BY id').all() as Array<{ id: string }>).map((r) => r.id);
+      expect(ids).toEqual(['peer-rel-fresh']);
+    } finally {
+      check.close();
+    }
+  });
+
   it('should normalize out-of-vocabulary categories from legacy sync files instead of dropping them', async () => {
     // Sync files written by machines that predate the facts.category CHECK
     // can carry 'requirement' / enum-echo / 'null' categories — those rows

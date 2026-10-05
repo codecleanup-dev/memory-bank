@@ -819,6 +819,8 @@ function logRowIsLatest(db, type, relationId, rowId) {
         .get(type, relationId);
     return r.id === rowId;
 }
+/** Log actions whose recorded verdict a replan may re-apply (see replanFromLog). */
+const REPLANNABLE_ACTIONS = new Set(['keep', 'delete', 'retype']);
 /**
  * Re-plan from recorded verdicts: for every active pair whose latest log row is a `keep`
  * with a committee verdict, and whose judged inputs are still exactly what the committee
@@ -858,9 +860,11 @@ export function replanFromLog(db, type, opts) {
         if (limit > 0 && actionable >= limit)
             break;
         const logged = rows.get(pair.relationId);
-        // Only a recorded `keep` with a real verdict qualifies: unresolved rows carry no verdict,
-        // and acted-on rows mean the edge is no longer the one that was judged.
-        if (!logged || logged.action !== 'keep' || !allowed.has(logged.verdict))
+        // A recorded verdict qualifies when it is a `keep`, or a `delete`/`retype` whose edge is
+        // nevertheless back in the queue (re-imported from a peer, or reverted): the recorded
+        // verdict still answers today's policy. Unresolved rows carry no verdict; a `deactivate`
+        // row's loser is inactive and never reaches this loop.
+        if (!logged || !REPLANNABLE_ACTIONS.has(logged.action) || !allowed.has(logged.verdict))
             continue;
         // The committee's verdict is reusable only while the pair is exactly what it judged
         // (snapshot and verdict come from the same row). A row without the fact dates (written

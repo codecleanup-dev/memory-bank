@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import type Database from 'better-sqlite3';
 import { initDatabase, getVecTableDtype, embeddingToVecBlob, vecParamSql } from './db.js';
 import { generateEmbedding, initEmbeddings, EMBEDDING_VERSION } from './embeddings.js';
 import { getSyncDir } from './sync-export.js';
@@ -28,9 +29,44 @@ interface SyncFact {
  * Only inserts records that don't already exist (by ID).
  * Generates embeddings for new facts.
  */
-export async function importFromSync(): Promise<{ newFacts: number; newDomains: number; newCategories: number; newRelations: number }> {
+function tripleKey(source: string, target: string, type: string): string {
+  return `${source}\x1f${target}\x1f${type}`;
+}
+
+/**
+ * Local tombstones for peer edges: every edge `memory-bank resolve --apply` deleted or retyped,
+ * keyed by its id AND by (source, target, type-before) so a peer copy with a different id (the
+ * same pair extracted independently over there) is caught too. CONTRADICTS is symmetric, so
+ * both directions are keyed. Empty when the log table does not exist yet.
+ */
+function resolveTombstones(db: Database.Database): Set<string> {
+  const out = new Set<string>();
+  const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'relation_resolution_log'").get();
+  if (!exists) return out;
+  const rows = db
+    .prepare(
+      `SELECT relation_id, source_fact_id, target_fact_id, relation_type_before
+       FROM relation_resolution_log WHERE action IN ('delete', 'retype')`,
+    )
+    .all() as Array<{ relation_id: string; source_fact_id: string; target_fact_id: string; relation_type_before: string }>;
+  for (const r of rows) {
+    out.add(r.relation_id);
+    out.add(tripleKey(r.source_fact_id, r.target_fact_id, r.relation_type_before));
+    if (r.relation_type_before === 'CONTRADICTS') out.add(tripleKey(r.target_fact_id, r.source_fact_id, r.relation_type_before));
+  }
+  return out;
+}
+
+export async function importFromSync(): Promise<{
+  newFacts: number;
+  newDomains: number;
+  newCategories: number;
+  newRelations: number;
+  /** Peer edges not re-inserted because this machine already judged them away (resolve delete/retype). */
+  skippedTombstoned: number;
+}> {
   const syncDir = getSyncDir();
-  const result = { newFacts: 0, newDomains: 0, newCategories: 0, newRelations: 0 };
+  const result = { newFacts: 0, newDomains: 0, newCategories: 0, newRelations: 0, skippedTombstoned: 0 };
 
   // Check if sync files exist
   const factsPath = path.join(syncDir, 'facts.jsonl');
@@ -197,6 +233,9 @@ export async function importFromSync(): Promise<{ newFacts: number; newDomains: 
     const relationsPath = path.join(syncDir, 'ontology-relations.jsonl');
     if (fs.existsSync(relationsPath)) {
       const lines = fs.readFileSync(relationsPath, 'utf-8').split('\n').filter(l => l.trim());
+      // Edges this machine already judged away must not come back from a peer that still has
+      // them (observed 2026-10-05: 226 of 264 resolve-deleted edges re-imported within hours).
+      const tombstones = resolveTombstones(db);
       for (const line of lines) {
         try {
           const r = JSON.parse(line);
@@ -208,6 +247,10 @@ export async function importFromSync(): Promise<{ newFacts: number; newDomains: 
           // Remap can collapse both endpoints onto one fact — a self-loop
           // carries no information.
           if (source === target) continue;
+          if (tombstones.has(r.id) || tombstones.has(tripleKey(source, target, r.relation_type))) {
+            result.skippedTombstoned++;
+            continue;
+          }
           // Remap can also land on an edge that already exists locally —
           // same semantics as the extraction channels: symmetric types
           // (SUPPORTS/CONTRADICTS) dedupe in either direction, directional
