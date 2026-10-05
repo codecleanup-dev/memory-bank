@@ -42,6 +42,38 @@ export function surpriseWeight(env: NodeJS.ProcessEnv = process.env): number {
 }
 
 /**
+ * [fork v0-3, 2026-10-05] Heritage cutoff for session injection.
+ *
+ * Facts created before this date are the original author's memory documents
+ * imported during the 2026-03~04 cc-sync intake (the "Hugh standards" series and
+ * session-memory imports), not this user's own decisions. Measured 2026-10-05:
+ * 38 of 7,312 injected facts in 30 days were heritage, including "Hugh의 인지
+ * 아키텍처와 자기 모델" 3x. They stay fully searchable (search / search_facts /
+ * graph tools) — only the automatic UserPromptSubmit injection skips them.
+ * Archive of the affected rows: docs/archive/heritage-facts-20261005.md.
+ *
+ * MEMORY_BANK_INJECT_HERITAGE_CUTOFF: ISO date (YYYY-MM-DD) to move the cutoff,
+ * '' or 'off' to disable. Unset → DEFAULT_HERITAGE_CUTOFF. Malformed → default
+ * (fail-closed toward the measured behaviour, not toward injecting heritage).
+ */
+export const DEFAULT_HERITAGE_CUTOFF = '2026-05-01';
+
+export function heritageCutoff(env: NodeJS.ProcessEnv = process.env): string | null {
+  const raw = env.MEMORY_BANK_INJECT_HERITAGE_CUTOFF;
+  if (raw === undefined) return DEFAULT_HERITAGE_CUTOFF;
+  const v = raw.trim();
+  if (v === '' || v.toLowerCase() === 'off') return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : DEFAULT_HERITAGE_CUTOFF;
+}
+
+/** created_at 날짜 접두(YYYY-MM-DD)가 컷오프보다 앞이면 유산. created_at 이 비어 있으면 유산으로 보지 않는다. */
+export function isHeritageFact(fact: { created_at?: string | null }, cutoff: string | null): boolean {
+  if (!cutoff) return false;
+  const d = (fact.created_at ?? '').slice(0, 10);
+  return d.length === 10 && d < cutoff;
+}
+
+/**
  * Compute the UserPromptSubmit context block for a prompt: top-K similar
  * facts gated by the probe baseline, expanded with 1-hop ontology relations,
  * plus repeated-prompt detection. Returns '' when there is nothing to inject.
@@ -103,7 +135,12 @@ export async function computeInjectContextDeferred(
     {
       // threshold 0: take top-k by distance, then gate by baseline margin below
       const candidates = searchSimilarFacts(db, embedding, project, TOP_K, 0);
+      // [fork v0-3] 유산 fact(원작자 수입분)는 주입 후보에서 뺀다. 검색 도구에는 그대로 남는다.
+      const cutoff = heritageCutoff();
+      const heritageExcluded = candidates.filter((r) => isHeritageFact(r.fact, cutoff)).length;
+      const heritageLog = heritageExcluded > 0 ? { heritage_excluded: heritageExcluded } : {};
       const results = candidates.filter((r) => {
+        if (isHeritageFact(r.fact, cutoff)) return false;
         const similarity = l2DistanceToSimilarity(r.distance);
         return similarity - baseline >= BASELINE_MARGIN;
       });
@@ -112,6 +149,7 @@ export async function computeInjectContextDeferred(
         appendInjectLog({
           status: 'no-match', project, prompt_len: userPrompt.length,
           candidates: candidates.length, injected: 0, duration_ms: Date.now() - t0, via,
+          ...heritageLog,
         });
         return { block: '', commitLedger: NOOP_COMMIT };
       }
@@ -134,6 +172,7 @@ export async function computeInjectContextDeferred(
       for (const { fact } of results.slice(0, 3)) {
         const related = getRelatedFacts(db, fact.id, 1, 0.6, 0.2, project);
         for (const { fact: relFact, relation } of related) {
+          if (isHeritageFact(relFact, cutoff)) continue; // [fork v0-3] 관계 확장분도 같은 기준
           if (!seenIds.has(relFact.id) && expandedFacts.length < MAX_CONTEXT_FACTS) {
             seenIds.add(relFact.id);
             expandedFacts.push({ fact: relFact, note: `[${relation.relation_type}]` });
@@ -151,6 +190,7 @@ export async function computeInjectContextDeferred(
           status: 'deduped', project, prompt_len: userPrompt.length,
           candidates: candidates.length, injected: 0, deduped: dedupedCount,
           duration_ms: Date.now() - t0, via,
+          ...heritageLog,
         });
         return { block: '', commitLedger: NOOP_COMMIT };
       }
@@ -194,6 +234,7 @@ export async function computeInjectContextDeferred(
         duration_ms: Date.now() - t0, via,
         surprise: injectedSurprises,
         ...(w > 0 ? { surprise_w: w } : {}),
+        ...heritageLog,
       });
       // 원장 커밋은 호출자의 전달 확인 뒤로 미룬다 (위 InjectComputation 주석 참조)
       return {

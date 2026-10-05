@@ -5,6 +5,27 @@
  */
 export declare function surpriseWeight(env?: NodeJS.ProcessEnv): number;
 /**
+ * [fork v0-3, 2026-10-05] Heritage cutoff for session injection.
+ *
+ * Facts created before this date are the original author's memory documents
+ * imported during the 2026-03~04 cc-sync intake (the "Hugh standards" series and
+ * session-memory imports), not this user's own decisions. Measured 2026-10-05:
+ * 38 of 7,312 injected facts in 30 days were heritage, including "Hugh의 인지
+ * 아키텍처와 자기 모델" 3x. They stay fully searchable (search / search_facts /
+ * graph tools) — only the automatic UserPromptSubmit injection skips them.
+ * Archive of the affected rows: docs/archive/heritage-facts-20261005.md.
+ *
+ * MEMORY_BANK_INJECT_HERITAGE_CUTOFF: ISO date (YYYY-MM-DD) to move the cutoff,
+ * '' or 'off' to disable. Unset → DEFAULT_HERITAGE_CUTOFF. Malformed → default
+ * (fail-closed toward the measured behaviour, not toward injecting heritage).
+ */
+export declare const DEFAULT_HERITAGE_CUTOFF = "2026-05-01";
+export declare function heritageCutoff(env?: NodeJS.ProcessEnv): string | null;
+/** created_at 날짜 접두(YYYY-MM-DD)가 컷오프보다 앞이면 유산. created_at 이 비어 있으면 유산으로 보지 않는다. */
+export declare function isHeritageFact(fact: {
+    created_at?: string | null;
+}, cutoff: string | null): boolean;
+/**
  * Compute the UserPromptSubmit context block for a prompt: top-K similar
  * facts gated by the probe baseline, expanded with 1-hop ontology relations,
  * plus repeated-prompt detection. Returns '' when there is nothing to inject.

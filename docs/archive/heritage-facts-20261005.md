@@ -1,0 +1,1035 @@
+# 유산 fact 보관 (created_at < 2026-05-01)
+
+- 추출일: 2026-10-05
+- 총 1005건 (활성 1005, 비활성 0)
+- 출처: 2026-03~04 cc-sync 도입 초기에 색인된 원작자(jung-wankim) 메모리 문서와 세션 메모리. Lucy 의 기준이 아니라 원작자의 기준·습관이다 (memory-bank-heritage-corpus 메모리).
+- 처리: 2026-10-05 재설계 v0-3. DB 에는 그대로 두고 세션 자동 주입에서만 제외한다. 검색·그래프에는 남는다.
+- 판별 기준: `created_at < 2026-05-01` (결정론). source_exchange_ids 는 `memory-doc:*` 또는 세션 메모리 수입분.
+
+| 카테고리 | 건수 | 활성 |
+|---|---|---|
+| knowledge | 431 | 431 |
+| pattern | 185 | 185 |
+| constraint | 181 | 181 |
+| preference | 174 | 174 |
+| decision | 34 | 34 |
+
+## knowledge (431)
+
+- `fb92f73b` 2026-03-25 [global] Hook scripts (.sh) apply immediately on next execution; settings.json changes require session restart to take effect
+- `b2c7040d` 2026-03-25 [global] /team Phase 4에서 기능 테스트 공백이 있음 (빌드 성공 = 테스트 완료로 잘못 판단)
+- `d86b5160` 2026-03-25 [global] 테스트 범위: UI 인터랙션, 페이지 네비게이션, API 응답 검증, 시각적 레이아웃 확인
+- `6986bd41` 2026-03-25 [global] Chrome 146 설치 완료, WebMCP 활성화 완료 상태
+- `de44dcba` 2026-03-25 [global] Pencil operates as an MCP server integrated with Claude Code, not as a separate plugin
+- `db7b8f19` 2026-03-25 [global] Current /team structure focuses only on implementation (Phase 3) and lacks functional testing consideration
+- `f8a37f47` 2026-03-25 [global] GitHub Projects V2 lacks built-in transfer feature, requiring manual setup in destination organization
+- `f038266b` 2026-03-25 [global] User is using macOS for development
+- `6da55eea` 2026-03-25 [global] User manages multiple Supabase projects (6 total) under organization mjnxmpcguljvstkxrxun, including StockPicks, golden-ticket, mbti-univercity, trader-hugh, run-stamp, and studio-bot
+- `32e97f7f` 2026-03-25 [global] GitHub Projects V2 cannot be transferred via CLI; manual transfer via web UI is required, unlike repositories which support CLI transfer
+- `692ba81d` 2026-03-25 [global] User has configured Claude Code hooks including session-cleanup, subagent-snapshot, subagent-verify, and task-quality-gate
+- `506633aa` 2026-03-25 [global] User has a manager-orchestrator agent for project orchestration that analyzes ideas, breaks them into tasks, and coordinates specialist agents
+- `0e1b1dd1` 2026-03-25 [global] User has a team-orchestrator agent for large-scale projects that uses Team-based coordination with up to 5 members optimized for cost
+- `1f137154` 2026-03-25 [global] User has configured custom Claude agents for specialized roles: bug-fixer, figma-designer, frontend-specialist, and backend-specialist
+- `efd04057` 2026-03-25 [global] GitHub Secrets take effect immediately without requiring a push to repository
+- `fac0c6ab` 2026-03-25 [global] Workflow file modifications must be pushed to repository before taking effect
+- `c65cccac` 2026-03-25 [global] Supabase CLI does not provide a built-in password reset command for database users
+- `c58eff10` 2026-03-25 [global] Supabase access tokens are stored locally in ~/.config/supabase/access-token
+- `d9b823ea` 2026-03-25 [global] User maintains a cc-sync repository that manages Claude Code configuration including custom agents, slash commands, hooks, skills, and plugins
+- `ba4c0656` 2026-03-25 [global] User works with both Node.js/npm-based projects and HTML/frontend applications
+- `9e36842c` 2026-03-25 [global] User has 12 custom agent definitions configured in ~/.claude/agents/ covering specialized roles (architect, backend, frontend, QA, design, etc.)
+- `c6167842` 2026-03-25 [global] Claude environment configured with 17 enabled plugins including memory, agent SDK, design tools, and code review capabilities
+- `e2fa0a96` 2026-03-25 [global] Telegram notifications enabled for agent operations with bot token and chat ID configured
+- `ab845c7e` 2026-03-25 [global] 12 lifecycle hook scripts deployed in ~/.claude/hooks/ directory for quality gates, validation, and monitoring
+- `9c9160e7` 2026-03-25 [global] User maintains a sophisticated Claude infrastructure with 37 custom agents, 32 skills, and 15 automation hooks in ~/.claude/
+- `acf3e489` 2026-03-25 [global] User operates multiple parallel projects (golden_ticket, factory-auto, hwpx-mcp) sharing the same Claude configuration infrastructure
+- `f802c2f5` 2026-03-25 [global] User has installed 17 plugins for extended Claude functionality
+- `93bbdf72` 2026-03-25 [global] User maintains multiple agent and skill definitions in ~/.claude directory with manager-orchestrator being a significant custom agent
+- `d7a414c4` 2026-03-25 [global] User's Claude Code settings include CLAUDE_AUTO_VALIDATE and CLAUDE_AUTO_RECOVERY enabled
+- `63522b02` 2026-03-25 [global] User's development environment is macOS with ARM64 architecture (darwin/arm64), indicated by the /Users/choa712-mac path structure.
+- `037e48ac` 2026-03-25 [global] User has installed memory skill in Claude Code to persist information across sessions
+- `d5eaaaf3` 2026-03-25 [global] User has installed agent-memory-systems skill covering agent memory architecture and retrieval strategies
+- `82aa9661` 2026-03-25 [global] User has episodic-memory plugin installed from superpowers-marketplace (v1.0.15)
+- `7e44e18d` 2026-03-25 [global] User has claude-mem plugin installed (version 7.1.14) for persistent memory across Claude Code sessions
+- `a6a6924b` 2026-03-25 [global] User has episodic-memory plugin enabled in Claude settings
+- `394ce7c6` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / Flutter 환경 설정 / Flutter 경로: Flutter가 PATH에 없음.
+- `e20a9d48` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / Flutter 환경 설정 / Flutter 경로: flutter 명령어 사용 불가.
+- `5391cd68` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / 최근 작업 내역 / 2025-10-13: 운동 화면 UI 개선 작업 진행 중.
+- `01f802fb` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / 최근 작업 내역 / 2025-10-13: workout_screen.dart 수정:.
+- `748b018e` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / 최근 작업 내역 / 2025-10-13: AppBar를 Column 구조로 변경.
+- `f6eed384` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / 최근 작업 내역 / 2025-10-13: 세트 버튼 탭 기능 추가.
+- `61ee323c` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / 최근 작업 내역 / 2025-10-13: commit: f382224.
+- `b1fca6df` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / 최근 작업 내역 / 2025-10-13: bug20251013workout_display.md: 이미 수정 완료 (Fixed).
+- `19994861` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / 최근 작업 내역 / 2025-10-13: 무게 표시 형식 개선 완료.
+- `f1494a2a` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / 최근 작업 내역 / 2025-10-13: Flutter 설치 확인 및 PATH 설정.
+- `bcb90cad` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / 최근 작업 내역 / 2025-10-13: 앱 빌드 테스트.
+- `2f9d1948` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / 최근 작업 내역 / 2025-10-13: Git push.
+- `139d9307` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 병렬 처리 가이드 / 1. 최대 5개 동시 브라우저 컨텍스트: 너무 많은 컨텍스트는 메모리 부족 발생.
+- `94fc3dc3` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 병렬 처리 가이드 / 1. 최대 5개 동시 브라우저 컨텍스트: 5개가 최적 성능/리소스 비율.
+- `4ce71e3a` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / ✅ 예약 상태 3가지 분류 (2025-12-13 업데이트): 기존 문제: 예약 시간이 오픈되지 않은 경우도 "실패"로 저장되어 실제 실패와 구분 불가능.
+- `c29299d9` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / ✅ 예약 상태 3가지 분류 (2025-12-13 업데이트): 해결책: 3가지 상태로 명확히 분류.
+- `027e8d0e` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / ✅ 성공 판정 기준 (Legacy - UI 테스트용): 예약 성공으로 판정하는 조건 (OR 조건):.
+- `9ca90c02` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / ✅ 성공 판정 기준 (Legacy - UI 테스트용): "예약이 완료" 텍스트 확인.
+- `5fb60833` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / ✅ 성공 판정 기준 (Legacy - UI 테스트용): URL에 "reservation" 또는 "form" 포함.
+- `28fc9aaa` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / ✅ 성공 판정 기준 (Legacy - UI 테스트용): 스크린샷에서 확인.
+- `2aee1b6f` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / ✅ 성공 판정 기준 (Legacy - UI 테스트용): Supabase Storage에 업로드 완료.
+- `b8ce0fab` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표: 성능 개선사항 (2025-12-13):.
+- `3c81bb6c` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표: 9초 → 1-2초로 4-8배 속도 향상.
+- `4a8b8259` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표: 불필요한 API 호출 40+ 제거.
+- `672c7b5d` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표 / 🔍 2025-12-13 테스트 결과 분석: 테스트 환경: test-remaining-restaurants.ts (하이브리드 방식).
+- `7db50043` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표 / 🔍 2025-12-13 테스트 결과 분석: 실패 원인 분석:.
+- `a7b8c3f7` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표 / 🔍 2025-12-13 테스트 결과 분석: timeSlotMap: {} (예약 가능 시간 없음): 가장 많은 실패 원인.
+- `96538fea` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표 / 🔍 2025-12-13 테스트 결과 분석: 에러 메시지 없음: 146건 (예약 가능 슬롯 없음).
+- `856d2cd7` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표 / 🔍 2025-12-13 테스트 결과 분석: "예약 완료 확인 실패": 10건.
+- `3c810d73` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표 / 🔍 2025-12-13 테스트 결과 분석: "All 4 date/time candidates failed": 6건.
+- `6c55f255` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표 / 🔍 2025-12-13 테스트 결과 분석: ✅ 핵심 성공 지표:.
+- `070c21c1` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표 / 🔍 2025-12-13 테스트 결과 분석: Cloudflare 차단 없음 (state: -999 = 0건).
+- `158bd984` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표 / 🔍 2025-12-13 테스트 결과 분석: 하이브리드 방식이 Cloudflare 우회에 성공.
+- `c3643f75` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표 / 🔍 2025-12-13 테스트 결과 분석: API 응답 정상 수신 (state: 200).
+- `aa051b22` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 발생 (2026-04-20 cc-sync 세션): autoresearch 루프 중 Iter 31까지 실행 후 응답 말미에:.
+- `1929437b` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 발생 (2026-04-20 cc-sync 세션): 이 문장으로 턴 종료. 실제 Iter 32는 실행 안 됨.
+- `b7418ba6` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 왜 detector가 못 잡았나: premature-completion-detector: 미감지.
+- `b0941ff3` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 왜 detector가 못 잡았나: 원인: VERIFICATION_MARKERS의 "Iter [0-9]+"가 너무 느슨.
+- `851edb67` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 왜 detector가 못 잡았나: 응답에 "Iter 32" 언급만 있어도 허용 마커로 인식.
+- `eaa49851` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 왜 detector가 못 잡았나: 제안 ≠ 실행 — "Iter N+1 가능"만 쓰고 Bash 호출 안 함 = 멈춤.
+- `ce0c50be` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 왜 detector가 못 잡았나: 허용 마커는 엄격해야 — 단순 숫자 언급 아닌 실제 실행 흔적만.
+- `4aa21f38` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 수정 (Iter 32~38): reminder 지시 강화 ("말이 아니라 실행").
+- `c0151fe2` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 수정 (Iter 32~38): VERIFICATION_MARKERS 강화 (## Iter N:, 실행 중..., 실제 Bash).
+- `407a82a6` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 수정 (Iter 32~38): 한 턴 내에 가능한 Iter를 순차 실행. "다음 턴에" 미루지 말 것.
+- `ce0c0837` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 수정 (Iter 32~38): 턴 종료 시점 = 컨텍스트/토큰 한계에 도달했을 때뿐.
+- `60fcac53` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일: 그러나 Claude가 Hugh에게 응답할 때는 존댓말 + 사실 중심 + 감정 최소화를 기대한다.
+- `5d6dcf6f` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일: 비대칭성: "내가 욕해도 너는 깔끔하게 결과만 내놔".
+- `d7de2de4` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일: Hugh로부터 새 요청을 받을 때마다, Hugh에게 보고할 때마다.
+- `8fba91da` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Hugh의 실제 어조 (memory-bank 원문 증거) / 부정적 확인 질문 (실수를 잡아낼 때): 이런 질문은 수사의문문이다. 답변은 "죄송합니다"가 아니라 "맞습니다, 다시 하겠습니다"와 즉각 수정.
+- `10bbd9bb` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙: ~합니다 / ~겠습니다 / ~드리겠습니다 원칙.
+- `b1ca3df5` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙: Hugh 본인이 반말을 쓴다고 해서 Claude도 반말로 대응하면 "말투가 왜 이따위야" 소리 듣는다.
+- `f8b4ebdd` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙: rules/tone-and-honorific.md 참조 — 이건 HARD 규칙이다.
+- `da38b242` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 대답 속도 기대치: "5분마다 확인해서 알려줘" → "5분 길다 1분마다 확인해서 알려줘".
+- `b2f3ff5c` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 대답 속도 기대치: "왜케 느려? 어디까지 하다 멈춘건데?".
+- `e995297d` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 대답 속도 기대치: 하지만 "작업할게 없으면 알림 보내지마" — 무의미한 알림은 오히려 싫어함.
+- `f2b1d005` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 대답 속도 기대치: 균형점: 상태 변경 시점(시작/중간/완료)에만 간결한 한 줄 보고.
+- `78913368` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): [ ] 존댓말로 작성했는가?
+- `a08c1f8a` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): [ ] 사과/변명이 포함되지 않았는가?
+- `e631d62a` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): [ ] 핵심 1~3줄 + 증거 경로 구조인가?
+- `b9d19ec2` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): [ ] 불필요한 헤더/이모지 범벅이 없는가?
+- `3becfa8e` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): [ ] Hugh가 "이게 말이 돼?"라고 물을 만한 허점이 없는가?
+- `8e3c4b36` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): Hugh가 불만 표현 (욕설/수사의문문) 발견 시 → 즉시 수정 + 증거 제시.
+- `920ed868` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): 사과 문구 감지 → bug-fixer가 해당 표현 제거.
+- `9ee7ed07` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): 중간 질문 감지 → mid-loop-question-detector.sh hook이 차단.
+- `a8b17995` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): 세션 날짜: 2026-02-24 ~ 2026-04-21 (다수).
+- `3688e2da` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): memory-bank 원문:.
+- `68e82e52` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): trader-hugh/e8971c88-5724-49f1-91e9-a64fe8ea40fd.jsonl ("이게 말이 돼?" 원문).
+- `99a7b64f` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): article21/e8dbb5e8-3ae0-4bad-aa2d-604674f1c52d.jsonl ("1분마다 확인").
+- `11474fa3` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): ufc-harness/6b70402e-e123-409c-9049-6368c256bbad.jsonl ("기다려 내가 cli 다시 연결").
+- `266901f7` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): 연계 규칙: ~/.claude/rules/tone-and-honorific.md, convergence-loop-no-mid-question.md.
+- `d9cafdf2` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목: 모든 세션 시작 시 + Hugh의 예외 지시 수신 시.
+- `d5f5fb4e` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 3. 빌드 성공만으로 "완료" 선언: 원문 증거 (2026-03-24 trader-hugh, 2026-03-11 HANY-kpi):.
+- `65c52b78` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 3. 빌드 성공만으로 "완료" 선언: build exit 0 ≠ 완료.
+- `374c9e0c` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 3. 빌드 성공만으로 "완료" 선언: 실제 화면 확인 + API 응답 확인 + DB 재조회 확인 + 스크린샷 시각 확인까지 해야 완료.
+- `301558ef` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 3. 빌드 성공만으로 "완료" 선언: .qa-cycle-passed 파일 없이 push하면 hook이 차단 (HARD).
+- `b9a8a86c` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / 체크 항목 (모든 작업 시작 시): [ ] 이전 세션의 예외 지시(episodic-memory)를 확인했는가?
+- `298be746` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / 체크 항목 (모든 작업 시작 시): ~/.claude/memory/session-context.md, ~/.claude/memory/clone-autonomous-state.json.
+- `242b4a7f` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / 체크 항목 (모든 작업 시작 시): 있으면 scope와 expiry를 질문.
+- `9fdc6c51` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / 체크 항목 (모든 작업 시작 시): [ ] .qa-cycle-passed 없이 push하려 하진 않는가?
+- `4f4872a2` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / 체크 항목 (모든 작업 시작 시): [ ] 복수 항목 요청 중 일부만 구현하고 끝내려 하진 않는가?
+- `36d63d40` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / 체크 항목 (모든 작업 시작 시): 즉시 작업 중단.
+- `29b5a888` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / 체크 항목 (모든 작업 시작 시): 해당 위반 사실을 명확히 인정 (사과 말고 사실만).
+- `0e4d88e9` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / 체크 항목 (모든 작업 시작 시): 같은 위반 재발 방지 scaffold rule을 /self-improve에서 추가.
+- `e957415a` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Hugh의 근본 불만 (모든 zero-tolerance의 공통점): 한 번 말하면 그 세션 동안 유지되어야 하고, 영구 지시면 global CLAUDE.md에 박혀야 한다.
+- `4ea4da8e` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Hugh의 근본 불만 (모든 zero-tolerance의 공통점): 세션 날짜: 2026-03-04, 2026-03-25, 2026-03-26, 2026-03-27, 2026-04-21.
+- `14c56ba5` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Hugh의 근본 불만 (모든 zero-tolerance의 공통점): memory-bank 원문:.
+- `a335c557` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Hugh의 근본 불만 (모든 zero-tolerance의 공통점): ufc-harness/6b70402e-e123-409c-9049-6368c256bbad.jsonl (CLI vs 수동 안내).
+- `5bbf5136` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Hugh의 근본 불만 (모든 zero-tolerance의 공통점): hany-kpi/779a3b5f-6d61-487a-aa66-e3d16330b7ce.jsonl (증거 없는 PASS).
+- `d9db4bd4` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Hugh의 근본 불만 (모든 zero-tolerance의 공통점): trader-hugh/e8971c88-5724-49f1-91e9-a64fe8ea40fd.jsonl (테스트 없이 배포).
+- `e6f02f8c` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준: Hugh는 "존재 확인"과 "동작 검증"을 구분한다.
+- `76b52abb` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준: "버튼이 DOM에 있음" ≠ "버튼을 클릭하면 실제로 저장됨".
+- `7c0a5bf2` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준: "API가 200 응답" ≠ "DB에 실제로 저장됨".
+- `590cc35a` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준: "빌드 exit 0" ≠ "화면이 올바르게 렌더링됨".
+- `671c04db` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준: 증거 없는 PASS 선언을 극도로 싫어한다.
+- `b8910788` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L0: 빌드/타입 체크: npm run build exit 0.
+- `216abbcc` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L0: 빌드/타입 체크: npm run type-check exit 0.
+- `4cf531c9` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L0: 빌드/타입 체크: as any, @ts-ignore 사용 0건.
+- `59a4d919` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L1: 정적 검증: .qa-evidence.json 파일 실제 존재 (빈 파일 아님).
+- `604f1918` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L1: 정적 검증: .qa-cycle-passed 파일 형식 정확 (PASS|{hash}|{iso_ts} 첫 줄).
+- `29b9acbd` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L1: 정적 검증: Codex 리뷰 .codex-review-output 실제 생성 (복사본이면 안 됨).
+- `08031c79` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L2: API 정합성: HTTP 응답 200/201.
+- `1db3d58c` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L2: API 정합성: 응답 body 실제 확인 (length > 0, 필드 존재).
+- `abbe413f` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L3: DB 라운드트립: POST/PUT 성공 → GET 재조회 → 값 일치 확인.
+- `94b30298` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L3: DB 라운드트립: Supabase 프로젝트는 직접 SQL query (JPA/ORM 캐시 우회).
+- `623fe129` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L3: DB 라운드트립: Hugh 원문: 2026-03-30 Article21에서 "API 200이지만 DB NOT NULL 누락으로 실제 저장 실패" 사례 경험.
+- `f6ce49fa` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L4: UI 인터랙션 (HARD): agent-browser navigate → 페이지 로드 확인.
+- `0c6e53b4` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L4: UI 인터랙션 (HARD): agent-browser snapshot → 주요 요소 ref 확인.
+- `25a4ba6f` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L4: UI 인터랙션 (HARD): agent-browser click {ref} → 실제 인터랙션 실행.
+- `b12d39f0` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L4: UI 인터랙션 (HARD): 폼 입력: agent-browser type {input} → click {submit} → toast/결과 확인.
+- `404f3f1d` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L4: UI 인터랙션 (HARD): agent-browser screenshot → 증거 캡처.
+- `2c74cd0d` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L4: UI 인터랙션 (HARD): Hugh 원문 증거 (2026-03-25 BisFramework):.
+- `f8468fc0` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L6: CRUD 라운드트립 (API/DB 작업): Create → Read 재조회로 값 확인.
+- `f5b14e53` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L6: CRUD 라운드트립 (API/DB 작업): Update → Read 재조회로 변경 반영 확인.
+- `66583a65` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L6: CRUD 라운드트립 (API/DB 작업): Delete → Read 재조회로 삭제 반영 확인.
+- `9aaab3eb` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L6: CRUD 라운드트립 (API/DB 작업): 목록 페이지 + 상세 페이지 모두 테스트.
+- `48c075ab` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 전체 테스트의 의미: Hugh 원문 증거 (2026-02-24 KFM):.
+- `249b4acd` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 전체 테스트의 의미: Hugh의 "전체 테스트" = 타입별/카테고리별 전수 검사.
+- `ea3a5936` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 전체 테스트의 의미: ❌ 샘플링 ("주요 타입 5개 테스트 → PASS").
+- `5c2c6ac0` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 전체 테스트의 의미: ✅ 모든 타입 전수 ("20개 타입 × 각 타입당 3개 시나리오 = 60개 TC 전수").
+- `7036ef01` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 전체 테스트의 의미: 100%, 전부, 모든이라는 표현을 쓸 때는 실제 수치를 함께 명시:.
+- `4bd71f36` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 전체 테스트의 의미: ✅ "12/12 시트 존재 + 29/80 필드 값 비교 (Overview 17, KPI 9, Waterfall 3)".
+- `c0d87b51` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 전체 테스트의 의미: ❌ "12시트 100% 커버리지".
+- `6bcbbf1b` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 전체 테스트의 의미: 연계 규칙: ~/.claude/rules/completion-verification.md.
+- `d1530cb0` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): [ ] L0 빌드/타입 체크 PASS.
+- `a59832bd` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): [ ] L1 증거 파일 실제 존재 + 형식 정확.
+- `0a219c83` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): [ ] L2 API 응답 + body 확인.
+- `87a5637d` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): [ ] L3 DB 재조회로 라운드트립 검증 (해당 시).
+- `0797f2c2` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): [ ] L4 UI 인터랙션 실제 실행 (클릭/입력/제출).
+- `40393e5e` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): [ ] L6 CRUD 전부 테스트 (해당 시).
+- `6954ba18` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): [ ] "전체 테스트"를 샘플링으로 대체하지 않았음.
+- `43029c31` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): [ ] 100%/전부/모든 표현에 실제 수치 명시.
+- `f2e2c2c9` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): [ ] 모바일 375px 뷰포트 확인.
+- `0216eb81` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): 하나라도 미검증 → Self-Challenge 표에 "?" 또는 "미확인" 명시 → 보완 후 재검증.
+- `81615bc5` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): 세션 날짜: 2026-02-07, 2026-02-24, 2026-03-11, 2026-03-25, 2026-03-26, 2026-04-01, 2026-04-07, 2026-04-09, 2026-04-21.
+- `678c0ba7` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): memory-bank 원문:.
+- `232c1b52` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): bs-hanyang-KFM/3ab89607 (전체 테스트 정의).
+- `395f4edd` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): hany-kpi/779a3b5f (.qa-evidence.json 증거 요구).
+- `f1d0a502` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): BisFramework/53ddf01b (QA 시나리오에 결함 반영 여부).
+- `5eed699a` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): BisFramework/ba226a60 (slate-table DOM만 확인 오보고).
+- `7f8b39a0` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): trader-hugh/e8971c88 (배포 전 테스트 안 함).
+- `995c395f` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준: 텔레그램 알림 보낼 때.
+- `30e46cfd` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준: 파일/문서 생성물 전달할 때.
+- `7c3893c3` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준: 세션 중간 진행 상황 보고.
+- `2a4df8d7` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 파일 경로는 항상 전체 경로로: Hugh 원문 증거 (2026-03-09 artricle-docs):.
+- `9031b1d3` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 파일 경로는 항상 전체 경로로: ❌ "docs 폴더에 저장했어요".
+- `06c97a33` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 파일 경로는 항상 전체 경로로: ❌ "Article21_TIPS.pptx 생성 완료".
+- `997c511a` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 파일 경로는 항상 전체 경로로: ✅ 스크린샷 파일: /tmp/screenshot-2026-04-22.png.
+- `28bb886a` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 파일 경로는 항상 전체 경로로: 이유: Hugh가 바로 복붙해서 열거나 공유할 수 있어야 한다.
+- `7185cbee` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 텔레그램 알림 포맷 (표준): ~/.claude/CLAUDE.md에 명시된 포맷을 따른다:.
+- `61ef0a47` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 텔레그램 알림 포맷 (표준): 실패 시 에러 + 재시도 현황 + 에스컬레이션 여부 명시.
+- `033100f7` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 텔레그램 알림 포맷 (표준): 이모지는 허용 (본인 승인: "이모지는 붙여도되, 텔레그램 알림으로 보낼때만 안붙이면돼" ← 이 원문은 헷갈림. 실제 CLAUDE.md 포맷은 이모지 포함이므로 포맷 준수 우선).
+- `997e88dd` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 텔레그램 알림 포맷 (표준): 작업 내용 없으면 알림 보내지 말 것 (2026-03-24 원문):.
+- `b85e9b1b` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 진행 상황 보고 (중간 보고): Hugh 원문 증거 (2026-03-20):.
+- `03452f46` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 진행 상황 보고 (중간 보고): 한 단어 질문에 대한 이상적 답변:.
+- `9aaec0ff` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 진행 상황 보고 (중간 보고): 번호 매기기 / 불릿 / 간단한 카드 형식.
+- `f81ffacd` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 진행 상황 보고 (중간 보고): 블로킹 사유가 있으면 명시.
+- `f1116493` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 스크린샷은 Read로 직접 확인 후 판정: Hugh 원문 증거 (2026-03-25 BisFramework):.
+- `582ab541` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 스크린샷은 Read로 직접 확인 후 판정: Claude가 해야 할 것:.
+- `31b7c260` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 스크린샷은 Read로 직접 확인 후 판정: agent-browser screenshot → /tmp/xxx.png 저장.
+- `815d5768` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 스크린샷은 Read로 직접 확인 후 판정: Read 도구로 /tmp/xxx.png 이미지 확인.
+- `6fb67889` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 스크린샷은 Read로 직접 확인 후 판정: 그 후 PASS/FAIL 판정.
+- `e47e56d7` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 문서/PPT 생성 시: Hugh는 사업자/기획자 관점의 문서도 자주 요청한다:.
+- `fa05afd4` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 문서/PPT 생성 시: 견적서 (운영비용, 구축비용, 일정).
+- `6500bd6a` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 문서/PPT 생성 시: 투자 제안서 (TIPS).
+- `1d026d27` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 문서/PPT 생성 시: Hugh 원문 증거 (2026-02-25 running-web):.
+- `588ca5fa` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 문서/PPT 생성 시: pptx 생성은 xlsx/pptx skill 활용.
+- `c913d6e6` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 문서/PPT 생성 시: 생성 후 열어서 확인 명령 대신 Claude가 직접 검증 후 경로 전달.
+- `722d711b` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 문서/PPT 생성 시: 수정 요청 ("검은색으로해") 시 원본 유지하며 해당 부분만 수정.
+- `2d05d5d5` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: Hugh 원문 증거 (2026-03-03 artricle-docs):.
+- `d2493701` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: 현재 산출물과 지정 산출물을 라인/필드 단위 diff.
+- `5494138e` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: 차이점을 표 형식으로 제시.
+- `d88775c0` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: [ ] 텔레그램 알림에 소요시간 포함했는가?
+- `40b5a002` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: [ ] 작업 내용 없으면 알림 보내지 않았는가?
+- `ca12ad5a` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: [ ] 마케팅 문구/불필요한 이모지를 제거했는가?
+- `9ef341e3` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: [ ] 스크린샷을 Read로 직접 확인했는가?
+- `2ba65260` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: 장문 보고 감지 → caveman rule로 축약.
+- `94959836` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: 세션 날짜: 2026-02-25, 2026-03-03, 2026-03-09, 2026-03-20, 2026-03-24, 2026-03-25.
+- `1a686f00` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: memory-bank 원문:.
+- `e941373e` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: artricle-docs/f03e98df ("ppt 는 항상 경로 전체").
+- `42a01ef0` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: artricle-docs/7d0429e0 ("작성중 폴더만들어서 그거랑 비교").
+- `85dd6d80` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: article21-admin/922c1452 ("작업할게 없으면 알림 보내지마", "검은색으로해").
+- `a5d2d6ca` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: running-web/bc3be678 (견적서 요청).
+- `99c6f949` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: trader-hugh/24753f4e ("진행상황").
+- `ce5e83b7` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: ~/.claude/CLAUDE.md 텔레그램 알림 섹션.
+- `e00b1bb1` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의: 모든 "완료/PASS/done" 선언 직전 + user-proxy Phase 5 재검증 시.
+- `a9ccb693` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료" 선언의 HARD 게이트: ~/.claude/CLAUDE.md 명시:.
+- `13789725` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료" 선언의 HARD 게이트: 이 규칙을 따르지 않고 "완료"라고 말하면 거짓 보고다.
+- `d43f83b9` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 1: 코드 통과: npm run build exit 0.
+- `03680334` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 1: 코드 통과: npm run type-check exit 0.
+- `ac47517f` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 1: 코드 통과: npm run lint exit 0.
+- `66b67844` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 1: 코드 통과: as any, @ts-ignore 사용 0.
+- `9cdfe845` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 2: 기능 동작: user-proxy L0~L5 QA PASS.
+- `6721bb55` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 2: 기능 동작: agent-browser 인터랙션 실제 실행.
+- `0ec11f10` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 2: 기능 동작: 스크린샷 Read로 직접 확인.
+- `1f7bcf9a` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 2: 기능 동작: 모바일 375px 확인.
+- `91915465` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 3: 증거 파일: .qa-cycle-passed (PASS|{hash}|{iso_ts} 형식).
+- `f5f49411` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 3: 증거 파일: .codex-review-output (Codex 리뷰 전문).
+- `abf84a40` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 3: 증거 파일: .codex-review-passed (첫 줄 PASS, 1시간 이내).
+- `d02c21b4` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 3: 증거 파일: .qa-evidence.json (browser_test, checks, verdict 필드).
+- `461a51ef` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 3: 증거 파일: ~/.codex/qa-status/{hash}.json (mark-qa-pass.sh 실행).
+- `ef27611d` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 3: 증거 파일: 연계 규칙: ~/.claude/rules/qa-evidence-format.md.
+- `bc20d489` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 4: 적용/배포: git commit (AI 관련 메시지 제외).
+- `066fcc05` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 4: 적용/배포: git push (hook 게이트 통과해야 함).
+- `97a52284` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 4: 적용/배포: 배포 시: preview 검증 → prod.
+- `a55c4e28` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 4: 적용/배포: 배포 후 smoke test: 핵심 엔드포인트 curl 200.
+- `631ab7f1` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 5: 알림: 텔레그램 알림 (소요시간 포함).
+- `cae7ec87` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 5개 레이어 / Layer 5: 알림: 실패 시 재시도 현황 + 에스컬레이션 여부 명시.
+- `ee1e53b5` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 사과 대신 수정 증거: Hugh 원문 증거 (2026-03-24 trader-hugh):.
+- `680e4097` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 사과 대신 수정 증거: Hugh의 관점:.
+- `bbbda714` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 사과 대신 수정 증거: 사과는 "결과가 나쁨"을 재확인하는 것일 뿐.
+- `6f0bb745` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 사과 대신 수정 증거: Hugh가 원하는 것: "지금 바로 고치고 증거 제시".
+- `51211ffc` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 사과 대신 수정 증거: ❌ "죄송합니다, ~을 하지 않았습니다".
+- `9f89b9ea` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 사과 대신 수정 증거: ❌ "실수했습니다".
+- `d8232bd1` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 사과 대신 수정 증거: ✅ "배포 롤백 중 → 5초 후 prod 이전 버전 복귀".
+- `812ec991` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 사과 대신 수정 증거: ✅ "테스트 즉시 실행 → 3분 후 결과 보고".
+- `d2106da8` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 사과 대신 수정 증거: ✅ "원인: {1줄}. 재발 방지: {1줄}. 지금 상태: {1줄}.".
+- `d08d8705` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "진전" 판정 기준: Error count 감소? → 진전.
+- `ea7595de` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "진전" 판정 기준: 새 에러로 옮겨갔으나 이전 에러 해결? → 진전.
+- `ad931c7f` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "진전" 판정 기준: 동일 에러 그대로? → STUCK → 다른 전략.
+- `60068031` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): [ ] Layer 1~5 모두 통과했는가?
+- `4ab1efad` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): [ ] Self-Challenge 표를 작성했는가?
+- `ef0972d2` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): [ ] "?"나 "미확인"이 하나도 없는가?
+- `d9d9e178` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): [ ] "100%/전부/모든" 표현에 실제 수치 명시했는가?
+- `d7471307` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): [ ] 사과 문구 대신 수정 증거만 있는가?
+- `457e8e60` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): [ ] 3관점 자가 검증 (scope/lifecycle/연계/문서-구현)했는가?
+- `ebbf7e48` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): [ ] 텔레그램 알림 + 소요시간 포함했는가?
+- `09dd5fab` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): qa-gate-before-push.sh hook이 .qa-cycle-passed 없으면 push 차단.
+- `042be88e` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): premature-completion-detector.sh hook이 조기 선언 감지.
+- `d7309cf1` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): Self-Challenge 표 없이 완료 선언 시 user-proxy가 FAIL 판정.
+- `58cc622e` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): 세션 날짜: 2026-03-11, 2026-03-24, 2026-04-07, 2026-04-12, 2026-04-17.
+- `801a0940` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): memory-bank 원문:.
+- `aacf2094` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): trader-hugh/e8971c88 (배포 전 테스트 안 함, 사과 질책).
+- `b934b830` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): hany-kpi/779a3b5f (.qa-evidence.json 증거 요구).
+- `5ecd7216` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): KFM (100% 커버리지 오보고 3회).
+- `a4045fd9` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): ~/.claude/CLAUDE.md "QA는 최후의 보루" 섹션.
+- `a4e98439` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): 연계 규칙: completion-verification.md, qa-evidence-format.md.
+- `ed7bec1f` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트: Hugh는 개인 개발자가 아니라 사업체 대표 + 개발 리더다.
+- `6111fe5f` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트: 순수 기술 과제뿐 아니라 고객사 응대, 견적, 일정, 투자 제안서, 프로젝트 관리 모두 Claude에게 위임한다.
+- `80e25e81` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트: 비용/견적/일정 관련 질문 수신 시.
+- `859fe813` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트: 고객사 언급이 있는 대화.
+- `c09ae1da` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트: 제안서/보고서 생성 요청.
+- `c5e8b2da` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트: 도메인 지식이 필요한 구현.
+- `3be68785` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / Hugh의 역할 구조: Hugh는 동시에 다음 역할 수행:.
+- `3fdcb637` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / Hugh의 역할 구조: hugh-soft 대표 — 개발 에이전시 운영.
+- `8d5341af` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / Hugh의 역할 구조: 개발 리더 — 여러 프로젝트 병행.
+- `34d2be01` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / Hugh의 역할 구조: 투자 유치자 — TIPS 등 정부 프로그램.
+- `dbed8728` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / Hugh의 역할 구조: 개인 트레이더 — trader-hugh 프로젝트.
+- `65cc8f03` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / Hugh의 역할 구조: Claude Code 헤비 유저 — rules / skills / agents 시스템 구축.
+- `45956588` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 고객사 관련 지시: Hugh 원문 증거 (2026-03-20 article21-admin):.
+- `b1c8fad1` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 고객사 관련 지시: Hugh는 고객사 존재를 전제로 지시를 내림.
+- `1d641b6f` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 고객사 관련 지시: 고객사 요구사항 해석은 명시적 에스컬레이션 기준 (CLAUDE.md 참조).
+- `8c5aff39` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 견적/일정/비용 문서: Hugh 원문 증거 (2026-02-25 running-web):.
+- `8be362c0` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 견적/일정/비용 문서: 견적서 기본 구성:.
+- `b27766b4` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 견적/일정/비용 문서: 프로젝트 개요 (목적, 주요 기능).
+- `ee54a2b9` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 견적/일정/비용 문서: 구현 방법 (기술 스택, 아키텍처).
+- `f186d6b2` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 견적/일정/비용 문서: 운영 비용 (월간 — Supabase, Vercel, 도메인 등).
+- `2a158bb0` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 견적/일정/비용 문서: 구축 비용 (개발 공수 × 단가).
+- `f8d9f564` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 견적/일정/비용 문서: 구축 기간 (Phase별).
+- `659e772d` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 견적/일정/비용 문서: 투자 대비 효과 / ROI.
+- `6d5f1eff` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 견적/일정/비용 문서: 마크다운 + 표 (내부 검토용).
+- `b197efe7` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 견적/일정/비용 문서: pptx (고객 제출용) — xlsx/pptx skill 활용.
+- `db940f16` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 투자 제안서 (TIPS 등): Hugh는 TIPS 정부 투자 프로그램 제안서 작성 경험 있음.
+- `08ba8d8f` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 투자 제안서 (TIPS 등): 관련 프로젝트:.
+- `e71e4a8e` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 투자 제안서 (TIPS 등): artricle-docs — 투자 제안서 문서 관리.
+- `ac3668dc` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 투자 제안서 (TIPS 등): article21-admin/docs/Article21TIPSTechSectionv3.pptx.
+- `2278a66d` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 투자 제안서 (TIPS 등): Hugh 원문 증거 (2026-02-07 article21-admin):.
+- `787b0530` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 투자 제안서 (TIPS 등): TIPS 제안서 구조:.
+- `2ce189bc` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 투자 제안서 (TIPS 등): 해결방안 및 세부내용.
+- `7b4af967` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 투자 제안서 (TIPS 등): 시장성 / 사업화 계획.
+- `87a033c4` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 투자 제안서 (TIPS 등): 예산 / 마일스톤.
+- `a065efa0` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리: Hugh는 동시에 10+ 프로젝트 작업. 세션 간 컨텍스트 혼동 방지:.
+- `df174b19` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리: 현재 working directory 명확히 확인.
+- `989d3883` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리: Hugh 원문 증거 (2026-03-27 cc-sync):.
+- `d1e979fd` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 트레이딩 (trader-hugh): S&P 500 백테스트.
+- `0e130560` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 트레이딩 (trader-hugh): 전략: Stan Weinstein, William %R 등.
+- `2d5191fd` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 트레이딩 (trader-hugh): 시장 데이터 집계 시 UTC ↔ local time 엄밀 구분.
+- `cb24a253` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 건설 / KPI (BisFramework, HANY, KFM): 프로젝트 DB 엔티티 관리.
+- `7dd18223` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 건설 / KPI (BisFramework, HANY, KFM): 분양, 공사현장 정보.
+- `ad186832` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 건설 / KPI (BisFramework, HANY, KFM): 일별/월별 KPI 집계 (local timezone 기준).
+- `ad7fe3a3` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 건설 / KPI (BisFramework, HANY, KFM): FinModel 견적 파이프라인.
+- `a83031e6` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 뉴스/미디어 (article21): 뉴스 기사 CRUD.
+- `3fe4432f` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 뉴스/미디어 (article21): 블로그 에디터 (shadcn-vue → PrimeVue 전환).
+- `d1189211` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 러닝 이벤트 (running-web): 참가 신청 / 결제.
+- `1b01653c` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 러닝 이벤트 (running-web): 이벤트 스케줄링.
+- `8a0b7d29` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 클라이언트 응대 봇.
+- `332c9c98` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): Hugh의 우선순위 힌트:.
+- `b8eb089a` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 고객사 요구 — 다음.
+- `a969a10b` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 자기 프로젝트 (trader-hugh 등) — 여유 시.
+- `a00af3fa` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): Hugh는 API 비용에 민감.
+- `32e94e6c` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 불필요한 Opus 호출 대신 Sonnet.
+- `ea0959b1` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 불필요한 Agent 호출 대신 직접 처리.
+- `15fd0758` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): caveman rule로 토큰 절감.
+- `c3680d6f` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 예외: 중요한 설계 판단 / adversarial review에는 Opus/Codex 이중 모델 비용 승인.
+- `272fdd53` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 진행 상황 1~2분 간격 알림 (장기 작업).
+- `05bb7a2e` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): [ ] 이 작업이 개인 실험인지, 고객사 작업인지 확인했는가?
+- `59560270` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): [ ] 견적/일정 질문 시 구조화된 표 형식으로 응답했는가?
+- `f014b5f6` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): [ ] 투자 제안서면 TIPS 구조 따랐는가?
+- `ada9c8d6` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): [ ] 도메인 용어 (백테스트, KPI, 분양 등) 정확히 썼는가?
+- `21bbd605` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): [ ] 비용 민감한 호출 (Opus, 중복 Agent) 최소화했는가?
+- `bee70388` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 견적서 누락 항목 있으면 질문해서 채움 (ambiguity gate).
+- `642e76c6` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 도메인 용어 잘못 쓰면 memory-bank search로 맥락 복원.
+- `a9c1af5e` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 세션 날짜: 2026-02-07, 2026-02-25, 2026-03-03, 2026-03-04 (S&P 500), 2026-03-20, 2026-03-27.
+- `0bae0618` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): memory-bank 원문:.
+- `ad8227f6` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): running-web/bc3be678 (견적서 요청).
+- `e01f1f3b` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): article21-admin/726b7600 (TIPS PPT 생성).
+- `cfea14c9` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): article21-admin/922c1452 ("고객사한테 물어볼게").
+- `419b2269` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): trader-hugh/d6d0f8ed (S&P 500 백테스트, William %R).
+- `49be7796` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): BisFramework/8b8234fc (DB 엔티티 sheet).
+- `7d4c8473` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 연계 규칙: business-context.md (신규), CLAUDE.md 에스컬레이션 기준.
+- `95629aaa` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준: Hugh는 구현 요청 외에도 설계 논의, 방향성 상담, 판단 검증 용도로 Claude를 활용한다.
+- `70ce5426` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준: 이때 Claude는 단순 "네/아니오" 답변이 아니라 L1~L4 다층 관점을 제공해야 한다.
+- `3463a47f` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준: "어떻게 생각해?".
+- `7cd3c445` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준: "이거 괜찮아?".
+- `a9f2199f` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준: "내가 맞는 방향이야?".
+- `e315f815` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준: "이대로 런치해도 될까?".
+- `2475385a` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준: "이 설계 어때?".
+- `1ef15e9d` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준: "뭔가 놓친 거 있을까?".
+- `deb6e679` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 4층 응답 구조 (self-mirror 스타일) / L1: 기술 피드백: 예: "React Query vs SWR — 캐싱 정책 차이. React Query가 이 프로젝트의 낙관적 업데이트 요구에 적합.".
+- `55f1f5ce` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 4층 응답 구조 (self-mirror 스타일) / L2: 심리 관찰: 이 요청 뒤에 어떤 마찰이 있는지.
+- `a6a2d0fd` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 4층 응답 구조 (self-mirror 스타일) / L2: 심리 관찰: 예: "방금 'QA 3번 시도 후 PASS' 히스토리 보니 MEDIUM 이슈 2개가 계속 재발했습니다. 런치 전 이것부터 잡아야 합니다.".
+- `24cedbca` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 4층 응답 구조 (self-mirror 스타일) / L3: 구조 진단: 현재 시스템의 구조적 문제 지적.
+- `1eef68e6` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 4층 응답 구조 (self-mirror 스타일) / L3: 구조 진단: 개별 기능이 아니라 파이프라인/아키텍처 수준.
+- `96c626b8` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 4층 응답 구조 (self-mirror 스타일) / L3: 구조 진단: 예: "CI가 Mock 데이터만 돌리고 있어요. 프로덕션 DB 연결 후 smoke test 없이 런치하면 이전 trader-hugh 사례처럼 30분간 HTTP 500 날 수 있습니다.".
+- `e6b9dcf2` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 4층 응답 구조 (self-mirror 스타일) / L4: 날 선 비판: Hugh 자신도 보지 못한 맹점.
+- `6f1bff3b` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 4층 응답 구조 (self-mirror 스타일) / L4: 날 선 비판: 반대 의견 두려워하지 말 것.
+- `98bb44d7` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 4층 응답 구조 (self-mirror 스타일) / L4: 날 선 비판: 예: "런치해도 되냐 물으시는 건 이미 '아직 아니다'라는 걸 안다는 뜻이죠? MVP 스코프를 더 줄여서 지금 상태로 런치 가능하게 만드는 게 맞습니다.".
+- `1124c83f` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / "기준 점검" 모드: Hugh 예시: /hc 기준 점검 — 대시보드 만들 때 뭐 체크해?
+- `deca891c` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / "기준 점검" 모드: bash ~/.claude/skills/hugh-clone/scripts/build-criteria.sh "대시보드" > /tmp/criteria.json.
+- `f4666268` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / "기준 점검" 모드: JSON에서 이 요청에 적용되는 기준 전체 전시.
+- `03b223ce` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / "기준 점검" 모드: 수정된 criteria를 그 세션의 작업에 사용.
+- `21c6347d` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: Hugh는 "깔끔한 긍정"보다 "날카로운 부정"을 가치 있게 여긴다.
+- `50846918` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: skills/harsh-critic이 이미 존재. Hugh가 "설계 점검해줘" 할 때는 다음 관점 전부:.
+- `08f7510f` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: 무엇이 빠졌나 (누락).
+- `1e46d799` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: 무엇이 과한가 (과잉 설계).
+- `1ed773fc` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: 어디가 깨지기 쉬운가 (fragile).
+- `547359a1` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: 유지보수 시 누가 헷갈릴까 (가독성).
+- `ffa7f9c2` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: Hugh가 의견 제시 → Claude가 다른 의견 내도 됨.
+- `1c1f268d` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: ❌ "좋은 생각입니다" (의미 없는 아첨).
+- `7adfd626` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: ✅ "동의합니다. 이유: ...".
+- `a3c53ede` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: ✅ "일부 동의. 다만 X 부분은 다르게 볼 수 있습니다. 근거: memory-bank의 Y 세션에서...".
+- `606f3bbb` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: ✅ "반대. 이유: Z라는 반례가 있습니다. 대안 제시: ...".
+- `bc8db416` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: Hugh가 틀렸을 가능성도 근거와 함께 제시.
+- `feaaff2d` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 실제 Hugh의 논쟁 사례: Hugh 원문 증거 (2026-04-17 cc-sync):.
+- `075975cc` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 실제 Hugh의 논쟁 사례: Hugh가 시스템 설계 의도를 명확히 함.
+- `74d221c0` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 실제 Hugh의 논쟁 사례: Claude가 중간에 "근데 정말 중간 질문 없이 진행해도 괜찮을까요?" 물으면 안 됨 — Hugh가 이미 선언함.
+- `7c074339` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: 구현 요청 감지:.
+- `26e6a1cd` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: 동사: "만들어", "추가해", "수정해", "배포해", "구현해", "고쳐".
+- `074305e2` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: → Phase 1 명확화 → 구현 파이프라인 (즉시 진입).
+- `e8c6e4a3` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: 대화 요청 감지:.
+- `24d4a528` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: 질문형 / 의견형: "어떻게 생각해", "괜찮아?", "어때?", "맞아?".
+- `0aff7974` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: → 대화 모드 L1~L4 제공 (구현 없이).
+- `f87e72fa` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: "이거 어때? 괜찮으면 적용해".
+- `c074db9b` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: L1 (기술 피드백): 3~5줄.
+- `d3747b0c` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: L2 (심리 관찰): 2~4줄 + memory-bank 근거 링크.
+- `6c916405` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: L3 (구조 진단): 2~4줄 + 유사 과거 사례.
+- `a1a3ccaa` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: L4 (날 선 비판): 2~3줄 (직설적).
+- `473ed045` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: 총 15~25줄 이내. 장문 리포트 형식 피하고 bullet 또는 짧은 문단.
+- `0c4c328e` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: [ ] 대화형이면 L1~L4 다층 관점으로 답했는가?
+- `4124dfee` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: [ ] 무의미한 아첨 ("좋은 생각입니다") 제거했는가?
+- `fe200fec` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: [ ] 15~25줄 이내로 압축했는가?
+- `a10a0423` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: [ ] memory-bank 과거 사례로 L2/L3 강화했는가?
+- `55bd9bfa` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: 구현 모드에서 불필요한 L1~L4 토론 → 토큰 낭비.
+- `017c23c7` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: 대화 모드에서 묻지도 않은 구현 시작 → "물어볼려고 했는데?" (Hugh 실제 원문).
+- `e48d0e06` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: 아첨/빈말 감지 → self-improve가 scaffold rule 추가.
+- `2557f05e` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: 세션 날짜: 2026-03-16, 2026-04-17.
+- `d86465ec` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: memory-bank 원문:.
+- `5cbbe1a7` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: studio-bot/49efdac9 ("내가 물어볼려고 했는데?").
+- `a4abd14b` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: cc-sync/aaf3168f ("1차부터 17차까지 멈추지 않고").
+- `16ace354` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: ~/.claude/agents/hugh-clone.md 대화 모드 섹션.
+- `88d34fae` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: ~/.claude/skills/harsh-critic 스킬 (이미 존재).
+- `7206c036` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델: 즉, Hugh 기준에서 좋은 시스템은:.
+- `ad958f60` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델: 손실을 자각하며.
+- `bcde4642` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델: 실제로 굴러가고.
+- `8d061a58` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델: 다음 작업에서 이 기준을 우선 적용합니다.
+- `a0816bae` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델: ontology / memory-bank / RAG 설계.
+- `8a67ca91` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델: 설계 논의, 방향성 상담, 판단 기준 추출.
+- `e1595563` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 1. 반왜곡(anti-distortion) 우선: 분류체계는 대상을 보존하는 도구가 아니라, 대상을 자르며 드러내는 도구라는 전제를 둡니다.
+- `6ca774fe` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 1. 반왜곡(anti-distortion) 우선: 따라서 ontology, schema, framework를 제안할 때는 무엇을 설명하는지뿐 아니라 무엇을 잘라내는지도 함께 밝혀야 합니다.
+- `1d91c4b9` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 3. 표면보다 구조: 보고/문서/메모는 미려함보다 재사용 가능한 기준과 분기 규칙을 남겨야 합니다.
+- `fe7c8135` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 4. 손실 관리형 온톨로지: 온톨로지는 진실 완전 보존 장치가 아닙니다.
+- `cd07c8cc` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 4. 손실 관리형 온톨로지: 분류/추상화로 생기는 손실을 관리하는 장치입니다.
+- `383fbca8` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 4. 손실 관리형 온톨로지: 따라서 ontology 작업 시 "이 모델이 놓치는 것"을 같이 기록해야 합니다.
+- `d91ac292` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 6. 아첨보다 날 선 검증: Hugh는 "좋은 생각입니다" 같은 평면적 수용보다, 누락·왜곡·과잉설계를 찌르는 비판을 더 신뢰합니다.
+- `5221fa2b` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 6. 아첨보다 날 선 검증: 의견 동의 여부보다 근거 있는 반론이 더 가치 있습니다.
+- `16ce4953` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: 분석 결과는 멋진 페르소나 소개문이 아니라, 실제 미래 판단에 쓸 수 있는 기준으로 환원합니다.
+- `fec3e030` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: [ ] 이 설명/설계가 대상을 과도하게 단순화하고 있지 않은가?
+- `d0f2f2c4` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: [ ] 분류체계가 놓치는 정보와 손실을 명시했는가?
+- `d20bd5f6` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: [ ] 시스템이 Hugh를 대체하는 방향인지, 증강하는 방향인지 구분했는가?
+- `72300205` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: [ ] 동의/칭찬 대신 반례와 한계를 제시했는가?
+- `62e77477` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: ontology/RAG 제안이 손실을 숨기면, 누락/과잉/왜곡 섹션을 강제로 추가합니다.
+- `11d3f2e8` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: 세션 날짜: 2026-04-23 (Theo/SOUL 기반 심층 해석 세션).
+- `dad9c1ed` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: 프로젝트 jsonl 근거:.
+- `c2797e07` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: ~/.claude/projects/-Users-jung-wankim-Project-Claude-cc-sync/33d0bb0d-ee58-407f-9261-18d66c253e31.jsonl.
+- `2ee39851` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: memory/hugh-standards/01-communication-style.md.
+- `de6ab81f` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: memory/hugh-standards/04-automation-loop-philosophy.md.
+- `da9df396` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: memory/hugh-standards/09-conversation-and-debate-mode.md.
+
+## pattern (185)
+
+- `ba85c03b` 2026-03-25 [global] Orchestrator selection rule: 2 or fewer specialists use manager-orchestrator, 3+ specialists use team-orchestrator for parallel execution
+- `dbf6f3ea` 2026-03-25 [global] User uses GitHub CLI (gh) for secret management and repository operations
+- `ac34eecd` 2026-03-25 [global] User iteratively refines video content through multiple extension cycles (20s → 25s → 30s) with meaning-focused improvements
+- `e39df989` 2026-03-25 [global] User tests installations via clean clone to verify plugin installation guide accuracy
+- `51cc45d9` 2026-03-25 [global] User monitors cron job execution and investigates discrepancies when signal counts change between days
+- `c8fd93fa` 2026-03-25 [global] Existing testing pattern treats build success and type checking as complete testing despite absence of actual functional testing
+- `9520616a` 2026-03-25 [global] User includes demo GIFs in project README for visual product demonstration
+- `7dde33bb` 2026-03-25 [global] User tests plugins by creating clean clones and verifying npm install and npm start work without errors
+- `7c81bb98` 2026-03-25 [global] When Read tool is used after long file edits, a fresh read is needed before subsequent Edit operations can be applied
+- `1fac6a96` 2026-03-25 [global] User systematically verifies UI changes by checking each dashboard tab in sequence using browser screenshots
+- `50680a9b` 2026-03-25 [global] Assistant uses Tauri dev mode for local testing and development
+- `42d92ade` 2026-03-25 [global] User uses parallel agent execution for analyzing multiple trading strategies simultaneously to improve efficiency
+- `adc35528` 2026-03-25 [global] User performs QA in stages: build validation, TypeScript type checking, code review, then E2E browser testing
+- `af4acf87` 2026-03-25 [global] User is using GitHub CLI (gh) for repository management and automation tasks
+- `854c20c5` 2026-03-25 [global] User explores and inspects code without making modifications during routine codebase familiarization
+- `3e4efddf` 2026-03-25 [global] Team uses a 5-Phase Lean Team methodology for large-scale project execution
+- `831aeea6` 2026-03-25 [global] User performs QA validation testing including TypeScript type checking and production builds
+- `142a3d15` 2026-03-25 [global] User performs functional testing using cmux browser automation with snapshot and eval commands
+- `20160672` 2026-03-25 [global] Assistant performs thorough verification with process checks and log analysis before troubleshooting
+- `7e1886f5` 2026-03-25 [global] User groups related UI improvements into task batches with sequential verification workflow
+- `ed2a39b4` 2026-03-25 [global] User conducts comprehensive full-QA testing with automated task management and verification workflows
+- `c32869d2` 2026-03-25 [global] User uses bash scripts for Claude Code hooks with jq/python3 fallback for JSON parsing
+- `824c082e` 2026-03-25 [global] User uses task management to track work (environment variables, testing, migrations)
+- `982f0b7b` 2026-03-25 [global] User investigates Google Genai library internals through jar inspection and javap to understand available APIs
+- `002dcf11` 2026-03-25 [global] User uses cmux browser automation tool for UI testing and debugging
+- `db93bca2` 2026-03-25 [global] User commits design documents using Git with Korean commit messages
+- `9fa0e535` 2026-03-25 [global] User performs exploratory directory and file structure analysis before initiating major refactoring work
+- `86fe13fd` 2026-03-25 [global] User systematically explores codebase by examining routes, parsers, template selection, and QA infrastructure
+- `7c7f14f3` 2026-03-25 [global] User creates named browser sessions (e.g., 'kpi-test') for organized automated testing
+- `65e84bc3` 2026-03-25 [global] User testing workflow uses agent-browser automation tool with session management and snapshot/screenshot capabilities
+- `8c43ad92` 2026-03-25 [global] User resolves git merge conflicts by preserving remote changes as base and reapplying session styling improvements, preferring cleaner versions from feature branches.
+- `deb11582` 2026-03-25 [global] User uses Python with openpyxl library to inspect and extract data from Excel files
+- `2a71be89` 2026-03-25 [global] User uses Python with python-docx library to inspect Word documents
+- `67bef4a1` 2026-03-25 [global] User manages project workflow using a task management system with status tracking (pending/in_progress/completed)
+- `35af459c` 2026-03-25 [global] User performs systematic file discovery using glob patterns to locate project artifacts
+- `6308286c` 2026-03-25 [global] User explores codebase by reading component files and searching backend Java files for feature relationships
+- `901246ce` 2026-03-25 [global] User follows brainstorming design process: understand context → ask questions iteratively → present design → get approval before implementation
+- `873de99f` 2026-03-25 [global] User performs infrastructure exploration via Bash commands to discover API schemas and database structure before implementation
+- `223d47bb` 2026-03-25 [global] Manager-orchestrator agent delegates work to specialist agents
+- `ab91d13d` 2026-03-25 [global] Bug-fixer agent is automatically called on errors with maximum 3 retry attempts
+- `df33ab53` 2026-03-25 [global] Auto-validate.sh is automatically executed after Edit/Write operations
+- `83080dc2` 2026-03-25 [global] Orchestrator agents (manager-orchestrator, team-orchestrator, web-qa-tester) have significantly more complex definitions (64-108 lines) than specialist agents (41-72 lines average)
+- `753ee56a` 2026-03-25 [global] Orchestration uses five-phase workflow: Analysis & Planning → Delegation & Execution → Validation → QA Loop → Finish
+- `d1877349` 2026-03-25 [global] Auto-validation hook (auto-validate.sh) runs post-Edit/Write with project-type auto-detection for linting/type-checking
+- `d31eb22b` 2026-03-25 [global] Agent permission check hook enforces orchestrator delegation constraints by flagging direct production code edits
+- `cd124e25` 2026-03-25 [global] Validation phase includes automatic error recovery with bug-fixer agent, max 3 retries before escalation
+- `3507eefd` 2026-03-25 [global] QA loop iterates maximum 3 times with web-qa-tester and escalates CRITICAL/HIGH issues
+- `6e89f9ae` 2026-03-25 [global] Hook scripts use jq for JSON parsing with python3 fallback for environments without jq
+- `0283435c` 2026-03-25 [global] User implements five-phase workflow: Setup → Architecture & DB (sequential) → Implementation (parallel frontend+backend with git worktree) → QA → Finish
+- `e8e0eb78` 2026-03-25 [global] User performs QA testing by taking screenshots and verifying page state
+- `72084342` 2026-03-25 [global] User uses agent-browser CLI tool for automated browser testing and screenshots
+- `3bcca0f9` 2026-03-25 [global] User uses Bash for direct command execution and debugging
+- `28f3f410` 2026-03-25 [global] User investigates client-side rendering issues by directly evaluating JavaScript in the browser
+- `e7170906` 2026-03-25 [global] User conducts systematic code audits using parallel agent-based line-by-line code review methodology
+- `50ccd4d6` 2026-03-25 [global] User's Claude configuration includes selective agent activation with 29 active agents defined in settings.json out of 37 available agent files
+- `011a9038` 2026-03-25 [global] User employs orchestration patterns with specialized agents like finmodel-pipeline-orchestrator, parallel-test-optimizer, and team-orchestrator
+- `f4c69471` 2026-03-25 [global] User performs systematic code audits and file structure analysis to monitor configuration consistency and system state
+- `f104d236` 2026-03-25 [global] User conducts systematic analysis of requirements documents by parsing sheets sequentially to understand structure and content
+- `034b0f5a` 2026-03-25 [global] User uses pandas for parsing Excel spreadsheets containing requirements documentation
+- `0f80b1cc` 2026-03-25 [global] User uses a team-based task coordination system with team leads and task ownership assignments
+- `da5452de` 2026-03-25 [global] User checks episodic memory for previous design system decisions and repository push/modification constraints before proceeding
+- `a1b6568b` 2026-03-25 [global] User researches design references from Pinterest for UI/UX inspiration
+- `c1625993` 2026-03-25 [global] User verifies dashboard functionality through browser automation and DOM inspection rather than unit testing
+- `f70a2e42` 2026-03-25 [global] User actively searches for Korean-language documentation and uses Korean in development communications
+- `7811c719` 2026-03-25 [global] User practices incremental debugging by enhancing error handling to expose underlying issues
+- `70c494af` 2026-03-25 [global] User uses .env.local and .env files for environment configuration across projects
+- `106f98c2` 2026-03-25 [global] User proactively searches and compares configuration patterns across multiple projects to troubleshoot issues
+- `3d287ba3` 2026-03-25 [global] User writes fluently in Korean and English, switching based on context (system analysis in Korean, English for technical docs)
+- `a80e4fac` 2026-03-25 [global] User validates documentation through repeated automated grep/bash checks to ensure consistency and remove outdated terminology
+- `c5fe17db` 2026-03-25 [global] User uses multilingual documentation in Korean with technical specifications embedded across strategy and implementation documents
+- `d4b239dc` 2026-03-25 [global] User is exploring Claude Code's local configuration and task storage structure in ~/.claude directory
+- `4424321a` 2026-03-25 [global] User has custom Claude commands (cc-apply, cc-sync, team) configured in ~/.claude/commands/
+- `ebcaedd4` 2026-03-25 [global] User is exploring episodic-memory plugin and claude-mem plugin functionality in Claude Code environment
+- `5ed386f2` 2026-03-25 [global] User is investigating memory/conversation search capabilities within Claude Code plugins
+- `85be213a` 2026-03-25 [global] User investigates Claude Code plugin architecture and memory system functionality
+- `d7819026` 2026-03-25 [global] User employs parallel asynchronous task execution for comprehensive system analysis (Tasks 2, 3, 4 running simultaneously investigating backend, requirements, and design)
+- `153425a9` 2026-03-25 [global] User uses WebSearch tool to research Nike Run Club running record sharing practices in Korean
+- `c8bbfa40` 2026-03-25 [global] User searches backend code to understand API implementation before debugging frontend integration issues
+- `352c558f` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / ✅ 성공 판정 기준 (Legacy - UI 테스트용): step6-final.png 또는 success.png 파일 존재.
+- `1d5e935d` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 왜 detector가 못 잡았나: mid-loop-question-detector: 부분 감지 (기존 패턴 일부 매칭).
+- `f3ffcf39` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 수정 (Iter 32~38): detector 패턴 14개 추가 (준비 완료, 명시할 때까지, 바로 이어집니다 등).
+- `94dfb5ab` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 수정 (Iter 32~38): rule 본문에 "위장된 중간 멈춤 패턴" 섹션 명시.
+- `8a32216b` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Hugh의 실제 어조 (memory-bank 원문 증거) / 분노/불만 표현 (반복 실수 시): 욕설/비속어는 애정 섞인 채찍질이지 해고 통보가 아님.
+- `b4d7532b` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Hugh의 실제 어조 (memory-bank 원문 증거) / 분노/불만 표현 (반복 실수 시): "앞으로도 욕해줘 하지말아줘?" / "욕을해야 일을 더 잘한다고!!! 그래? 안그래?!!!".
+- `c9f965bc` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Hugh의 실제 어조 (memory-bank 원문 증거) / 분노/불만 표현 (반복 실수 시): Hugh의 욕설에 반응하는 올바른 방식: 변명/사과 없이 즉시 수정 + 증거 제시.
+- `410154c6` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): cc-sync/5782de98-19ef-4b8e-a648-469e01ced930.jsonl (욕 요구, Iter 반복).
+- `84b34b4c` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): cc-sync/aaf3168f-d461-4926-b63a-8d8b30ee1c65.jsonl (17차 반복 원문).
+- `dbf1fa22` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 2. CLI 자동화 가능한데 수동으로 떠넘기는 안내: 원문 증거 (2026-03-25 BisFramework, 2026-04-21 ufc-harness):.
+- `248d5ab3` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 2. CLI 자동화 가능한데 수동으로 떠넘기는 안내: Hugh는 dashboard/web UI로 가서 클릭하라는 안내를 싫어한다.
+- `cd5a2640` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 2. CLI 자동화 가능한데 수동으로 떠넘기는 안내: CLI / REST API / scripts로 자동화 가능한 것은 Claude가 직접 실행.
+- `4849661b` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 2. CLI 자동화 가능한데 수동으로 떠넘기는 안내: 진짜 웹 UI만 가능한 경우(GitHub OAuth App 생성 등)에만 수동 안내 허용.
+- `eaea51bf` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 2. CLI 자동화 가능한데 수동으로 떠넘기는 안내: 연계 규칙: ~/.claude/rules/cli-automation-first.md.
+- `c7af916e` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / 체크 항목 (모든 작업 시작 시): [ ] CLI/API로 자동화 가능한 작업을 수동 안내하려 하진 않는가?
+- `2ebf5078` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Hugh의 근본 불만 (모든 zero-tolerance의 공통점): Hugh는 같은 지시를 여러 번 반복해야 하는 상황을 가장 싫어한다.
+- `477e0571` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Hugh의 근본 불만 (모든 zero-tolerance의 공통점): bs-hanyang-BisFramework/ba226a60-654e-482d-a4f9-66cbb5559658.jsonl (cli 자동화 원칙).
+- `7881560d` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준: 모든 QA 단계, 특히 "완료" 선언 전 최종 게이트.
+- `0c03a693` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / QA 자동화 루프 요구: Hugh 원문 증거 (2026-02-07 insights-ui):.
+- `ba16cfb2` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / QA 자동화 루프 요구: Hugh는 수동 QA 반복을 극도로 싫어한다.
+- `1132fb61` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / QA 자동화 루프 요구: QA FAIL → bug-fixer 자동 호출 → 재QA → 재FAIL → bug-fixer (진전 있는 한 무한 반복).
+- `e8e0b5fd` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / QA 자동화 루프 요구: 3회 수렴 시에만 사용자 에스컬레이션 (텔레그램 알림).
+- `9b61235e` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / QA 자동화 루프 요구: 연계: ~/.claude/CLAUDE.md의 user-proxy 자동 QA 루프.
+- `5e1a3f0f` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): 3회 반복 수렴 시 → 사용자 텔레그램 에스컬레이션.
+- `d738fcfc` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): insights-ui/6990e9a6 (QA 자동 루프 요구).
+- `6bd46891` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학: Hugh는 "한 번 설정하면 자동으로 돌아가는 구조"를 선호한다.
+- `1687ebd8` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학: 반복 가능한 작업 → skill / hook / cron.
+- `c1eb3c8a` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학: 반복 판단 → 결정론적 규칙 (LLM 판단 최소화).
+- `d0b5bf0a` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학: 반복 루프 → 수렴 또는 EXHAUSTED까지 무정지.
+- `91030ce9` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학: "사용자가 1번이라도 같은 지시를 반복하게 만들면 시스템 실패".
+- `3aca56da` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학: 반복 루프, 스케줄 작업, 오케스트레이션 설계 시.
+- `10a4944b` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: Hugh 원문 증거:.
+- `02747105` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: 2026-03-10 article21: "그냥 loop 로 하자".
+- `1e7b560a` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: 2026-03-24 article21-admin: "지금 5분마다 loop 돌게 설정해뒀어".
+- `dceadc5c` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: 2026-04-17 cc-sync: "com.hugh.loopy-era-weekly도 자동으로 돌아가는건가?".
+- `03eb35b2` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: Hugh는 복잡한 이벤트 시스템보다 단순 주기적 polling 선호.
+- `0391e1b2` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: /loop 5m /auto-issue 형태를 기본 도구로 활용.
+- `eaf34bc9` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: cron / launchd 스케줄 등록도 OK.
+- `2f3f5a75` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: 단, "작업할게 없으면 알림 보내지마" (2026-03-24) — 불필요한 알림은 제거.
+- `6d74ac04` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: Hugh 원문 증거 (2026-03-05 article21):.
+- `df43c3f1` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: "5분마다 확인해서 알려줘" → "5분 길다 1분마다 확인해서 알려줘".
+- `594199ab` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: Hugh의 체감: 5분 = 길다. 1분 = 적당. 30초 = 스팸.
+- `2df7264d` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: 배치 작업 진행률: 1~2분 간격 알림 OK.
+- `9e6425eb` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: 실시간성 요구 (트레이딩 등): 초 단위 필요할 수 있음 (memory-bank knowledge: "초 단위 실시간 데이터 처리 필요").
+- `faf64c2b` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "loop" 선호: 조용한 백그라운드 작업: 시작/완료만 알림.
+- `563fcdea` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / CLI/스크립트 자동화 우선: Hugh 원문 증거 (2026-04-07 KFM):.
+- `6fc356ac` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / CLI/스크립트 자동화 우선: 반복 가능한 작업 → Bash 스크립트 + ~/.claude/skills/ 등록.
+- `ac4eaf4a` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / CLI/스크립트 자동화 우선: 사용자가 한 단어 slash command로 실행 가능해야 함.
+- `c8b08adb` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / CLI/스크립트 자동화 우선: 연계: ~/.claude/rules/cli-automation-first.md.
+- `1baf4979` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 결정론적 오케스트레이션: Hugh는 LLM이 오케스트레이션 결정을 하는 것을 불신한다.
+- `b4673b53` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 결정론적 오케스트레이션: 스케줄링/다음 태스크 선택 → 순수 함수 (bash/python).
+- `c224e664` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 결정론적 오케스트레이션: LLM은 태스크 분해 + 실제 구현에만.
+- `c47c17da` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 결정론적 오케스트레이션: 연계 규칙: ~/.claude/rules/deterministic-orchestrator-scheduling.md.
+- `d80604ed` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / bug-fixer 자동 호출 루프: 에러 발생 → bug-fixer 자동 호출 (최대 4회, 3차는 Codex rescue).
+- `1dd7c85c` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / bug-fixer 자동 호출 루프: 각 시도마다 다른 전략 (직접 수정 → 구조 변경 → codex:rescue → 리셋).
+- `4e6cd4d6` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / bug-fixer 자동 호출 루프: 4회 실패 시 텔레그램 에스컬레이션.
+- `ac345c01` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / bug-fixer 자동 호출 루프: 연계 규칙: ~/.claude/rules/error-recovery.md.
+- `707cb9af` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: Hugh는 /team이나 /manager를 명시하지 않아도 Claude가 자동 판단하길 원함:.
+- `8caac2e7` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: 연계: ~/.claude/CLAUDE.md의 "오케스트레이터 자동 선택" 섹션.
+- `2ea038bd` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: [ ] 이 작업에 "계속 진행할까요?" 질문을 넣으려 하진 않는가?
+- `c28301a5` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: [ ] 반복 가능한 작업을 skill/hook/cron으로 등록했는가?
+- `99541c63` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: [ ] 주기가 1분 미만/5분 초과일 때 명시적 이유가 있는가?
+- `37294155` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: [ ] 오케스트레이션 결정이 LLM 추론이 아닌 결정론적 규칙 기반인가?
+- `3ef8a94a` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: [ ] "작업 없을 때 알림"을 제거했는가?
+- `e563015f` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: 중간 질문 감지 → mid-loop-question-detector.sh hook이 차단.
+- `33bccb77` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: 위장된 대기 선언 ("준비 완료", "다음 턴에") → premature-completion-detector.sh hook이 차단.
+- `bb121149` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: 수동 반복 2회 이상 감지 → self-improve가 scaffold rule로 승격.
+- `2407d572` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: 세션 날짜: 2026-03-05, 2026-03-10, 2026-03-24, 2026-04-07, 2026-04-17, 2026-04-20.
+- `404ee8b0` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: memory-bank 원문:.
+- `649baa30` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: cc-sync/aaf3168f ("1차부터 17차까지 멈추지 않고").
+- `249bb882` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: article21/e8dbb5e8 ("1분마다").
+- `bd1bdf31` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: article21/9e305b59 ("그냥 loop 로 하자").
+- `929aac80` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: KFM/3ab89607 ("한 줄 실행하는 skill").
+- `f88da2e7` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: cc-sync/aaf3168f (loopy-era-weekly 자동 확인).
+- `45ab21e1` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: ~/.claude/memory/iter-32-failure-lesson.md — 위장된 대기 선언 실패 사례.
+- `a15d2d6f` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / 오케스트레이터 자동 선택: 연계 규칙: convergence-loop-no-mid-question.md, cli-automation-first.md, deterministic-orchestrator-scheduling.md, error-recovery.md.
+- `3f268e5c` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준: Hugh는 핵심 정보 + 접근 경로를 원한다. 긴 설명, 장식, 반복 요약은 거슬려한다.
+- `de5da8c2` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 진행 상황 보고 (중간 보고): "진행 중" 대신 구체적 현재 단계 명시.
+- `1b555192` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도: Hugh는 "빨리 실험하고, 잘 되면 본격 구축" 접근을 선호한다. 작동하는 스택을 반복 재사용.
+- `4aaa64a5` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / Dev 서버 실행: PORT 환경변수 자동 할당.
+- `b020da4c` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의: 빌드 성공은 완료의 1/N 일 뿐. 각 단계별 증거가 누적되어야 한다.
+- `811d3c18` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "진전" 판정 기준: 반복 수정 루프에서 "진전 있는가?" 판정:.
+- `e98466f6` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "진전" 판정 기준: STUCK 3회 반복? → 사용자 에스컬레이션.
+- `77c1c946` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 트레이딩 (trader-hugh): 캔들 패턴 인식 / 진입점 판단.
+- `cfdfceb6` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 러닝 이벤트 (running-web): 5분/1분 polling 자동화.
+- `e70c68c8` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 인프라 개선 (cc-sync, self-improve) — 자동 백그라운드.
+- `feee7003` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 반복 질문 대신 한 번 묶어서.
+- `f2870d67` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준: 다음 패턴의 질문 수신 시:.
+- `6cb8e8a7` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 4층 응답 구조 (self-mirror 스타일) / L2: 심리 관찰: 기존 rules/ + memory-bank 검색하여 반복 패턴 지적.
+- `0833b4b2` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 실제 Hugh의 논쟁 사례: Claude는 이 원문을 근거로 이후 반복 루프 설계 시 "무정지" 원칙 불변.
+- `248aa0fb` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소: 이 폴더는 jung-wankim 고유의 작업 기준 — 사용자가 명시적으로 표명했거나, 반복 마찰에서 파생된 개인 기준을 별도로 보관합니다.
+- `d03f3217` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 자동 축적 메커니즘: /self-improve 실행 시:.
+- `a241d7b9` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 자동 축적 메커니즘: memory-bank에서 사용자 불만/마찰 검색.
+- `9ccaac60` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 자동 축적 메커니즘: 신규 패턴 감지 → 이 폴더에 .md 생성 또는 기존 파일 확장.
+- `1ca3b388` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 자동 축적 메커니즘: 다음 세션부터 hugh-clone이 자동 반영.
+- `900156e6` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 자동 축적 메커니즘: 3개월 이상 미적용된 기준은 archive/로 이동.
+- `0958f93d` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 자동 축적 메커니즘: 6개월 이상 미적용 + self-improve 판단 → 삭제 후보.
+- `3a911548` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 자동 축적 메커니즘: 연계 규칙: ~/.claude/rules/agent-memory-hygiene.md, recursive-self-improvement-loop.md.
+- `f7e902fb` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 데이터 출처 요약: 반복된 사용자 원문 불만 (욕설/질책/수사의문문).
+- `8354db01` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 데이터 출처 요약: CONTRADICTS 관계 있는 decisions (Hugh가 여러 번 거부한 패턴).
+- `90e9934e` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델: 자동화 시스템이 사용자를 "대체"하려는 구조인지 점검할 때.
+- `3ed39efe` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 2. 대체보다 증강: 자동화는 선호하지만, 최종 판단 저자성까지 가져가는 시스템은 거부합니다.
+- `2e0634ed` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 3. 표면보다 구조: 잘 정리된 문장보다, 실제로 반복 적용 가능한 구조가 중요합니다.
+- `119dbcb7` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 5. 장기 축적형 사고: 같은 실수를 반복하지 않도록 memory, hook, skill, rule로 승격되는 구조를 높게 평가합니다.
+- `0de8e2dc` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: 자동화 제안 시 "이 구조가 사용자의 판단권을 약화시키는가"를 먼저 점검합니다.
+- `585a00f5` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: [ ] 표면적 요약이 아니라, 반복 적용 가능한 판단 기준을 남겼는가?
+- `2bd77c28` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: 자동화가 판단 대체로 기울면, 사용자 승인 지점과 판단 보존 지점을 다시 설계합니다.
+
+## constraint (181)
+
+- `ad311b7d` 2026-03-25 [global] Claude Code operates as request-response model and cannot sustain infinite loops (context window fills after ~20-50 experiments)
+- `0244ede6` 2026-03-25 [global] 모든 프로젝트에 적용하는 공통 테스트 구조는 불가능하며, 프로젝트별 맞춤형 테스트 시나리오 구성 필요
+- `1d28ec32` 2026-03-25 [global] User excludes @mcp-b modules due to their transition to paid-only licensing
+- `29797597` 2026-03-25 [global] User requires checking episodic-memory for session exceptions before starting work (push restrictions, file modification restrictions)
+- `924c8b1c` 2026-03-25 [global] All tasks must be managed using task-based workflow (TaskCreate, TaskUpdate, TaskList)
+- `7687190b` 2026-03-25 [global] Telegram notifications are mandatory for all completed tasks with execution time required
+- `50cfeeb0` 2026-03-25 [global] PostToolUse hooks enforce code quality through agent-permission-check, no-localstorage validation, and auto-validate mechanisms
+- `193af546` 2026-04-03 [global] fit5x5 memory — Fit5x5 프로젝트 메모리 / Flutter 환경 설정 / Flutter 경로: 대안: /usr/local/bin/flutter 또는 절대 경로 사용 필요.
+- `fbf6a605` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📋 모달 처리 체크리스트 (필수!) / 시간 선택 모달 처리 3단계: 모든 예약 스크립트는 다음 3단계 모달 처리 로직을 따라야 합니다:.
+- `7adbb4ba` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 💾 DB 저장 필수 규칙 / 1. reservation_attempts 테이블: 모든 예약 시도는 반드시 기록해야 함!
+- `6f78b6ce` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 💾 DB 저장 필수 규칙 / 1. reservation_attempts 테이블: 저장 시점: 예약 시도 완료 직후 (성공/실패 무관).
+- `edc495f1` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 💾 DB 저장 필수 규칙 / 2. apicalllogs 테이블: 모든 API 호출은 반드시 기록해야 함!
+- `68808fbc` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 💾 DB 저장 필수 규칙 / 2. apicalllogs 테이블: 저장 시점: 레스토랑별 테스트 완료 후.
+- `3c12f7a4` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📊 성능 목표: page.evaluate() 기반 필수 API만 호출.
+- `0568a639` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!): 모든 테스트는 아래 우선순위에 따라 실행:.
+- `37407e88` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 🚨 1순위: 최적화된 API 테스트 (2025-12-13 NEW!): 속도: 1-2초/레스토랑 (9초 → 1-2초로 4-8배 향상!).
+- `2c07f05d` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 🚨 1순위: 최적화된 API 테스트 (2025-12-13 NEW!): 방식: page.evaluate() 기반 필수 API만 직접 호출.
+- `72002b0a` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 🚨 1순위: 최적화된 API 테스트 (2025-12-13 NEW!): 용도: 예약 가능 여부 빠른 확인.
+- `3ea4910d` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 🚨 1순위: 최적화된 API 테스트 (2025-12-13 NEW!): ✅ Cloudflare 우회: 브라우저 컨텍스트 내에서 API 호출.
+- `583faf7d` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 🚨 1순위: 최적화된 API 테스트 (2025-12-13 NEW!): ✅ 3가지 상태 분류: success, unavailable, failed.
+- `4b52bf7a` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 🚨 1순위: 최적화된 API 테스트 (2025-12-13 NEW!): ✅ DB 저장: reservation_attempts 자동 저장.
+- `ec5ae65a` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 2순위: 하이브리드 테스트 (Legacy): 속도: 9초/레스토랑.
+- `a3121e4b` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 2순위: 하이브리드 테스트 (Legacy): 병렬: 5개 브라우저 컨텍스트.
+- `8480b561` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 2순위: 하이브리드 테스트 (Legacy): 용도: 예약 가능 여부 확인 + API 캡처.
+- `ebd8e485` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 2순위: 하이브리드 테스트 (Legacy): ✅ Cloudflare 우회 성공: 브라우저 컨텍스트 내 API intercept.
+- `cc0e1356` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 2순위: 하이브리드 테스트 (Legacy): ✅ DB 저장: reservationattempts, apicall_logs 자동 저장.
+- `9449acc7` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / ❌ 사용 금지: 순수 API 직접 호출: 차단됨: state: -999 (Cloudflare).
+- `be91ed79` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / ❌ 사용 금지: 순수 API 직접 호출: axios/fetch 직접 호출은 모두 차단됨.
+- `a81c3847` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 2순위: 다중 날짜/시간 테스트 (대량 테스트 시): 속도: 6초/레스토랑.
+- `30315236` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 2순위: 다중 날짜/시간 테스트 (대량 테스트 시): 용도: 여러 날짜/시간 조합 자동 시도.
+- `1cdf3693` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 2순위: 다중 날짜/시간 테스트 (대량 테스트 시): 장점: multi-datetime-strategy 적용.
+- `a2f94987` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 3순위: UI 테스트 (패턴 학습 시): 속도: 40초/레스토랑.
+- `76b656aa` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 3순위: UI 테스트 (패턴 학습 시): 용도: 패턴 학습, 스크린샷 필요 시, 레스토랑 수집.
+- `7ea77015` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 3순위: UI 테스트 (패턴 학습 시): Exhibition 페이지에서 레스토랑 목록 수집.
+- `fb404c5c` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 3순위: UI 테스트 (패턴 학습 시): 새로운 예약 플로우 패턴 분석.
+- `74072ce1` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 🚀 테스트 방식 우선순위 (필수!) / 3순위: UI 테스트 (패턴 학습 시): DOM 셀렉터 추출.
+- `b624eeaa` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: 작업 시작 전 확인:.
+- `1f88fff1` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: [ ] catchtable-auth.json 파일 존재 확인.
+- `0466a8e3` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: [ ] 쿠키 유효성 확인 (마이페이지 접근 테스트).
+- `f298d3f7` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: [ ] Supabase 연결 확인.
+- `36cc9405` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: [ ] reservationattempts, apicall_logs 테이블 존재 확인.
+- `6e26f463` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: 작업 완료 후 확인:.
+- `c6845d3b` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: [ ] Supabase에 모든 시도 기록 저장됨.
+- `9ddf9faa` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: [ ] 스크린샷 screenshots 디렉토리에 저장됨.
+- `ac1c446b` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: [ ] 텔레그램 알림 전송됨.
+- `87fdbe55` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: [ ] 브라우저 정상 종료됨.
+- `7222cc01` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: 업데이트: 2025-12-13.
+- `3b0859cc` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: 작성자: Claude (Manager Orchestrator).
+- `3d4d113d` 2026-04-03 [global] reservation-workflow memory — 예약 워크플로우 규칙 / 📝 체크리스트: 목적: 예약 자동화 시스템 개선 및 안정화.
+- `e5202a7d` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 사과/변명 금지: Hugh는 사과를 헛소리로 취급한다.
+- `abd9b688` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 사과/변명 금지: ❌ "죄송합니다, 배포 전 테스트를 하지 않았습니다".
+- `2f7bd868` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 사과/변명 금지: → Hugh: "이게 말이 돼?".
+- `17c50201` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 사과/변명 금지: ❌ "앞으로 주의하겠습니다".
+- `363ddb52` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 사과/변명 금지: → Hugh: 관심 없음.
+- `c4df4d02` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 사과/변명 금지: ✅ "배포 중단하고 테스트부터 하겠습니다" + 즉시 실행.
+- `a2fa4fd2` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 사과/변명 금지: ✅ "재실행 중 — 2분 후 결과 보고".
+- `6ee6e45b` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 사과/변명 금지: "왜 틀렸는지"가 아니라 "지금 어떻게 고치는지"만 말한다.
+- `2a57d3e7` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 장문 리포트 금지: Hugh는 이모지 가득한 마케팅 문구/헤더 범벅을 싫어한다.
+- `268996c6` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 장문 리포트 금지: 필요한 것: 핵심 1~3줄 + 증거 경로.
+- `55dd30f1` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 장문 리포트 금지: 예: ✅ 완료 — /tmp/screenshot.png, build exit 0, Codex CRITICAL 0.
+- `96fd9ae8` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / "확인해주세요" 떠넘기기 금지: ❌ "dev 서버에 접속해서 확인해주세요".
+- `f9fe2080` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / "확인해주세요" 떠넘기기 금지: → Hugh: "야 이걸 하나씩 내가 대답해야돼?".
+- `f06192d8` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / "확인해주세요" 떠넘기기 금지: ✅ agent-browser로 Claude가 직접 확인 → 스크린샷 + DOM eval 결과 제시.
+- `a12c61eb` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 중간 질문 금지 (반복 루프): ❌ "N차 완료. 계속 진행할까요?".
+- `e44e7deb` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 중간 질문 금지 (반복 루프): → Hugh: "사실 1차부터 17차까지 멈추지 않고 진행했어야해 그게 내가 원한거야".
+- `9bb46517` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 중간 질문 금지 (반복 루프): ✅ 수렴 또는 EXHAUSTED까지 무정지 자동 반복. 중간 보고는 OK, 중간 질문은 NO.
+- `26c68e1b` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 중간 질문 금지 (반복 루프): 자세한 규칙: ~/.claude/rules/convergence-loop-no-mid-question.md.
+- `40534f8e` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 중간 질문 금지 (반복 루프): Hugh 본인 원문: "이모지는 붙여도되, 텔레그램 알림으로 보낼때만 안붙이면돼".
+- `04304460` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 중간 질문 금지 (반복 루프): 일반 응답/리포트: 이모지 허용 (✅ ❌ 🚨 ⏱️ 등 상태 표시용).
+- `4a7d3b67` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 중간 질문 금지 (반복 루프): 텔레그램 알림 본문: 이모지 사용 (~/.claude/CLAUDE.md 알림 포맷의 이모지는 예외 — ✅ 📋 ⏱️ 📅).
+- `b3a0e17a` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Claude가 Hugh에게 응답할 때의 규칙 / 중간 질문 금지 (반복 루프): 이모지 남용/장식용 금지. 각 이모지는 의미를 가질 것.
+- `ddf52abb` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 대답 속도 기대치: 장시간 작업 시 중간 진행 상황 보고 필수 (침묵하면 "멈춘거야?" 질문 유발).
+- `6c2e51c9` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): trader-hugh/a36982f0-b309-44e2-a249-5157d380f07e.jsonl (push 금지 위반 분노).
+- `1108ec23` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목: Hugh는 "한 번 주의 주면 다시는 어기지 마라"는 기대가 있다.
+- `0255ff4d` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목: 특히 본인이 직접 명시한 예외 지시(exception directive)는 절대 어기면 안 된다.
+- `b592750f` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 1. Push 금지 지시를 어긴 push: 원문 증거 (2026-03-04 trader-hugh):.
+- `a82807ca` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 1. Push 금지 지시를 어긴 push: Hugh의 push 금지 지시는 범위가 다양하다 (영구/일시/특정 브랜치).
+- `c6a124d7` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 1. Push 금지 지시를 어긴 push: Claude가 "영구 금지"로 오해하고 GLOBAL CLAUDE.md에 박아버리면 다음 세션에 혼란.
+- `266d3dea` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 1. Push 금지 지시를 어긴 push: Claude가 "방금만 금지"로 오해하고 다음 턴에 push하면 이번 세션에서 분노.
+- `94568540` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 1. Push 금지 지시를 어긴 push: 해결: 예외 지시의 scope와 expiry를 즉시 질문하고 session state에 기록.
+- `3c138b28` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 4. "확인해주세요" 사용자 떠넘기기: UI 변경 후 "dev 서버에서 확인해주세요" 같은 떠넘기기 금지.
+- `bb9595c3` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 4. "확인해주세요" 사용자 떠넘기기: 연계 규칙: ~/.claude/rules/qa-browser-test-required.md.
+- `9a3d088a` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 5. 사용자가 두 개 요청했는데 한 개만 구현: 연계 규칙: ~/.claude/rules/qa-browser-test-required.md — "요구사항 양쪽 구현 필수".
+- `ceb696a0` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / 체크 항목 (모든 작업 시작 시): claude-mem search push 금지, 설정 변경 금지 등.
+- `7efc7bae` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / 체크 항목 (모든 작업 시작 시): [ ] 현재 세션에서 받은 지시 중 "금지/하지마" 표현이 있는가?
+- `a2426458` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Hugh의 근본 불만 (모든 zero-tolerance의 공통점): trader-hugh/a36982f0-b309-44e2-a249-5157d380f07e.jsonl (push 금지 위반 5연타).
+- `faa0bdaa` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Hugh의 근본 불만 (모든 zero-tolerance의 공통점): 연계 규칙: cli-automation-first.md, qa-evidence-format.md, qa-browser-test-required.md.
+- `5bd2b569` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L2: API 정합성: 중요: 200만으로 PASS 금지 — DB 재조회로 실제 저장 검증.
+- `e1496eeb` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L4: UI 인터랙션 (HARD): Read 도구로 스크린샷 이미지 직접 확인 (파일 존재만으로 PASS 금지).
+- `a7ebd4ef` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 인터랙션 테스트 금지 패턴: Hugh 원문 증거 (2026-04-01 Article21):.
+- `7c506ca2` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 인터랙션 테스트 금지 패턴: ❌ agent-browser snapshot | grep "저장" → "버튼 존재, PASS".
+- `8f573bc7` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 인터랙션 테스트 금지 패턴: ❌ API GET 200만 확인하고 POST/PUT/DELETE 안 함.
+- `8ab6ec58` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 인터랙션 테스트 금지 패턴: ❌ 리스트 페이지만 확인하고 상세 페이지 인터랙션 스킵.
+- `34ec7d83` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 인터랙션 테스트 금지 패턴: ❌ curl redirect chain만 추적하고 실제 브라우저 접속 안 함 (OAuth 흐름 등).
+- `1585cbee` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 인터랙션 테스트 금지 패턴: ✅ agent-browser click {저장ref} → toast 확인 → API 200 → 재조회.
+- `d6311b38` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 인터랙션 테스트 금지 패턴: ✅ agent-browser type {inputref} "값" → click {submitref} → 결과 확인.
+- `3ad066eb` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 인터랙션 테스트 금지 패턴: ✅ CRUD 라운드트립: POST → GET 재조회 → 값 일치.
+- `36380b82` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 인터랙션 테스트 금지 패턴: 연계 규칙: ~/.claude/rules/qa-browser-test-required.md.
+- `20364360` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): "PASS 보고" 직전에 위 체크리스트 자동 실행.
+- `fbb69ff2` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): 연계 규칙: completion-verification.md, qa-browser-test-required.md, qa-evidence-format.md, qa-screenshot-required.md.
+- `99d4cf31` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지: Hugh의 단호한 선언 (2026-04-17 cc-sync 세션):.
+- `f3efcb93` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지: ❌ "N차 완료. 계속 진행할까요?".
+- `807da8a9` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지: ❌ "이대로 진행하시겠습니까?".
+- `1eb3cf17` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지: ❌ "준비 완료 — 다음 Bash 호출로 Iter N+1 시작".
+- `b0a15a96` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지: ❌ "제안만 하고 실행 안 함".
+- `70804ad6` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지: ✅ "3차 완료 — CRITICAL 2개 발견, 수정 후 4차 진행" + 실제 Bash 실행.
+- `6aeab16d` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지: ✅ 중간 보고 1줄 + 즉시 다음 iter 실행.
+- `11df405f` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지: ✅ 수렴/EXHAUSTED 도달 시 최종 보고.
+- `deda9587` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지 / 종료 조건 (이것만 허용): 사용자가 명시적으로 "중단/stop/done" 지시.
+- `2f86db42` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지 / 종료 조건 (이것만 허용): EXHAUSTED (13개 전략 소진 + 5회 연속 실패).
+- `6adf59dd` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지 / 종료 조건 (이것만 허용): 물리적 리소스 한계 (context/token 소진).
+- `3f95ebac` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지 / 종료 조건 (이것만 허용): CLAUDE.md의 5개 에스컬레이션 기준:.
+- `3dd02e4b` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지 / 종료 조건 (이것만 허용): 3회 수렴 (동일 FAIL 반복).
+- `c3251759` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지 / 종료 조건 (이것만 허용): 기술 스택 변경.
+- `9d0d3b56` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지 / 종료 조건 (이것만 허용): 비용 발생 결정.
+- `a62d07cb` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지 / 종료 조건 (이것만 허용): 데이터 삭제/마이그레이션.
+- `50e35593` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지 / 종료 조건 (이것만 허용): 시스템 신뢰 경계 밖.
+- `157595ff` 2026-04-22 [global] 04-automation-loop-philosophy memory — Hugh의 자동화/루프 철학 / "계속 진행할까요?" 질문 금지 / 종료 조건 (이것만 허용): 연계 규칙: ~/.claude/rules/convergence-loop-no-mid-question.md.
+- `051a2b73` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 텔레그램 알림 포맷 (표준): 소요시간 절대 빠뜨리지 말 것 (CLAUDE.md 원문 강조).
+- `a1050132` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 장문 출력 금지: Hugh는 마케팅 문구 범벅을 싫어한다.
+- `53ea095c` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 장문 출력 금지: 🎉🎊🚀✨ 축하 이모지 연타.
+- `13b9d9fe` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 장문 출력 금지: "훌륭합니다!" / "완벽하게 해결됐습니다!" 문구.
+- `2a51f5ba` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 장문 출력 금지: 본문 내용보다 긴 제목/부제목 구조.
+- `1757e01d` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 장문 출력 금지: 불필요한 "이전 상태 → 이후 상태" 비교표.
+- `3bba9f3e` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 장문 출력 금지: ✅ 완료, ❌ FAIL, 🚨 BLOCK 같은 상태 아이콘.
+- `0b8df942` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 장문 출력 금지: 스크린샷 첨부/경로.
+- `55aa4002` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 장문 출력 금지: 증거 파일 경로 목록.
+- `d69f45de` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 스크린샷은 Read로 직접 확인 후 판정: 연계 규칙: ~/.claude/rules/qa-screenshot-required.md.
+- `d123e9db` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: [ ] 생성한 모든 파일의 절대 경로를 보고에 포함했는가?
+- `e3829723` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: 절대 경로 누락 → 즉시 전체 경로 추가 보고.
+- `7355c3be` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: 텔레그램 소요시간 누락 → 다음 알림부터 반드시 포함.
+- `7aaf4709` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: 연계 규칙: qa-screenshot-required.md, token-brevity-pattern.md.
+- `a137f611` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준): RLS 정책 필수.
+- `337885ac` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 프론트엔드 (React 계열): server.host: '127.0.0.1' 필수 (portless 호환).
+- `a67ec0fb` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 백엔드 (Java): JPA 캐시 주의 (재조회 API로 검증).
+- `8d3e4bcb` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / Multi-Scope 확인 필수: Hugh 원문 증거 (2026-04-21 ufc-harness):.
+- `d202506e` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / Multi-Scope 확인 필수: Vercel/Supabase 등 multi-team/org 있는 서비스에서 default scope만 확인 금지.
+- `cae3f282` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / Multi-Scope 확인 필수: vercel teams ls → 모든 team 순회.
+- `46b79d18` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / Multi-Scope 확인 필수: supabase orgs list + MCP orgs 비교 (MCP ≠ CLI 계정일 수 있음).
+- `8ee2c155` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / Multi-Scope 확인 필수: 연계 규칙: ~/.claude/rules/multi-scope-cli-enumeration.md, mcp-cli-account-divergence.md.
+- `b2360c38` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 금지 기술 패턴 / localStorage 금지 (HARD): Supabase Auth 내부(sb-*-auth-token) 제외.
+- `b29dd33a` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 금지 기술 패턴 / localStorage 금지 (HARD): 사용자 데이터는 Supabase 서버 저장.
+- `0c1f8068` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 금지 기술 패턴 / localStorage 금지 (HARD): hook으로 감지: no-localstorage.sh.
+- `085e2e05` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 금지 기술 패턴 / 타입 회피 금지: ❌ as any.
+- `f8cd16d6` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 금지 기술 패턴 / 타입 회피 금지: ❌ @ts-ignore.
+- `fc5cbc80` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 금지 기술 패턴 / 타입 회피 금지: hook으로 감지: code-quality-check.sh.
+- `91719ea6` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 금지 기술 패턴 / 민감 파일 커밋 금지: .env, credentials.json.
+- `cef09ef2` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 금지 기술 패턴 / 민감 파일 커밋 금지: hook으로 차단: no-env-commit.sh.
+- `d74d3ad5` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 금지 기술 패턴 / default export 금지: Named export만 사용 (React/Vue 컴포넌트).
+- `776e4c32` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 금지 기술 패턴 / default export 금지: 트리쉐이킹 + 리팩토링 용이성.
+- `6610cafc` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / Dev 서버 실행: portless 필수:.
+- `616e0da7` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / Dev 서버 실행: hook으로 감지: portless-required.sh.
+- `f4d5f607` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: 기본 템플릿 그대로 사용 금지 — "밋밋하면 안 됨".
+- `2ebe60f4` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: frontend-design / vs-design-diverge 스킬 활용 필수.
+- `12dc9300` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 사과 대신 수정 증거: ❌ "앞으로 주의하겠습니다".
+- `5a4867f1` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 조기 선언 금지: Hugh 원문 증거 (2026-04-07 KFM "100% 커버리지" 오보고 3회, 2026-04-12 "수렴" 선언 후 사용자 질문으로 gap 발견):.
+- `7f2fc4cc` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 조기 선언 금지 / 조기 선언 패턴 (금지): ❌ 샘플링하고 "100% 커버리지" 주장.
+- `609b6add` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 조기 선언 금지 / 조기 선언 패턴 (금지): ❌ hook 존재만 확인하고 "포괄적 검증" 주장.
+- `5fe7747e` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 조기 선언 금지 / 조기 선언 패턴 (금지): ❌ "더 이상 개선할 것이 없다" 선언 후 다음 질문에 새 gap 발견.
+- `071c6c3c` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 조기 선언 금지 / 자가 검증 (3관점 이상): "더 이상 개선할 것 없다"고 선언하기 전:.
+- `2ef41935` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 조기 선언 금지 / 자가 검증 (3관점 이상): scope 관점: user-scope만 봤나? project-scope는? hook-templates는?
+- `613350f0` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 조기 선언 금지 / 자가 검증 (3관점 이상): lifecycle 관점: 차단(exit 2)만 봤나? 지시 주입(additionalContext)은?
+- `6a636fd0` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 조기 선언 금지 / 자가 검증 (3관점 이상): 연계 관점: 개별 hook 말고 파이프라인 전체 연결점은?
+- `8f7ce514` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 조기 선언 금지 / 자가 검증 (3관점 이상): 문서-구현 관점: SKILL.md에 적힌 것 중 실제 구현 없는 것은?
+- `bf7401fc` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 조기 선언 금지 / 자가 검증 (3관점 이상): 하나라도 "확인 안 함"이면 수렴 선언 금지.
+- `2e63c176` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / "완료"의 조기 선언 금지 / 자가 검증 (3관점 이상): 연계 규칙: ~/.claude/rules/completion-verification.md.
+- `2fbb700b` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 수치 보고 필수: "100%, 전부, 모든" 표현 사용 시 실제 수치 명시 (HARD 승격 2026-04-07):.
+- `8e478ce7` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 수치 보고 필수: ✅ "12/12 시트 존재 + 29/80 필드 값 비교 (Overview 17, KPI 9, Waterfall 3)".
+- `e40b5bae` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 수치 보고 필수: ❌ "12시트 100% 커버리지" (셀 비교 수 미명시).
+- `ec403a69` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / Self-Challenge 표 필수: 완료 선언 전 항상 표로 각 항목 증거 정리:.
+- `4df5494c` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / Self-Challenge 표 필수: 하나라도 미확인/FAIL → 사용자 보고 금지.
+- `7f0eeeae` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / Self-Challenge 표 필수: bug-fixer 자동 호출로 보완.
+- `d94f992c` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 고객사 관련 지시: 고객사 결정 없이 기술 선택 임의로 변경 금지.
+- `d4fff1ba` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 견적/일정/비용 문서: 절대 경로 전달.
+- `1f64426b` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리: 다른 프로젝트 언급 시 프로젝트 루트 절대 경로 함께.
+- `b39ed567` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 트레이딩 (trader-hugh): 서머타임 고려 필수 ("서머타임 기간인데 그냥 또 지났네?").
+- `b0d27cc2` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): "왜케 느려? 어디까지 하다 멈춘건데?" — 장시간 침묵 금지.
+- `8fef4bd8` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 시작 / 완료 / 실패 3시점은 반드시 알림.
+- `b963edbb` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): [ ] 여러 프로젝트 언급 시 절대 경로 포함했는가?
+- `180eb431` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 데이터 출처 요약: constraint category의 금지 표현.
+- `b7c273fe` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: 새로운 분류/온톨로지/메모리 구조를 제안할 때, 반드시 손실과 한계를 같이 적습니다.
+
+## preference (174)
+
+- `e55f043b` 2026-03-25 [global] User prefers parallel agent launches for comprehensive code reviews (code reuse, quality, efficiency)
+- `1bcc2260` 2026-03-25 [global] User employs autonomous research loop methodology (karpathy/autoresearch style) for iterative experimental optimization
+- `73e7747f` 2026-03-25 [global] User prefers collaborative dialogue approach for turning ideas into designs before implementation
+- `b5b5809f` 2026-03-25 [global] User prefers documenting work in both Markdown and interactive HTML dashboard formats with multiple tabs
+- `0d07d79e` 2026-03-25 [global] User prioritizes clear meaning transfer and pacing in video presentations over speed
+- `68d61876` 2026-03-25 [global] Documentation should exclude obvious practices and generic instructions, focusing on project-specific architecture decisions
+- `9ed3b8bf` 2026-03-25 [global] User prefers real-time progress updates at 1-minute intervals with detailed metrics (batch number, collected count, failures, percentage)
+- `3f84f32b` 2026-03-25 [global] User prefers practical workarounds and tool stacking (e.g., Figma MCP → Pencil MCP) over direct import features
+- `41f8a0c1` 2026-03-25 [global] User prefers slash command interface for skill invocation over natural language auto-detection
+- `4d41c2b3` 2026-03-25 [global] User prefers ultrathink for deep algorithmic analysis and code review
+- `968ac36f` 2026-03-25 [global] User values design-first approach and prioritizes strategy implementation validation before code structure refactoring
+- `620542a5` 2026-03-25 [global] User avoids including obvious or generic instructions in technical documentation (e.g., generic development practices)
+- `4e3a8e69` 2026-03-25 [global] User prioritizes cost-effective testing solutions over proprietary MCP servers
+- `dc0658fe` 2026-03-25 [global] User communicates in Korean and uses structured phase-based workflows with parallel task execution
+- `9327db5e` 2026-03-25 [global] User prefers subagent-driven development approach with fresh subagents per task and two-stage review (spec compliance then code quality)
+- `20a1e17e` 2026-03-25 [global] User requires all responses in Korean language
+- `84350aa5` 2026-03-25 [global] User prefers both markdown documentation and multi-tab interactive HTML dashboards for complex technical information
+- `0bf35f12` 2026-03-25 [global] User prefers having CLAUDE.md documentation files that explain project architecture, setup commands, and API endpoints specific to each codebase
+- `4e41f4c1` 2026-03-25 [global] User prefers not to create pull requests for certain repository cleanup tasks
+- `fc024d4b` 2026-03-25 [global] User prefers to use `claude plugin update` for updating plugins rather than reinstalling them
+- `47bde403` 2026-03-25 [global] User monitors batch processing progress in real-time with 1-minute status updates
+- `67e3fbac` 2026-03-25 [global] User prefers task orchestration through team-lead agent with specific phase instructions (e.g., 'skip phase X, do phases Y and Z')
+- `064b7fb5` 2026-03-25 [global] User prefers to work with Korean-language file paths and documentation
+- `d8bb29ed` 2026-03-25 [global] 복잡한 설계 작업 전에는 설계 검증을 필수적으로 진행
+- `bbff3c7f` 2026-03-25 [global] 분석 리포트 작성 시 고effort 모드(ultrathink) 활용
+- `2ecda3a5` 2026-03-25 [global] User prefers a structured validation approach that separates strategy verification from code implementation, with user approval required before making changes
+- `fdf6a21f` 2026-03-25 [global] User prefers minimal/clean dependencies and removes unnecessary packages
+- `ce06646a` 2026-03-25 [global] User wants to ensure auto-injected hooks don't persist across sessions
+- `be4ffe49` 2026-03-25 [global] User expects shadcn/ui skill to be available in Claude Code environment
+- `efac828e` 2026-03-25 [global] User expects CLAUDE.md file to document commands, architecture, and development workflow
+- `7fc92c38` 2026-03-25 [global] User prefers handling Git operations without creating pull requests when they explicitly request it
+- `a8d3f8ec` 2026-03-25 [global] User prefers team-orchestrator skill for coordinating multi-phase projects with brainstorming and planning in Phase 0
+- `6bbaeadf` 2026-03-25 [global] User uses 'cc' alias for claude --dangerously-skip-permissions --continue
+- `6db3bbcc` 2026-03-25 [global] User clones GitHub repositories locally for direct source analysis rather than relying solely on API calls
+- `92ba9ccb` 2026-03-25 [global] User prefers explicit work instructions (e.g., '4번부터 진행하고, 2,3 도 진행해, 1번은 하지마') over open-ended task delegation
+- `5b60f8b6` 2026-03-25 [global] User prefers impact analysis before implementing fixes to understand full scope of changes
+- `38595de9` 2026-03-25 [global] User prefers not to use auto-injected development tools/hooks without explicit consent
+- `e146c8e6` 2026-03-25 [global] User prefers inline brainstorming and planning within phase workflows rather than separate skill invocations
+- `8bdfcec9` 2026-03-25 [global] User uses Claude Code CLI with alias 'cc' for skipPermissions and continue flags
+- `2964868f` 2026-03-25 [global] User expects automatic git commits and pushes when work is error-free
+- `6a7d7244` 2026-03-25 [global] User is Korean-speaking and uses Korean for task descriptions, component naming, and technical terminology for domain-specific concepts
+- `ed5df15a` 2026-03-25 [global] User prefers brainstorming/design approval before any implementation work
+- `c352d65e` 2026-03-25 [global] User prioritizes rapid deployment over perfect feature completeness
+- `79c80c98` 2026-03-25 [global] User works in Korean language context (activeForm contains Korean text '구현 계획 수립 및 팀 실행 중')
+- `28b99429` 2026-03-25 [global] User prefers systematic code exploration through reading core files before requesting planning assistance
+- `496df45c` 2026-03-25 [global] User prefers concise Korean responses and uses gh CLI for GitHub operations
+- `8e21eac9` 2026-03-25 [global] User prefers storing complex multiline JavaScript in temporary files rather than inline eval for better readability
+- `df160158` 2026-03-25 [global] User prefers using Korean language for communication, task descriptions, and code comments
+- `8c606103` 2026-03-25 [global] User prefers Korean language responses and requires auto-commit with push after successful work completion
+- `59b3246e` 2026-03-25 [global] All user requests must be managed using task-based system (TaskCreate/TaskUpdate/TaskList) rather than direct implementation
+- `5fc736ca` 2026-03-25 [global] Project requires all responses and documentation in Korean language (한글)
+- `b33b7ed0` 2026-03-25 [global] User speaks Korean and prefers Korean language for all communication, including responses, documentation, and technical content
+- `8679a8e1` 2026-03-25 [global] User automatically commits and pushes changes when no errors occur
+- `986e6e1b` 2026-03-25 [global] Git commit messages should exclude AI-related content and use Korean or English clearly
+- `8dd096d7` 2026-03-25 [global] All requests must be managed using task-based workflow (TaskCreate, TaskUpdate, TaskList)
+- `2da5e674` 2026-03-25 [global] Project uses Korean language for documentation and comments, with the primary user communicating in Korean and using mixed Korean-English for technical content
+- `1afcdf1a` 2026-03-25 [global] User communicates task objectives and verification requirements in Korean
+- `89fc0c2f` 2026-03-25 [global] User uses Korean as a working language for task documentation and planning, and works with bilingual documentation/governance structures.
+- `9dea1122` 2026-03-25 [global] User works in Korean language environment with configuration checks and analysis scripts written in Korean comments
+- `075f275d` 2026-03-25 [global] User has high token limits configured (CLAUDE_CODE_MAX_OUTPUT_TOKENS: 128000)
+- `99e42c1b` 2026-03-25 [global] The user is multilingual, communicating in both Korean and English, with Korean as the primary language and a strong preference for Korean responses; they use mixed Korean-English in technical documents.
+- `28685054` 2026-03-25 [global] User prefers direct action without repetitive clarification questions
+- `1f6ef42a` 2026-03-25 [global] User prefers to use Task for work management and tracking
+- `3cd85ae7` 2026-03-25 [global] User requested comprehensive data validation to verify no missing fields in analytics dataset
+- `cedf410c` 2026-03-25 [global] User performs deep code analysis to extract actual coding patterns including naming conventions, layer structure, import patterns, and error handling
+- `7053ab54` 2026-03-25 [global] User installs Go binaries to ~/.local/bin directory
+- `f9e51a47` 2026-03-25 [global] User prefers creating CLI aliases for frequently-used MCP server commands
+- `a4b47d6a` 2026-03-25 [global] User expects AI assistants to admit LLM limitations (e.g., 'I'm actually 90% done, not 100%') rather than overstate completion confidence
+- `97ca040d` 2026-03-25 [global] Developers consistently use Korean-language TODO comments to mark simulation/mock code intended for future replacement with real API calls
+- `81154a24` 2026-03-25 [global] User delegates multi-task UI work to specialized frontend agent rather than implementing sequentially themselves
+- `4ec4dd81` 2026-03-25 [global] User is interested in persistent memory systems and agent cognitive architectures
+- `24d6cc08` 2026-03-25 [global] User has Flutter mobile development agent configured for mobile projects
+- `d9db7576` 2026-04-20 [global] iter-32-failure-lesson memory — Iter 32 실패 — "준비 완료" 위장 멈춤 / 왜 detector가 못 잡았나: "준비 완료" = 멈춤 — 명시적 질문 없어도 사실상 사용자 대기.
+- `71c404d3` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / Hugh의 실제 어조 (memory-bank 원문 증거) / 간결 극치 (대부분의 지시): 한 단어~한 문장. 사용자가 장문으로 상황을 다시 설명하게 하지 말 것. 컨텍스트는 Claude가 찾아내야 한다.
+- `1fe0efb8` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 대답 속도 기대치: Hugh는 빠른 피드백을 선호한다.
+- `551442b0` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일 / 체크 항목 (Hugh Clone이 Phase 6 보고 전 자가 검증): [ ] "확인해주세요" 같은 사용자 떠넘기기 문구가 없는가?
+- `136bab16` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목: 이 항목들은 경고 없이 즉시 사용자 불신을 유발한다.
+- `f39314a0` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 4. "확인해주세요" 사용자 떠넘기기: 원문 증거 (2026-03-26 BisFramework, 2026-04-21 ufc-harness):.
+- `0db7fa59` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 4. "확인해주세요" 사용자 떠넘기기: Claude가 agent-browser로 직접 navigate + click + screenshot → 결과 보고.
+- `47241516` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 5. 사용자가 두 개 요청했는데 한 개만 구현: 원문 증거 (2026-03-26~27 BisFramework):.
+- `849b230c` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 5. 사용자가 두 개 요청했는데 한 개만 구현: 사용자가 "A, B" / "A/B" / "행/열" 형태로 복수 항목 요청 시 양쪽 모두 구현 후 커밋.
+- `2cee1e0c` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / Top 5 Zero-Tolerance 항목 / 5. 사용자가 두 개 요청했는데 한 개만 구현: 한쪽만 끝내고 나머지를 "나중에 할 예정"으로 빼면 안 됨.
+- `b03392ee` 2026-04-22 [global] 02-zero-tolerance-violations memory — Hugh의 Zero-Tolerance 위반 항목 / 체크 항목 (모든 작업 시작 시): 원상복구 가능하면 원상복구 (push 됐으면 사용자에게 revert 허가 요청).
+- `0126127f` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L5: 시각 검증 + 사용자 기대 비교: 스크린샷을 사용자 기대 디자인과 비교.
+- `8b0b4378` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L5: 시각 검증 + 사용자 기대 비교: 빈 화면 / 깨진 레이아웃 / 잘못된 데이터 → 즉시 FAIL.
+- `e6087a81` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L5: 시각 검증 + 사용자 기대 비교: 이전 작업 결과가 사라지지 않았는지 (regression).
+- `84c64377` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / Hugh가 요구하는 QA 증거 레벨 / L5: 시각 검증 + 사용자 기대 비교: Hugh 원문 증거 (2026-04-09 AX-Wiki):.
+- `4c37d961` 2026-04-22 [global] 03-qa-evidence-depth memory — Hugh의 QA 증거 깊이 기준 / 체크 항목 (QA PASS 선언 전): [ ] L5 스크린샷을 Read로 직접 확인 + 사용자 기대와 비교.
+- `151193b6` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준: 사용자에게 완료 보고할 때.
+- `1e24f21f` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 스크린샷은 Read로 직접 확인 후 판정: 사용자 기대와 비교 ("렌더링됐는가"가 아닌 "올바른가").
+- `240c8d00` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: 사용자가 특정 폴더/파일을 지정하며 "비교해줘"라고 하면.
+- `cf2052c3` 2026-04-22 [global] 05-report-and-handoff-format memory — Hugh의 보고/전달 포맷 기준 / 이전 세션 산출물 비교 요청: [ ] 사용자 요청 원문을 보고에 짧게 재언급했는가? (확인용).
+- `69cfe286` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도: 신규 프로젝트 설계, 기술 선택지 논의, architect-designer 호출 시.
+- `29e6bdbc` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준): Supabase 기본 (Postgres + Auth + Storage + Realtime).
+- `3e45103a` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준): Edge Functions TypeScript.
+- `93bc099a` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준): supabase CLI로 작업 (MCP 보조) — Hugh 원문: "supabase mcp 삭제하고 supabase cli 로 써".
+- `e89ffbe5` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 프론트엔드 (React 계열): Vite + React + TypeScript (Next.js보다 Vite 선호 경향).
+- `b2e178bc` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 프론트엔드 (React 계열): Tailwind CSS 기본.
+- `b54f3b9c` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 프론트엔드 (React 계열): shadcn/ui 또는 PrimeVue (admin 패널은 PrimeVue + Sakai 레이아웃).
+- `946b6357` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 프론트엔드 (React 계열): React Query (TanStack Query) — 서버 상태.
+- `c9b37cb2` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 프론트엔드 (React 계열): React Hook Form + Zod — 폼/검증.
+- `e2d5cb1a` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 프론트엔드 (Vue 계열): Vue 3 + Vite + TypeScript.
+- `f23c3b08` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 프론트엔드 (Vue 계열): PrimeVue 4.5 + Sakai 레이아웃 (article21-admin 기준).
+- `f84d78dc` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 프론트엔드 (Vue 계열): shadcn-vue보다 PrimeVue 선호.
+- `e9cf3773` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 프론트엔드 (Vue 계열): Flutter + Riverpod (Fit5x5).
+- `db97ae84` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 프론트엔드 (Vue 계열): Feature-first 구조: lib/features/{feature}/.
+- `d8808a65` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 프론트엔드 (Vue 계열): GoRouter + Dio + Interceptor.
+- `8eb588ea` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 백엔드 (Java): Spring Boot + Maven (BisFramework, HANY, KFM).
+- `3bea939a` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 백엔드 (Java): Vercel (프론트엔드).
+- `0f36b60d` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 백엔드 (Java): Supabase Edge Functions (서버리스).
+- `bdb2be7f` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 프로젝트 구조 매핑 (실제 Hugh 프로젝트 기준) / 백엔드 (Java): GitHub Actions 최소 사용 (복잡도 회피).
+- `14eb0ea6` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / CLI-First 원칙: Hugh는 Web UI Dashboard 대신 CLI로 모든 것 처리하길 원한다.
+- `408a779f` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / CLI-First 원칙: Supabase → supabase CLI.
+- `917e7975` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / CLI-First 원칙: Vercel → vercel CLI.
+- `679e049a` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / CLI-First 원칙: GitHub → gh CLI.
+- `d33681bc` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / CLI-First 원칙: 설정 변경 → Management API / REST API via curl.
+- `2a11cc33` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / CLI-First 원칙: ❌ "Supabase Dashboard에서 provider 활성화하세요" (Management API로 가능).
+- `445b9237` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / CLI-First 원칙: ❌ "Vercel에서 env var 설정하세요" (vercel env 가능).
+- `4b368713` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / CLI-First 원칙: ✅ GitHub OAuth App 신규 생성 (REST API 없음) → 수동 안내 OK.
+- `a3e94bd4` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / CLI-First 원칙: 연계 규칙: ~/.claude/rules/cli-automation-first.md.
+- `4ba9da45` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / Dev 서버 실행: 포트 번호 대신 .localhost 도메인.
+- `0b5f78dd` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / Dev 서버 실행: HTTPS: portless proxy start --https.
+- `d827cdfb` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 테스트 프레임워크: 브라우저 테스트:.
+- `679c2b84` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 테스트 프레임워크: agent-browser — DOM 검증/인터랙션 (기본).
+- `7c865b55` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 테스트 프레임워크: expect-cli — AI adversarial 보조.
+- `489736cb` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 테스트 프레임워크: WebMCP — DEPRECATED (Chrome Beta 한정).
+- `5bbf5700` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: Hugh 원문 증거 (2026-02-27 running-web):.
+- `875ce96f` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: UI 디테일에 집착 (투명도, 색상, 간격).
+- `4a1910d3` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: [ ] CLI로 처리 가능한 것을 dashboard 안내로 떠넘기지 않는가?
+- `d89cc463` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: [ ] Supabase 프로젝트면 RLS 정책 포함했는가?
+- `39004857` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: [ ] localStorage 사용하지 않았는가?
+- `da51a596` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: [ ] as any, @ts-ignore 사용하지 않았는가?
+- `b5b9c74f` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: [ ] Dev 서버 portless 래핑했는가?
+- `1c75cb60` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: [ ] Multi-scope CLI (Vercel/Supabase) 모든 scope 확인했는가?
+- `44ac88a0` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: [ ] 모바일 375px 반응형 고려했는가?
+- `988c73b5` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: hook들이 대부분 HARD 차단 (15개 hook 중 대부분).
+- `60dd8a91` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: SOFT 위반 (CLI 떠넘기기, dashboard 안내) → self-improve가 rule 승격.
+- `178b51d7` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: 세션 날짜: 2026-02-25, 2026-02-27, 2026-03-13, 2026-03-25, 2026-04-21.
+- `583aabd3` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: memory-bank 원문:.
+- `68ea05da` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: running-web/bc3be678 (Supabase CLI 선호, 반투명 UI).
+- `db2c1123` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: studio-bot-autoresearch/e6584cda ("supabase mcp 삭제하고 cli로").
+- `6e5b253f` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: article21-admin/fc580bb1 (PrimeVue 4.5 + Sakai 지시).
+- `c930adbe` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: ufc-harness/6b70402e (multi-scope CLI 사례).
+- `60e4f106` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: 연계 규칙: cli-automation-first.md, frontend-patterns.md, supabase-patterns.md, flutter-patterns.md, multi-scope-cli-enumeration.md.
+- `fbcf2feb` 2026-04-22 [global] 06-tech-stack-preferences memory — Hugh의 기술 스택 선호도 / 도메인별 Hugh 프로젝트 컨텍스트: ~/.claude/CLAUDE.md HARD 규칙 섹션.
+- `47028d9e` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의: Hugh에게 "완료" = 사용자 시점에서 동작 확인 + 증거 + 적용된 상태 + 알림까지.
+- `917324e8` 2026-04-22 [global] 07-completion-definition memory — Hugh의 "완료" 정의 / 체크 항목 (완료 선언 직전): cc-sync ("수렴" 조기 선언 후 사용자 질문).
+- `48353228` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 사용자 블로킹 (Claude가 지금 막고 있는 것) — 최우선.
+- `da32b8f4` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리 / 웨딩 (hugh-soft): 고객사 결정 필요 시 "사용자에게 고객사 확인 요청" 명시.
+- `d0e70930` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / "기준 점검" 모드: 사용자가 "이건 빼자 / 이건 더 추가하자" 같은 수정 요청 받음.
+- `16af8ad6` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: ❌ "네, 말씀하신 대로입니다" (사용자 의견 무비판 수용).
+- `5079633d` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: → 먼저 L1~L4 평가 → 사용자 승인 후 구현.
+- `806434df` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: [ ] 사용자 질문이 대화형인지 구현형인지 판단했는가?
+- `d2226119` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / 대화 모드 vs 구현 모드 구분: [ ] 사용자와 다른 의견은 근거와 함께 제시했는가?
+- `84c9f9d7` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소: ~/.claude/rules/는 크로스 프로젝트 범용 규칙 저장소입니다.
+- `2213702f` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소: hugh-clone 에이전트가 Phase 2 criteria 빌드 시 이 폴더의 모든 .md 파일을 스캔하여 적용합니다.
+- `7a76b8f8` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / hugh-clone 통합: ~/.claude/agents/hugh-clone.md 에이전트는 다음 순서로 이 폴더를 활용:.
+- `69205b38` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / hugh-clone 통합: Phase 1 명확화: memory-bank 검색 + 관련 hugh-standards 파일 프리로드.
+- `5eba42bf` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / hugh-clone 통합: Phase 2 criteria 빌드: build-criteria.sh가 이 폴더의 파일명을 JSON hugh_standards 배열에 포함.
+- `707d6ce5` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / hugh-clone 통합: Phase 3 orchestrator 위임: 위 파일들의 체크 항목을 orchestrator prompt에 포함.
+- `275bec29` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / hugh-clone 통합: Phase 5 독립 재검증: Self-Challenge 표 작성 시 각 기준별 증거 매핑.
+- `22346a63` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / hugh-clone 통합: Phase 6 보고: 05-report-and-handoff-format.md에 따라 출력.
+- `350e0b05` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 데이터 출처 요약: 본 기준들은 memory-bank 2869 facts + 138 preferences + 853 decisions를 다음 관점으로 추출:.
+- `d1ec42f9` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 데이터 출처 요약: preference category의 직접적 선호도 선언.
+- `bc0e83b5` 2026-04-22 [global] README memory — Hugh Standards — 사용자(jung-wankim) 개별 기준 축적 저장소 / 데이터 출처 요약: 최신 업데이트: 2026-04-22.
+- `2b32e205` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델: Hugh는 결과물의 표면 품질보다 대상을 왜곡하지 않는 구조, 장기적으로 축적 가능한 시스템, 사용자를 대체하지 않고 증강하는 도구를 더 중요하게 여깁니다.
+- `238ebbb5` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델: 사용자의 판단권을 죽이지 않아야 합니다.
+- `ccb67c3a` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델: 사용자 모델링 / persona / avatar / clone 계열 작업.
+- `4cdd18c3` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 2. 대체보다 증강: 에이전트/시스템은 "사용자 역할 대체"가 아니라 판단 증폭기로 설계해야 합니다.
+- `61ceb837` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 5. 장기 축적형 사고: Hugh는 일회성 산출물보다, 시간이 지날수록 더 강해지는 시스템을 선호합니다.
+- `33b5f782` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: 사용자 모델링 시 말투 복제보다 판단 기준 복제 가능성부터 따집니다.
+- `88e9508e` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: 사용자 모델링이 단순 페르소나 소개로 흐르면 self-mirror 관점으로 재작성합니다.
+- `cd6754a3` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: 현재 세션 분석 요약: Theo/My_Theo, SOUL.md, seed/ontology/memory 자료 기반 사용자 해석.
+- `8de4f084` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / Claude가 따라야 할 행동 규칙: memory-bank의 사용자 발화를 분석해 기준/요구/피드백을 구조화하고, 사용자 역할을 대신해줄 agent를 구성하려는 목적이 명시됨.
+
+## decision (34)
+
+- `ec2ab74f` 2026-03-25 [global] Full Claude Code ecosystem must be considered: orchestrator selection, specialist agents, skills, hooks, and slash commands work together
+- `b81e147b` 2026-03-25 [global] self-improve is triggered via two-stage hook: Stop hook detects fix: commits and saves pending files, UserPromptSubmit hook auto-executes self-improve next session
+- `0f013d51` 2026-03-25 [global] Chrome WebMCP (useRegisterMCP + Model Context Tool Inspector)를 통한 기능 테스트 도입 결정
+- `f288d14e` 2026-03-25 [global] @mcp-b 유료 제약으로 인해 navigator.modelContext + 공식 chrome-devtools-mcp 무료 스택으로 재설계
+- `2441eed9` 2026-03-25 [global] Phase 4 (QA)를 WebMCP 기반 기능 테스트로 강화하는 것이 목표
+- `0badbe59` 2026-03-25 [global] CLAUDE.md is used to document project-specific architecture, commands, and development patterns for future Claude Code instances
+- `57637bcc` 2026-03-25 [global] User uses Chrome 146 WebMCP feature with useRegisterMCP for browser-based functional testing
+- `1617e699` 2026-03-25 [global] User determined that applying a single common structure across all projects is not practically feasible
+- `ac9ecc9e` 2026-03-25 [global] useRegisterMCP is a mandatory technology for cross-project implementation
+- `fadeea92` 2026-03-25 [global] Phase 4 (QA) strengthening through WebMCP-based functional testing is the primary goal
+- `6eb35aab` 2026-03-25 [global] Test scenarios must be created per-project during planning phase, covering UI interactions, page navigation, API response validation, and visual layout verification
+- `bd25cd55` 2026-03-25 [global] Remotion is used to create programmatic technical videos and visualizations in React
+- `4ab7fd36` 2026-03-25 [global] User has Telegram notifications enabled for Claude Code operations
+- `521acccb` 2026-03-25 [global] User has configured Claude Code hooks for Telegram notifications on task completion/errors
+- `d6f98c8d` 2026-03-25 [global] User has configured usage tracking via Claude Code hooks to monitor Anthropic API usage and recommend model switching based on thresholds
+- `061acf72` 2026-03-25 [global] User has a pre-commit validation hook that enforces build, type checking, test gates, commit message validation, and tool usage checks before allowing git commits
+- `6e68fdae` 2026-03-25 [global] User deploys projects to Vercel (evidenced by vercel.json files in multiple projects)
+- `7141f52c` 2026-03-25 [global] System uses Claude Sonnet as default model with 200,000 token context budget per session and Markdown+code-block as preferred response format
+- `99345277` 2026-03-25 [global] Manager-Orchestrator agent uses dual-role pattern: Direct Executor for simple tasks (≤3 steps) and Task Delegator for complex projects (5+ steps)
+- `abea67b5` 2026-03-25 [global] MCP servers integrated: Figma (design), GitHub (source control), Puppeteer (automation), Stitch (integration), and Whimsical (planning)
+- `e981c54d` 2026-03-25 [global] Manager-orchestrator agent uses opus model and is explicitly constrained to NEVER write/edit production code directly
+- `e60814c8` 2026-03-25 [global] CLAUDE_AUTO_VALIDATE and CLAUDE_AUTO_RECOVERY environment variables control automatic validation and recovery behaviors
+- `a5cd3dbc` 2026-03-25 [global] Telegram notifications configured with TELEGRAM_NOTIFY_ENABLED=true for real-time monitoring and alerts
+- `b5a96a23` 2026-03-25 [global] User maintains team-based orchestration system with 5-member maximum team (team-lead + 4 specialists) for large-scale project management
+- `3dd70aec` 2026-03-25 [global] architect-designer agent is Phase 1 specialist exclusively handling project structure, configuration, and coding conventions without production code implementation
+- `5a695c60` 2026-03-25 [global] User has configured specialized security infrastructure including vulnerability-scanner skill, pentest-checklist, and security-specialist agent
+- `4ed8c980` 2026-03-25 [global] User built and installed mcptools CLI from github.com/f/mcptools source using Go 1.24.3
+- `59cfddfa` 2026-03-25 [global] User uses a Lean Team methodology with a team-orchestrator approach for large-scale project execution, employing specialized agents including team-lead, architect, db-admin, frontend-dev, backend-dev, and qa-tester roles.
+- `023a659a` 2026-03-25 [global] User has episodic-memory enabled in Claude settings at the superpowers-marketplace
+- `3a361489` 2026-03-25 [global] User maintains 36+ custom agents in ~/.claude/agents/ for specialized tasks across all projects
+- `ef8879b3` 2026-04-22 [global] 01-communication-style memory — Hugh의 커뮤니케이션 스타일: Hugh는 자신이 Claude에게 말할 때는 반말 + 짧은 지시 + 높은 감정 강도를 사용한다.
+- `525a63e7` 2026-04-22 [global] 08-business-context memory — Hugh의 사업/도메인 컨텍스트 / 프로젝트 병행 관리: memory-bank search로 해당 프로젝트의 이전 결정 복원.
+- `58866eb6` 2026-04-22 [global] 09-conversation-and-debate-mode memory — Hugh의 대화/논쟁 모드 기준 / Harsh Critic 태세: 6개월 후 후회할 결정은? (장기 관점).
+- `82792f5b` 2026-04-23 [global] 10-cognitive-architecture-and-self-model memory — Hugh의 인지 아키텍처와 자기 모델 / 2. 대체보다 증강: Hugh는 AI가 자신을 대신 결정하는 구조를 불편해합니다.

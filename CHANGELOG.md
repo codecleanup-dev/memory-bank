@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.12.3] - 2026-10-05
+
+_memory 계층 재설계 v0 (브리프 2026-10-05). 원작자 수입 fact 를 세션 주입에서만 빼고, upstream 추적 계약을 merge 의무에서
+cherry-pick 으로 바꾼다. 데이터 쪽 v0 항목(추출 백로그 정리·임베딩 백필)은 코드 변경 없이 운영 상태 파일과 DB 에서 처리했다._
+
+### Changed
+- **세션 주입 유산 컷오프** (`src/inject-core.ts`): `created_at < 2026-05-01` 인 fact 는 UserPromptSubmit 주입 후보와
+  관계 확장분에서 제외한다. 이 날짜 이전 fact 는 2026-03~04 cc-sync 도입기에 수입된 원작자 메모리 문서·세션 메모리다.
+  30일 실측: 주입 7,312건 중 38건(0.5%)이 유산이었고 "Hugh의 인지 아키텍처와 자기 모델" 이 3회 들어갔다.
+  검색·search_facts·그래프 도구에는 그대로 남는다. `MEMORY_BANK_INJECT_HERITAGE_CUTOFF` 로 날짜를 옮기거나
+  `off` 로 끈다. 로그에 `heritage_excluded` 가 붙어 효과를 셀 수 있다.
+- **upstream 추적 계약** (`PORT-PLAN.md`): merge-only 에서 "추적 유지 + 안정성 수정 cherry-pick" 으로. 포크 149커밋 대
+  upstream 29커밋으로 갈라져 전체 merge 는 비현실적이고, upstream 의 2026-10-03 안정성 묶음(deps-heal·fact-validity·
+  prompt-gate·sync 최소 간격)은 수정 단위로 가져온다.
+
+### Docs
+- `docs/archive/heritage-facts-20261005.md`: 제외 대상 활성 유산 fact 1,005건 보관 사본 (DB 에서는 지우지 않는다).
+
+### Tests
+- `test/inject-heritage.test.ts` 신설: 컷오프 env 해석(기본·override·off·malformed) + 날짜 판정 경계.
+
 ## [1.12.2] - 2026-10-05
 
 _1.12.1 이 드러낸 "빈 응답" 의 실제 원인은 `error_max_turns` 였다: 도구가 열린 한 턴 호출에서 sonnet 이 세 번에 한 번쯤
