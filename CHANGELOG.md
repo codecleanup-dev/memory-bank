@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.12.3] - 2026-10-05
+
+_간선 행동 임계값 0.8 → 0.6 (Lucy 결정, 2026-10-05) 과, 임계값 변경을 재판정 없이 적용하는 `--replan`._
+
+### Changed
+- **`EDGE_ACTION_THRESHOLD` 0.8 → 0.6.** 간선 삭제·재분류는 `relation_resolution_log` 로 되돌릴 수 있어 팩트 퇴역(0.9, 그대로)
+  보다 낮은 확신으로 충분하다. 라이브 실측: sonnet 위원회의 하위 중앙값 confidence 가 "무관/충돌 아님" 374쌍(459쌍 중)에서
+  0.55~0.75 에 몰려 0.8 은 큐의 80% 를 손대지 못했다.
+
+### Added
+- **`memory-bank resolve <type> --replan [--apply]`**: 모델 호출 없이, 이전 `--apply` 런이 keep 으로 기록한 위원회 판정에
+  오늘의 정책(임계값)을 다시 적용한다. 판정 입력(두 팩트 본문·reasoning·카테고리·scope·확인 횟수)이 기록과 같을 때만
+  재사용하고, 변경된 쌍·unresolved 행·이미 행동한 행은 건너뛴다. 판정과 스냅샷은 **같은 로그 행**에서 읽고, 쓰기
+  트랜잭션 안에서 그 행이 여전히 그 관계의 최신 판정인지 확인한다(사이에 다른 프로세스가 재판정을 기록했으면
+  `skipped-changed`). `--limit` 은 **바꿀 쌍의 수**를 묶는다(기본 200, 0 = 전체; keep 으로 남는 기록은 세지 않아
+  앞쪽 keep 이 제한을 소진하지 않는다). 결과 로그 행의 judge_reasoning 에
+  `[replanned from log #id]` 를 남긴다. `--rejudge` 와 함께 쓸 수 없다. 요약에 `source: judge | log`.
+
+### Fixed
+- **`callHaiku` per-call 타임아웃** (`MEMORY_BANK_LLM_CALL_TIMEOUT_MS`, 기본 180초, 상한 10분): Agent SDK 호출에
+  `abortController` 를 넘기고 시간이 지나면 끊어 `timeout` 사유의 transient 에러로 던진다(재시도 → 소진 시 throw →
+  위원회에서는 결석 표). 2026-10-05 라이브 런에서 판정 호출 하나가 CPU 0 으로 25분 매달려 136배치 런 전체가 멈춘 실측.
+  타임아웃은 유료 API 폴백으로 넘어가지 않으며, 폴백 요청 자체도 같은 abort 신호를 받아 같은 예산 안에서 끊긴다.
+  데드라인은 abort 와 **독립적으로** 호출자에게 거부를 돌려주므로(Promise.race), abort 를 무시하는 전송(자식 프로세스가
+  stdout 을 쥐고 있는 경우)도 호출자를 예산 너머로 잡아두지 못한다. 버려진 작업의 결과는 무시된다.
+- **판정 스냅샷에 두 팩트의 `created_at` 추가** (`source_created`·`target_created`): 판정기는 날짜를 보고 시간 순서를
+  읽으므로 날짜가 정정되면 기록된 판정을 재사용하지 않는다(쓰기 트랜잭션의 재확인에서도 대조). 1.12.3 이전 행은
+  날짜 값이 없어 비교할 수 없으므로, `--replan` 은 그런 행을 두 팩트의 `updated_at` 이 기록 시각 이후가 아닐 때만
+  재사용한다(코드 경로의 팩트 수정은 모두 `updated_at` 을 올린다).
+
+### Tests
+- `test/relation-resolve.test.ts` +2 (기록된 keep 판정을 모델 호출 없이 재계획·적용·재실행 멱등, 입력이 바뀐 쌍과
+  unresolved 행은 건너뜀), 정책 테스트 임계값 재고정(0.6/0.59, RELATED_NOT_CONFLICTING 0.6 → retype).
+- `test/llm-retry.test.ts` +3 (매달린 호출을 타임아웃으로 끊고 다음 시도가 성공하면 반환, 소진 시 timeout 사유로 throw,
+  직접 API 폴백도 같은 예산에서 끊김), `test/relation-resolve.test.ts` +1 (replan 의 `--limit` 과 "최신 로그 행" 검증).
+
 ## [1.12.2] - 2026-10-05
 
 _1.12.1 이 드러낸 "빈 응답" 의 실제 원인은 `error_max_turns` 였다: 도구가 열린 한 턴 호출에서 sonnet 이 세 번에 한 번쯤

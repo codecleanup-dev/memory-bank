@@ -128,8 +128,37 @@ function backoffMs(attempt: number): number {
 
 const sleep = (ms: number) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
 
-/** 단발 호출 — Agent SDK 우선, 실패 시(그리고 키가 있을 때만) Anthropic SDK 폴백. */
-async function callOnce(systemPrompt: string, userMessage: string, maxTokens: number): Promise<string> {
+/**
+ * Per-call wall-clock budget. A hung transport (observed 2026-10-05: one judge call sat
+ * 25 minutes with zero CPU and no result, stalling a 136-batch run) must become a
+ * transient error that the retry loop and the callers' abstention logic can handle.
+ * MEMORY_BANK_LLM_CALL_TIMEOUT_MS overrides (digits, capped at 10 minutes); default 3 minutes.
+ */
+const DEFAULT_CALL_TIMEOUT_MS = 180_000;
+const MAX_CALL_TIMEOUT_MS = 600_000;
+function callTimeoutMs(): number {
+  const raw = process.env.MEMORY_BANK_LLM_CALL_TIMEOUT_MS;
+  if (raw != null && /^\d+$/.test(raw.trim())) return Math.max(1, Math.min(MAX_CALL_TIMEOUT_MS, parseInt(raw.trim(), 10)));
+  return DEFAULT_CALL_TIMEOUT_MS;
+}
+
+/** Message contains "timeout" on purpose: classifyLlmError reads that as transient (retry, then throw). */
+function callTimeoutError(ms: number): Error {
+  return new Error(`LLM call timeout after ${ms} ms (aborted)`);
+}
+
+/**
+ * 단발 호출 — Agent SDK 우선, 실패 시(그리고 키가 있을 때만) Anthropic SDK 폴백.
+ * The deadline is enforced OUTSIDE this function (callOnce races it against a timer), so a
+ * transport that ignores the abort signal still cannot hold the caller past the budget.
+ */
+async function callOnceInner(
+  systemPrompt: string,
+  userMessage: string,
+  maxTokens: number,
+  abort: AbortController,
+  timeoutMs: number,
+): Promise<string> {
   const model = process.env.MEMORY_BANK_FACT_MODEL || 'haiku';
 
   // Try Claude Agent SDK first (works inside Claude Code without API key)
@@ -152,6 +181,7 @@ async function callOnce(systemPrompt: string, userMessage: string, maxTokens: nu
         tools: [],
         settingSources: [],
         cwd: llmWorkdir(),
+        abortController: abort,
       } as any,
     })) {
       if (message && typeof message === 'object' && 'type' in message && (message as any).type === 'result') {
@@ -169,9 +199,14 @@ async function callOnce(systemPrompt: string, userMessage: string, maxTokens: nu
         return m.result || '';
       }
     }
-    // 스트림이 result 메시지 없이 끝남 — 호출 실패이지 "빈 답변"이 아니다.
+    // 스트림이 result 메시지 없이 끝남 — 호출 실패이지 "빈 답변"이 아니다. (Aborted by the
+    // timer: the SDK may end the stream quietly instead of throwing — report the timeout.)
+    if (abort.signal.aborted) throw callTimeoutError(timeoutMs);
     return '';
   } catch (agentSdkError) {
+    // A timed-out call is a transport hang, not a reason to fall back to the metered API:
+    // surface it as a transient timeout and let the retry loop decide.
+    if (abort.signal.aborted) throw callTimeoutError(timeoutMs);
     // Fallback to direct Anthropic SDK if agent SDK fails (standalone mode)
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.MEMORY_BANK_API_TOKEN;
     if (!apiKey) {
@@ -184,15 +219,51 @@ async function callOnce(systemPrompt: string, userMessage: string, maxTokens: nu
     const baseURL = process.env.MEMORY_BANK_API_BASE_URL;
     const client = new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) });
 
-    const response = await client.messages.create({
-      model: process.env.MEMORY_BANK_FACT_MODEL || 'claude-haiku-4-5-20251001',
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    });
+    // The same per-call budget covers the fallback: the timer keeps running from the start of
+    // this call and the request carries the abort signal, so a slow fallback cannot hang either.
+    let response;
+    try {
+      response = await client.messages.create(
+        {
+          model: process.env.MEMORY_BANK_FACT_MODEL || 'claude-haiku-4-5-20251001',
+          max_tokens: maxTokens,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userMessage }],
+        },
+        { signal: abort.signal },
+      );
+    } catch (fallbackError) {
+      if (abort.signal.aborted) throw callTimeoutError(timeoutMs);
+      throw fallbackError;
+    }
 
     const textBlock = response.content.find((b: any) => b.type === 'text');
     return (textBlock as any)?.text || '';
+  }
+}
+
+/**
+ * One call under a hard wall-clock budget. The timer does two things: it aborts the
+ * transport (cooperative cleanup) AND rejects on its own, so even a transport that ignores
+ * the abort signal (child process keeping stdout open) cannot hold the caller past the
+ * budget. The abandoned work is detached and its eventual outcome ignored.
+ */
+async function callOnce(systemPrompt: string, userMessage: string, maxTokens: number): Promise<string> {
+  const timeoutMs = callTimeoutMs();
+  const abort = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      abort.abort();
+      reject(callTimeoutError(timeoutMs));
+    }, timeoutMs);
+  });
+  const work = callOnceInner(systemPrompt, userMessage, maxTokens, abort, timeoutMs);
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    work.catch(() => {}); // detached after a timeout: never an unhandled rejection
   }
 }
 
