@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.12.7] - 2026-10-07
+
+_`hooks/hooks.json` 의 명령 8개 중 7개가 `${CLAUDE_PLUGIN_ROOT}` 를 따옴표 없이 썼다. 플러그인 캐시 경로에 공백이 있는
+머신(홈 디렉토리에 공백 등)에서는 bash 가 경로를 단어 분리해 SessionStart·SessionEnd·UserPromptSubmit 훅이 조용히 실패한다.
+keystone 쪽 래퍼 스크립트(`memory-bank-session-start.sh`/`-end.sh`)가 자기 경로를 인용해 이 구멍을 가리고 있었는데, 그
+래퍼가 플러그인 훅과 같은 일을 두 번 하는 중복이라 등록을 빼면서 드러났다(keystone-hub 적대 리뷰 HIGH, 2026-10-07)._
+
+### Fixed
+- **`hooks/hooks.json`**: 모든 명령의 `${CLAUDE_PLUGIN_ROOT}` 경로를 큰따옴표로 감싼다. `version-drift-check` 항목만
+  인용돼 있던 것을 나머지 7개에 맞춰 통일.
+
+### Tests
+- `test/hooks-json-quoting.test.ts` +1 (hooks.json 의 모든 command 에서 `${CLAUDE_PLUGIN_ROOT}` 가 따옴표 안에만 나타남).
+
 ## [1.12.6] - 2026-10-05
 
 _resolve 가 지운 간선이 크로스머신 import 로 되살아나는 구멍. 1.12.3 라이브 런에서 삭제 264 중 226 이 몇 시간 안에
