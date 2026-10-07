@@ -1,6 +1,6 @@
 {
   "name": "memory-bank",
-  "version": "1.12.6",
+  "version": "1.12.7",
   "engines": {
     "node": ">=22.15"
   },
