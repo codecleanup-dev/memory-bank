@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.12.8] - 2026-10-16
+
+_1.12.7 설치 뒤 Claude Code 가 캐시의 1.12.5·1.12.6 디렉토리를 지웠는데(in-use sweep, 10/14), 그 전에 시작한 세션 5개는
+MCP 서버를 지워진 경로에서 계속 돌리고 있었다. 호출 시점에 경로로 찾는 것이 셋이다. ① better-sqlite3 는 네이티브 애드온을
+import 때가 아니라 첫 `new Database()` 때 `bindings` 로 찾는다(도구를 한 번도 안 부른 세션은 첫 호출에서
+`Cannot find module 'bindings'`, 2026-10-16 실측). ② sqlite-vec 확장은 SQLite 가 연결마다 dlopen 하는데, 같은 프로세스의
+다른 연결이 그 이미지를 잡고 있어도 지워진 경로는 다시 열리지 않는다(실험 확인). 그래서 DB 를 열어 둔 세션도 다음 호출에서
+깨진다. ③ 임베딩 모델 캐시는 `node_modules/@xenova/transformers/.cache` 안에 있고, 소켓을 잡은 세션 하나만 기동 때 올리므로
+나머지 세션은 첫 `search` 때 지워진 경로에서 읽으려다 재다운로드로 빠진다._
+
+### Fixed
+- **`src/runtime-assets.ts`**: sqlite-vec 확장과 임베딩 모델 캐시를 `conversation-index/runtime-assets/` 아래로 미러링한다
+  (하드링크 우선, 실패 시 복사. 크기 같으면 건너뛰고 temp+rename 으로 원자적). `loadSqliteVec(db)` 는 미러에서 확장을 올리고,
+  `relocateModelCache(model)` 은 transformers.js 의 `env.cacheDir` 를 미러로 돌리면서 번들 캐시에 있는 모델을 심는다.
+- **`src/db.ts`**: 두 연결 경로(`initDatabase`·`openDatabaseReadonly`) 모두 `loadSqliteVec` 를 쓴다.
+- **`src/embeddings.ts` `initEmbeddings()`**: pipeline 생성 전에 `relocateModelCache` 를 부른다.
+- **`src/native-warm.ts` `warmNativeBindings()`**: 서버 기동 직후 미러링을 하고 DB 를 한 번 열고 닫아 애드온을 매핑한다.
+  실패해도 로그만 남기고 transport 기동은 막지 않는다.
+- **`src/mcp-server.ts` `main()`**: `server.connect()` 전에 `warmNativeBindings()` 를 부른다. 1.12.8 이전 버전으로 떠 있는
+  세션에는 소급되지 않으므로 그 세션들은 재시작해야 한다.
+
+### Tests
+- `test/runtime-assets.test.ts` +7 (하드링크 미러·멱등·temp 잔재 없음, 원본 삭제 후 생존, 결측 소스는 false, 트리 미러,
+  sqlite-vec 미러 경로·로드, 지워진 경로 dlopen 실패 대조 + 미러 성공, 모델 캐시 재배치·시드·sweep 생존).
+- `test/native-warm.test.ts` +7 (실제 DB 열림·애드온 require 캐시 적재, 미러 생성·cacheDir 전환, open/close 1회, 실패 시
+  throw 없이 false + stderr, main() 배선 순서, db.ts 가 `loadSqliteVec` 만 쓰는지, embeddings 가 pipeline 전에 재배치하는지).
+
 ## [1.12.7] - 2026-10-07
 
 _`hooks/hooks.json` 의 명령 8개 중 7개가 `${CLAUDE_PLUGIN_ROOT}` 를 따옴표 없이 썼다. 플러그인 캐시 경로에 공백이 있는
