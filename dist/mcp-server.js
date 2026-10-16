@@ -2872,20 +2872,20 @@ var require_compile = __commonJS({
     var util_1 = require_util();
     var validate_1 = require_validate();
     var SchemaEnv = class {
-      constructor(env) {
+      constructor(env2) {
         var _a2;
         this.refs = {};
         this.dynamicAnchors = {};
         let schema;
-        if (typeof env.schema == "object")
-          schema = env.schema;
-        this.schema = env.schema;
-        this.schemaId = env.schemaId;
-        this.root = env.root || this;
-        this.baseId = (_a2 = env.baseId) !== null && _a2 !== void 0 ? _a2 : (0, resolve_1.normalizeId)(schema === null || schema === void 0 ? void 0 : schema[env.schemaId || "$id"]);
-        this.schemaPath = env.schemaPath;
-        this.localRefs = env.localRefs;
-        this.meta = env.meta;
+        if (typeof env2.schema == "object")
+          schema = env2.schema;
+        this.schema = env2.schema;
+        this.schemaId = env2.schemaId;
+        this.root = env2.root || this;
+        this.baseId = (_a2 = env2.baseId) !== null && _a2 !== void 0 ? _a2 : (0, resolve_1.normalizeId)(schema === null || schema === void 0 ? void 0 : schema[env2.schemaId || "$id"]);
+        this.schemaPath = env2.schemaPath;
+        this.localRefs = env2.localRefs;
+        this.meta = env2.meta;
         this.$async = schema === null || schema === void 0 ? void 0 : schema.$async;
         this.refs = {};
       }
@@ -3069,15 +3069,15 @@ var require_compile = __commonJS({
           baseId = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schId);
         }
       }
-      let env;
+      let env2;
       if (typeof schema != "boolean" && schema.$ref && !(0, util_1.schemaHasRulesButRef)(schema, this.RULES)) {
         const $ref = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schema.$ref);
-        env = resolveSchema.call(this, root, $ref);
+        env2 = resolveSchema.call(this, root, $ref);
       }
       const { schemaId } = this.opts;
-      env = env || new SchemaEnv({ schema, schemaId, root, baseId });
-      if (env.schema !== env.root.schema)
-        return env;
+      env2 = env2 || new SchemaEnv({ schema, schemaId, root, baseId });
+      if (env2.schema !== env2.root.schema)
+        return env2;
       return void 0;
     }
   }
@@ -3228,8 +3228,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path9) {
-      let input = path9;
+    function removeDotSegments(path10) {
+      let input = path10;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3481,8 +3481,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path9, query2] = wsComponent.resourceName.split("?");
-        wsComponent.path = path9 && path9 !== "/" ? path9 : void 0;
+        const [path10, query2] = wsComponent.resourceName.split("?");
+        wsComponent.path = path10 && path10 !== "/" ? path10 : void 0;
         wsComponent.query = query2;
         wsComponent.resourceName = void 0;
       }
@@ -4565,8 +4565,8 @@ var require_ref = __commonJS({
       schemaType: "string",
       code(cxt) {
         const { gen, schema: $ref, it } = cxt;
-        const { baseId, schemaEnv: env, validateName, opts, self } = it;
-        const { root } = env;
+        const { baseId, schemaEnv: env2, validateName, opts, self } = it;
+        const { root } = env2;
         if (($ref === "#" || $ref === "#/") && baseId === root.baseId)
           return callRootRef();
         const schOrEnv = compile_1.resolveRef.call(self, root, baseId, $ref);
@@ -4576,8 +4576,8 @@ var require_ref = __commonJS({
           return callValidate(schOrEnv);
         return inlineRefSchema(schOrEnv);
         function callRootRef() {
-          if (env === root)
-            return callRef(cxt, validateName, env, env.$async);
+          if (env2 === root)
+            return callRef(cxt, validateName, env2, env2.$async);
           const rootName = gen.scopeValue("root", { ref: root });
           return callRef(cxt, (0, codegen_1._)`${rootName}.validate`, root, root.$async);
         }
@@ -4607,14 +4607,14 @@ var require_ref = __commonJS({
     exports.getValidate = getValidate;
     function callRef(cxt, v2, sch, $async) {
       const { gen, it } = cxt;
-      const { allErrors, schemaEnv: env, opts } = it;
+      const { allErrors, schemaEnv: env2, opts } = it;
       const passCxt = opts.passContext ? names_1.default.this : codegen_1.nil;
       if ($async)
         callAsyncRef();
       else
         callSyncRef();
       function callAsyncRef() {
-        if (!env.$async)
+        if (!env2.$async)
           throw new Error("async schema referenced by sync schema");
         const valid = gen.let("valid");
         gen.try(() => {
@@ -6875,12 +6875,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs10, exportName) {
+    function addFormats(ajv, list, fs11, exportName) {
       var _a2;
       var _b;
       (_a2 = (_b = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs10[f]);
+        ajv.addFormat(f, fs11[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8362,17 +8362,17 @@ var init_stainless_helper_header = __esm({
 function encodeURIPath(str) {
   return str.replace(/[^A-Za-z0-9\-._~!$&'()*+,;=:@]+/g, encodeURIComponent);
 }
-var EMPTY, createPathTagFunction, path6;
+var EMPTY, createPathTagFunction, path7;
 var init_path = __esm({
   "../../../node_modules/@anthropic-ai/sdk/internal/utils/path.mjs"() {
     init_error();
     EMPTY = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.create(null));
-    createPathTagFunction = (pathEncoder = encodeURIPath) => function path9(statics, ...params) {
+    createPathTagFunction = (pathEncoder = encodeURIPath) => function path10(statics, ...params) {
       if (statics.length === 1)
         return statics[0];
       let postPath = false;
       const invalidSegments = [];
-      const path10 = statics.reduce((previousValue, currentValue, index) => {
+      const path11 = statics.reduce((previousValue, currentValue, index) => {
         if (/[?#]/.test(currentValue)) {
           postPath = true;
         }
@@ -8389,7 +8389,7 @@ var init_path = __esm({
         }
         return previousValue + currentValue + (index === params.length ? "" : encoded);
       }, "");
-      const pathOnly = path10.split(/[?#]/, 1)[0];
+      const pathOnly = path11.split(/[?#]/, 1)[0];
       const invalidSegmentPattern = /(?<=^|\/)(?:\.|%2e){1,2}(?=\/|$)/gi;
       let match;
       while ((match = invalidSegmentPattern.exec(pathOnly)) !== null) {
@@ -8410,12 +8410,12 @@ var init_path = __esm({
         }, "");
         throw new AnthropicError(`Path parameters result in path with invalid segments:
 ${invalidSegments.map((e) => e.error).join("\n")}
-${path10}
+${path11}
 ${underline}`);
       }
-      return path10;
+      return path11;
     };
-    path6 = /* @__PURE__ */ createPathTagFunction(encodeURIPath);
+    path7 = /* @__PURE__ */ createPathTagFunction(encodeURIPath);
   }
 });
 
@@ -8464,7 +8464,7 @@ var init_files = __esm({
        */
       delete(fileID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.delete(path6`/v1/files/${fileID}`, {
+        return this._client.delete(path7`/v1/files/${fileID}`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "files-api-2025-04-14"].toString() },
@@ -8487,7 +8487,7 @@ var init_files = __esm({
        */
       download(fileID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.get(path6`/v1/files/${fileID}/content`, {
+        return this._client.get(path7`/v1/files/${fileID}/content`, {
           ...options,
           headers: buildHeaders([
             {
@@ -8510,7 +8510,7 @@ var init_files = __esm({
        */
       retrieveMetadata(fileID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.get(path6`/v1/files/${fileID}`, {
+        return this._client.get(path7`/v1/files/${fileID}`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "files-api-2025-04-14"].toString() },
@@ -8568,7 +8568,7 @@ var init_models = __esm({
        */
       retrieve(modelID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.get(path6`/v1/models/${modelID}?beta=true`, {
+        return this._client.get(path7`/v1/models/${modelID}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { ...betas?.toString() != null ? { "anthropic-beta": betas?.toString() } : void 0 },
@@ -10035,7 +10035,7 @@ var init_batches = __esm({
        */
       retrieve(messageBatchID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.get(path6`/v1/messages/batches/${messageBatchID}?beta=true`, {
+        return this._client.get(path7`/v1/messages/batches/${messageBatchID}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "message-batches-2024-09-24"].toString() },
@@ -10088,7 +10088,7 @@ var init_batches = __esm({
        */
       delete(messageBatchID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.delete(path6`/v1/messages/batches/${messageBatchID}?beta=true`, {
+        return this._client.delete(path7`/v1/messages/batches/${messageBatchID}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "message-batches-2024-09-24"].toString() },
@@ -10120,7 +10120,7 @@ var init_batches = __esm({
        */
       cancel(messageBatchID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.post(path6`/v1/messages/batches/${messageBatchID}/cancel?beta=true`, {
+        return this._client.post(path7`/v1/messages/batches/${messageBatchID}/cancel?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "message-batches-2024-09-24"].toString() },
@@ -10343,7 +10343,7 @@ var init_versions = __esm({
        */
       create(skillID, params = {}, options) {
         const { betas, ...body } = params ?? {};
-        return this._client.post(path6`/v1/skills/${skillID}/versions?beta=true`, multipartFormRequestOptions({
+        return this._client.post(path7`/v1/skills/${skillID}/versions?beta=true`, multipartFormRequestOptions({
           body,
           ...options,
           headers: buildHeaders([
@@ -10365,7 +10365,7 @@ var init_versions = __esm({
        */
       retrieve(version2, params, options) {
         const { skill_id, betas } = params;
-        return this._client.get(path6`/v1/skills/${skill_id}/versions/${version2}?beta=true`, {
+        return this._client.get(path7`/v1/skills/${skill_id}/versions/${version2}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() },
@@ -10388,7 +10388,7 @@ var init_versions = __esm({
        */
       list(skillID, params = {}, options) {
         const { betas, ...query2 } = params ?? {};
-        return this._client.getAPIList(path6`/v1/skills/${skillID}/versions?beta=true`, PageCursor, {
+        return this._client.getAPIList(path7`/v1/skills/${skillID}/versions?beta=true`, PageCursor, {
           query: query2,
           ...options,
           headers: buildHeaders([
@@ -10410,7 +10410,7 @@ var init_versions = __esm({
        */
       delete(version2, params, options) {
         const { skill_id, betas } = params;
-        return this._client.delete(path6`/v1/skills/${skill_id}/versions/${version2}?beta=true`, {
+        return this._client.delete(path7`/v1/skills/${skill_id}/versions/${version2}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() },
@@ -10467,7 +10467,7 @@ var init_skills = __esm({
        */
       retrieve(skillID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.get(path6`/v1/skills/${skillID}?beta=true`, {
+        return this._client.get(path7`/v1/skills/${skillID}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() },
@@ -10507,7 +10507,7 @@ var init_skills = __esm({
        */
       delete(skillID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.delete(path6`/v1/skills/${skillID}?beta=true`, {
+        return this._client.delete(path7`/v1/skills/${skillID}?beta=true`, {
           ...options,
           headers: buildHeaders([
             { "anthropic-beta": [...betas ?? [], "skills-2025-10-02"].toString() },
@@ -11274,7 +11274,7 @@ var init_batches2 = __esm({
        * ```
        */
       retrieve(messageBatchID, options) {
-        return this._client.get(path6`/v1/messages/batches/${messageBatchID}`, options);
+        return this._client.get(path7`/v1/messages/batches/${messageBatchID}`, options);
       }
       /**
        * List all Message Batches within a Workspace. Most recently created batches are
@@ -11310,7 +11310,7 @@ var init_batches2 = __esm({
        * ```
        */
       delete(messageBatchID, options) {
-        return this._client.delete(path6`/v1/messages/batches/${messageBatchID}`, options);
+        return this._client.delete(path7`/v1/messages/batches/${messageBatchID}`, options);
       }
       /**
        * Batches may be canceled any time before processing ends. Once cancellation is
@@ -11334,7 +11334,7 @@ var init_batches2 = __esm({
        * ```
        */
       cancel(messageBatchID, options) {
-        return this._client.post(path6`/v1/messages/batches/${messageBatchID}/cancel`, options);
+        return this._client.post(path7`/v1/messages/batches/${messageBatchID}/cancel`, options);
       }
       /**
        * Streams the results of a Message Batch as a `.jsonl` file.
@@ -11511,7 +11511,7 @@ var init_models2 = __esm({
        */
       retrieve(modelID, params = {}, options) {
         const { betas } = params ?? {};
-        return this._client.get(path6`/v1/models/${modelID}`, {
+        return this._client.get(path7`/v1/models/${modelID}`, {
           ...options,
           headers: buildHeaders([
             { ...betas?.toString() != null ? { "anthropic-beta": betas?.toString() } : void 0 },
@@ -11555,12 +11555,12 @@ var init_resources = __esm({
 var readEnv;
 var init_env = __esm({
   "../../../node_modules/@anthropic-ai/sdk/internal/utils/env.mjs"() {
-    readEnv = (env) => {
+    readEnv = (env2) => {
       if (typeof globalThis.process !== "undefined") {
-        return globalThis.process.env?.[env]?.trim() ?? void 0;
+        return globalThis.process.env?.[env2]?.trim() ?? void 0;
       }
       if (typeof globalThis.Deno !== "undefined") {
-        return globalThis.Deno.env?.get?.(env)?.trim();
+        return globalThis.Deno.env?.get?.(env2)?.trim();
       }
       return void 0;
     };
@@ -11715,9 +11715,9 @@ var init_client = __esm({
       makeStatusError(status, error2, message, headers) {
         return APIError.generate(status, error2, message, headers);
       }
-      buildURL(path9, query2, defaultBaseURL) {
+      buildURL(path10, query2, defaultBaseURL) {
         const baseURL = !__classPrivateFieldGet(this, _BaseAnthropic_instances, "m", _BaseAnthropic_baseURLOverridden).call(this) && defaultBaseURL || this.baseURL;
-        const url = isAbsoluteURL(path9) ? new URL(path9) : new URL(baseURL + (baseURL.endsWith("/") && path9.startsWith("/") ? path9.slice(1) : path9));
+        const url = isAbsoluteURL(path10) ? new URL(path10) : new URL(baseURL + (baseURL.endsWith("/") && path10.startsWith("/") ? path10.slice(1) : path10));
         const defaultQuery = this.defaultQuery();
         if (!isEmptyObj(defaultQuery)) {
           query2 = { ...defaultQuery, ...query2 };
@@ -11748,24 +11748,24 @@ var init_client = __esm({
        */
       async prepareRequest(request, { url, options }) {
       }
-      get(path9, opts) {
-        return this.methodRequest("get", path9, opts);
+      get(path10, opts) {
+        return this.methodRequest("get", path10, opts);
       }
-      post(path9, opts) {
-        return this.methodRequest("post", path9, opts);
+      post(path10, opts) {
+        return this.methodRequest("post", path10, opts);
       }
-      patch(path9, opts) {
-        return this.methodRequest("patch", path9, opts);
+      patch(path10, opts) {
+        return this.methodRequest("patch", path10, opts);
       }
-      put(path9, opts) {
-        return this.methodRequest("put", path9, opts);
+      put(path10, opts) {
+        return this.methodRequest("put", path10, opts);
       }
-      delete(path9, opts) {
-        return this.methodRequest("delete", path9, opts);
+      delete(path10, opts) {
+        return this.methodRequest("delete", path10, opts);
       }
-      methodRequest(method, path9, opts) {
+      methodRequest(method, path10, opts) {
         return this.request(Promise.resolve(opts).then((opts2) => {
-          return { method, path: path9, ...opts2 };
+          return { method, path: path10, ...opts2 };
         }));
       }
       request(options, remainingRetries = null) {
@@ -11869,8 +11869,8 @@ var init_client = __esm({
         }));
         return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
       }
-      getAPIList(path9, Page2, opts) {
-        return this.requestAPIList(Page2, opts && "then" in opts ? opts.then((opts2) => ({ method: "get", path: path9, ...opts2 })) : { method: "get", path: path9, ...opts });
+      getAPIList(path10, Page2, opts) {
+        return this.requestAPIList(Page2, opts && "then" in opts ? opts.then((opts2) => ({ method: "get", path: path10, ...opts2 })) : { method: "get", path: path10, ...opts });
       }
       requestAPIList(Page2, options) {
         const request = this.makeRequest(options, null, void 0);
@@ -11958,8 +11958,8 @@ var init_client = __esm({
       }
       async buildRequest(inputOptions, { retryCount = 0 } = {}) {
         const options = { ...inputOptions };
-        const { method, path: path9, query: query2, defaultBaseURL } = options;
-        const url = this.buildURL(path9, query2, defaultBaseURL);
+        const { method, path: path10, query: query2, defaultBaseURL } = options;
+        const url = this.buildURL(path10, query2, defaultBaseURL);
         if ("timeout" in options)
           validatePositiveInteger("timeout", options.timeout);
         options.timeout = options.timeout ?? this.timeout;
@@ -12583,8 +12583,8 @@ function getErrorMap() {
 
 // ../../../node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path9, errorMaps, issueData } = params;
-  const fullPath = [...path9, ...issueData.path || []];
+  const { data, path: path10, errorMaps, issueData } = params;
+  const fullPath = [...path10, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -12700,11 +12700,11 @@ var errorUtil;
 
 // ../../../node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path9, key) {
+  constructor(parent, value, path10, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path9;
+    this._path = path10;
     this._key = key;
   }
   get path() {
@@ -16342,10 +16342,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path9) {
-  if (!path9)
+function getElementAtPath(obj, path10) {
+  if (!path10)
     return obj;
-  return path9.reduce((acc, key) => acc?.[key], obj);
+  return path10.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -16665,11 +16665,11 @@ function aborted(x2, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path9, issues) {
+function prefixIssues(path10, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path9);
+    iss.path.unshift(path10);
     return iss;
   });
 }
@@ -23236,8 +23236,8 @@ var StdioServerTransport = class {
 
 // src/inject-daemon.ts
 import net from "node:net";
-import fs7 from "node:fs";
-import path5 from "node:path";
+import fs8 from "node:fs";
+import path6 from "node:path";
 
 // src/paths.ts
 import os from "os";
@@ -23287,9 +23287,451 @@ var LLM_WORKDIR_BASENAME = "memory-bank-llm";
 
 // src/db.ts
 import Database from "better-sqlite3";
-import path2 from "path";
+import path3 from "path";
+import fs3 from "fs";
+
+// src/runtime-assets.ts
 import fs2 from "fs";
+import path2 from "path";
+import { createHash } from "crypto";
 import * as sqliteVec from "sqlite-vec";
+import * as transformers from "@xenova/transformers";
+var transformersEnv = transformers.env;
+var BUNDLED_MODEL_CACHE_DIR = typeof transformersEnv.cacheDir === "string" ? path2.resolve(transformersEnv.cacheDir) : null;
+function runtimeAssetsDir() {
+  return path2.join(getIndexDir(), "runtime-assets");
+}
+function mirrorFile(src, dst) {
+  try {
+    const st = fs2.statSync(src);
+    if (!st.isFile()) return false;
+    try {
+      const have = fs2.statSync(dst);
+      const sameInode = have.dev === st.dev && have.ino === st.ino;
+      const sameStamp = Math.abs(have.mtimeMs - st.mtimeMs) < 2;
+      if (have.isFile() && have.size === st.size && (sameInode || sameStamp)) {
+        return true;
+      }
+    } catch {
+    }
+    fs2.mkdirSync(path2.dirname(dst), { recursive: true });
+    const tmp = `${dst}.${process.pid}.tmp`;
+    try {
+      fs2.copyFileSync(src, tmp, fs2.constants.COPYFILE_FICLONE);
+      fs2.utimesSync(tmp, st.atime, st.mtime);
+      fs2.renameSync(tmp, dst);
+      return true;
+    } catch {
+      fs2.rmSync(tmp, { force: true });
+      return false;
+    }
+  } catch {
+    return false;
+  }
+}
+function mirrorTree(srcDir, dstDir) {
+  let entries;
+  try {
+    entries = fs2.readdirSync(srcDir, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+  let ok = true;
+  for (const entry of entries) {
+    const s = path2.join(srcDir, entry.name);
+    const d2 = path2.join(dstDir, entry.name);
+    let isDir = entry.isDirectory();
+    let isFile = entry.isFile();
+    if (entry.isSymbolicLink()) {
+      try {
+        const target = fs2.statSync(s);
+        isDir = target.isDirectory();
+        isFile = target.isFile();
+      } catch {
+        ok = false;
+        continue;
+      }
+    }
+    if (isDir) ok = mirrorTree(s, d2) && ok;
+    else if (isFile) ok = mirrorFile(s, d2) && ok;
+    else ok = false;
+  }
+  return ok;
+}
+var stableVecPath;
+function platformPackageVersion(loadablePath) {
+  try {
+    const pkgPath = path2.join(path2.dirname(loadablePath), "package.json");
+    const pkg = JSON.parse(fs2.readFileSync(pkgPath, "utf8"));
+    if (pkg.version) return pkg.version;
+  } catch {
+  }
+  return "unknown";
+}
+function stableSqliteVecPath() {
+  if (stableVecPath) return stableVecPath;
+  try {
+    const src = sqliteVec.getLoadablePath();
+    const dst = path2.join(
+      runtimeAssetsDir(),
+      "sqlite-vec",
+      `${platformPackageVersion(src)}-${process.platform}-${process.arch}`,
+      path2.basename(src)
+    );
+    if (mirrorFile(src, dst)) {
+      stableVecPath = dst;
+      return dst;
+    }
+  } catch {
+  }
+  return null;
+}
+function loadSqliteVec(db) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const stable = stableSqliteVecPath();
+    if (!stable) break;
+    try {
+      db.loadExtension(stable);
+      return;
+    } catch (error2) {
+      const message = error2 instanceof Error ? error2.message : String(error2);
+      console.error(`sqlite-vec: stable mirror failed to load (${message}); re-mirroring`);
+      stableVecPath = void 0;
+    }
+  }
+  sqliteVec.load(db);
+}
+function stableModelCacheRoot() {
+  return path2.join(runtimeAssetsDir(), "models");
+}
+var FINGERPRINT_RE = /^[0-9a-f]{12}$/;
+var STAGING_RE = /^([0-9a-f]{12})\.staging-(\d+)$/;
+function listModelFiles(dir, base = dir, out = []) {
+  for (const entry of fs2.readdirSync(dir, { withFileTypes: true })) {
+    const full = path2.join(dir, entry.name);
+    const st = fs2.statSync(full);
+    if (st.isDirectory()) listModelFiles(full, base, out);
+    else if (st.isFile()) {
+      out.push({ rel: path2.relative(base, full).split(path2.sep).join("/"), size: st.size, mtime: Math.floor(st.mtimeMs) });
+    }
+  }
+  return out.sort((a, b2) => a.rel < b2.rel ? -1 : a.rel > b2.rel ? 1 : 0);
+}
+function fingerprintOf(files) {
+  return createHash("sha1").update(JSON.stringify(files)).digest("hex").slice(0, 12);
+}
+var REQUIRED_MODEL_FILES = ["config.json", "tokenizer.json", "tokenizer_config.json"];
+function looksCompleteModel(files) {
+  const have = (rel) => files.some((f) => f.rel === rel && f.size > 0);
+  return REQUIRED_MODEL_FILES.every(have) && // The weights file a default feature-extraction pipeline (quantized: true)
+  // actually loads — any other .onnx would be re-downloaded, not used.
+  have("onnx/model_quantized.onnx");
+}
+var MODEL_QUIET_MS = 3e4;
+function isQuiescent(files, now = Date.now()) {
+  return files.every((f) => now - f.mtime >= MODEL_QUIET_MS);
+}
+function readVarint(fd, pos, size) {
+  const buf = Buffer.alloc(10);
+  const n = fs2.readSync(fd, buf, 0, Math.min(10, size - pos), pos);
+  let value = 0n;
+  for (let i = 0; i < n; i++) {
+    value |= BigInt(buf[i] & 127) << BigInt(7 * i);
+    if ((buf[i] & 128) === 0) return { value, next: pos + i + 1 };
+  }
+  return null;
+}
+function onnxLooksComplete(file) {
+  let fd = null;
+  try {
+    const size = fs2.statSync(file).size;
+    if (size === 0) return false;
+    fd = fs2.openSync(file, "r");
+    let pos = 0;
+    let sawGraph = false;
+    while (pos < size) {
+      const tag = readVarint(fd, pos, size);
+      if (!tag) return false;
+      pos = tag.next;
+      const field = Number(tag.value >> 3n);
+      const wireType = Number(tag.value & 7n);
+      if (wireType === 0) {
+        const v2 = readVarint(fd, pos, size);
+        if (!v2) return false;
+        pos = v2.next;
+      } else if (wireType === 1) {
+        pos += 8;
+      } else if (wireType === 5) {
+        pos += 4;
+      } else if (wireType === 2) {
+        const len = readVarint(fd, pos, size);
+        if (!len) return false;
+        pos = len.next + Number(len.value);
+        if (field === 7) sawGraph = true;
+      } else {
+        return false;
+      }
+      if (pos > size) return false;
+    }
+    return pos === size && sawGraph;
+  } catch {
+    return false;
+  } finally {
+    if (fd !== null) fs2.closeSync(fd);
+  }
+}
+function jsonLooksComplete(file) {
+  try {
+    JSON.parse(fs2.readFileSync(file, "utf8"));
+    return true;
+  } catch {
+    return false;
+  }
+}
+function modelFilesIntact(dir) {
+  try {
+    return listModelFiles(dir).every((f) => {
+      const full = path2.join(dir, f.rel);
+      if (f.rel.endsWith(".onnx")) return onnxLooksComplete(full);
+      if (f.rel.endsWith(".json")) return jsonLooksComplete(full);
+      return f.size > 0;
+    });
+  } catch {
+    return false;
+  }
+}
+var MANIFEST = "manifest.json";
+function isPublished(root, fp, modelId) {
+  return fs2.existsSync(path2.join(root, fp, modelId, "config.json")) && fs2.existsSync(path2.join(root, fp, MANIFEST));
+}
+function publishedDirs(root, modelId) {
+  let names;
+  try {
+    names = fs2.readdirSync(root);
+  } catch {
+    return [];
+  }
+  return names.filter((n) => FINGERPRINT_RE.test(n) && isPublished(root, n, modelId)).flatMap((n) => {
+    try {
+      return [{ dir: path2.join(root, n), mtime: fs2.statSync(path2.join(root, n)).mtimeMs }];
+    } catch {
+      return [];
+    }
+  }).sort((a, b2) => b2.mtime - a.mtime).map((x2) => x2.dir);
+}
+function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+}
+var PUBLISH_GRACE_MS = 24 * 60 * 60 * 1e3;
+function modelInUseDir(root) {
+  return path2.join(root, "inuse");
+}
+function snapshotMatchesManifest(snapshot, modelId) {
+  try {
+    const files = JSON.parse(fs2.readFileSync(path2.join(snapshot, MANIFEST), "utf8"));
+    return looksCompleteModel(files) && files.every((f) => fs2.statSync(path2.join(snapshot, modelId, f.rel)).size === f.size);
+  } catch {
+    return false;
+  }
+}
+function removeDeadSnapshots(root) {
+  try {
+    for (const n of fs2.readdirSync(modelInUseDir(root))) {
+      if (/^\d+$/.test(n) && !pidAlive(Number(n))) {
+        fs2.rmSync(path2.join(modelInUseDir(root), n), { recursive: true, force: true });
+      }
+    }
+  } catch {
+  }
+}
+var exitCleanupRegistered = false;
+function registerExitCleanup(dir) {
+  if (exitCleanupRegistered) return;
+  exitCleanupRegistered = true;
+  process.on("exit", () => {
+    try {
+      fs2.rmSync(dir, { recursive: true, force: true });
+    } catch {
+    }
+  });
+}
+function useVersion(root, fp, modelId) {
+  const mine = path2.join(modelInUseDir(root), String(process.pid));
+  const snapshot = path2.join(mine, fp);
+  const dst = path2.join(snapshot, modelId);
+  const marker = path2.join(snapshot, ".complete");
+  if (fs2.existsSync(marker) && snapshotMatchesManifest(snapshot, modelId)) {
+    transformersEnv.cacheDir = snapshot;
+    return snapshot;
+  }
+  fs2.rmSync(snapshot, { recursive: true, force: true });
+  try {
+    removeDeadSnapshots(root);
+    const src = path2.join(root, fp, modelId);
+    const files = JSON.parse(fs2.readFileSync(path2.join(root, fp, MANIFEST), "utf8"));
+    if (!looksCompleteModel(files)) return null;
+    for (const f of files) {
+      const from = path2.join(src, f.rel);
+      const to = path2.join(dst, f.rel);
+      fs2.mkdirSync(path2.dirname(to), { recursive: true });
+      try {
+        fs2.linkSync(from, to);
+      } catch (e) {
+        const code = e.code;
+        if (code === "EEXIST") continue;
+        if (code === "ENOENT") throw e;
+        if (!mirroringAllowed) throw e;
+        fs2.copyFileSync(from, to, fs2.constants.COPYFILE_FICLONE);
+      }
+    }
+    const whole = files.every((f) => {
+      try {
+        return fs2.statSync(path2.join(dst, f.rel)).size === f.size;
+      } catch {
+        return false;
+      }
+    });
+    if (!whole) throw new Error("incomplete snapshot");
+    const manifestCopy = path2.join(snapshot, MANIFEST);
+    try {
+      fs2.linkSync(path2.join(root, fp, MANIFEST), manifestCopy);
+    } catch {
+      fs2.copyFileSync(path2.join(root, fp, MANIFEST), manifestCopy);
+    }
+    fs2.writeFileSync(marker, "");
+  } catch {
+    fs2.rmSync(snapshot, { recursive: true, force: true });
+    return null;
+  }
+  registerExitCleanup(mine);
+  transformersEnv.cacheDir = snapshot;
+  return snapshot;
+}
+function tidyModelRoot(root, modelId, keep = 3, now = Date.now()) {
+  try {
+    for (const n of fs2.readdirSync(root)) {
+      const m2 = STAGING_RE.exec(n);
+      if (m2 && !pidAlive(Number(m2[2]))) fs2.rmSync(path2.join(root, n), { recursive: true, force: true });
+    }
+    removeDeadSnapshots(root);
+    for (const dir of publishedDirs(root, modelId).slice(keep)) {
+      if (now - fs2.statSync(dir).mtimeMs < PUBLISH_GRACE_MS) continue;
+      fs2.rmSync(dir, { recursive: true, force: true });
+    }
+  } catch {
+  }
+}
+function currentCacheDir() {
+  const c = transformersEnv.cacheDir;
+  return typeof c === "string" ? c : "";
+}
+function currentModelCacheDir() {
+  return currentCacheDir();
+}
+function underStableRoot(dir) {
+  try {
+    return path2.resolve(dir).startsWith(path2.resolve(stableModelCacheRoot()) + path2.sep);
+  } catch {
+    return false;
+  }
+}
+var mirroringAllowed = false;
+var provenSource = null;
+var tidiedThisProcess = false;
+function notifyModelLoaded(modelId, cacheDir) {
+  if (!cacheDir || underStableRoot(cacheDir)) return;
+  provenSource = { modelId, dir: cacheDir };
+  if (mirroringAllowed) publishProvenModel();
+}
+function allowModelMirroring() {
+  mirroringAllowed = true;
+  publishProvenModel();
+}
+function publishProvenModel() {
+  if (!provenSource) return null;
+  return relocateModelCache(provenSource.modelId, provenSource.dir, true);
+}
+function isModelMirrored(modelId) {
+  const dir = currentCacheDir();
+  return underStableRoot(dir) && fs2.existsSync(path2.join(dir, modelId, "config.json"));
+}
+function adoptStableModelCache(modelId) {
+  const current = currentCacheDir();
+  try {
+    const root = stableModelCacheRoot();
+    if (current && !path2.resolve(current).startsWith(path2.resolve(root) + path2.sep)) {
+      const src = path2.join(current, modelId);
+      if (fs2.existsSync(src)) {
+        let files = null;
+        try {
+          files = listModelFiles(src);
+        } catch {
+          files = null;
+        }
+        if (files) {
+          const fp = fingerprintOf(files);
+          if (isPublished(root, fp, modelId)) {
+            const dir = useVersion(root, fp, modelId);
+            if (dir) return dir;
+          }
+          if (looksCompleteModel(files) && modelFilesIntact(src)) return current;
+        }
+      }
+    }
+    for (const candidate of publishedDirs(root, modelId)) {
+      const dir = useVersion(root, path2.basename(candidate), modelId);
+      if (dir) return dir;
+    }
+  } catch {
+  }
+  return current;
+}
+function relocateModelCache(modelId, fromDir = BUNDLED_MODEL_CACHE_DIR, proven = false) {
+  try {
+    const root = stableModelCacheRoot();
+    const src = fromDir ? path2.join(fromDir, modelId) : null;
+    if (!src || !fs2.existsSync(src) || path2.resolve(src).startsWith(path2.resolve(root) + path2.sep)) {
+      return adoptStableModelCache(modelId);
+    }
+    const before = listModelFiles(src);
+    if (!looksCompleteModel(before) || !proven && !isQuiescent(before)) return currentCacheDir();
+    const fp = fingerprintOf(before);
+    const final = path2.join(root, fp);
+    if (!isPublished(root, fp, modelId)) {
+      const staging = path2.join(root, `${fp}.staging-${process.pid}`);
+      fs2.rmSync(staging, { recursive: true, force: true });
+      const mirrored = mirrorTree(src, path2.join(staging, modelId));
+      const unchanged = mirrored && fingerprintOf(listModelFiles(src)) === fp;
+      const intact = unchanged && modelFilesIntact(path2.join(staging, modelId));
+      if (intact) {
+        try {
+          fs2.writeFileSync(path2.join(staging, MANIFEST), JSON.stringify(before));
+          fs2.renameSync(staging, final);
+        } catch {
+        }
+      }
+      fs2.rmSync(staging, { recursive: true, force: true });
+      if (!isPublished(root, fp, modelId)) return currentCacheDir();
+      const used2 = useVersion(root, fp, modelId);
+      tidyModelRoot(root, modelId);
+      tidiedThisProcess = true;
+      return used2 ?? currentCacheDir();
+    }
+    const used = useVersion(root, fp, modelId);
+    if (!tidiedThisProcess) {
+      tidiedThisProcess = true;
+      tidyModelRoot(root, modelId);
+    }
+    return used ?? currentCacheDir();
+  } catch {
+    return currentCacheDir();
+  }
+}
 
 // src/project-canon.ts
 var slugCache = /* @__PURE__ */ new Map();
@@ -23362,12 +23804,15 @@ var EMBEDDING_VERSION = modelVersion(EMBEDDING_MODEL);
 var embeddingPipeline = null;
 async function initEmbeddings() {
   if (!embeddingPipeline) {
+    adoptStableModelCache(EMBEDDING_MODEL);
+    const cacheDirUsed = currentModelCacheDir();
     console.error(`Loading embedding model ${EMBEDDING_MODEL} (first run may take time)...`);
     embeddingPipeline = await pipeline(
       "feature-extraction",
       EMBEDDING_MODEL
     );
     console.error("Embedding model loaded");
+    notifyModelLoaded(EMBEDDING_MODEL, cacheDirUsed);
   }
 }
 function applyModePrefix(text, mode) {
@@ -23649,12 +24094,12 @@ function migrateFactsCategoryVocabulary(db) {
 }
 function initDatabase() {
   const dbPath = getDbPath();
-  const dbDir = path2.dirname(dbPath);
-  if (!fs2.existsSync(dbDir)) {
-    fs2.mkdirSync(dbDir, { recursive: true });
+  const dbDir = path3.dirname(dbPath);
+  if (!fs3.existsSync(dbDir)) {
+    fs3.mkdirSync(dbDir, { recursive: true });
   }
   const db = new Database(dbPath);
-  sqliteVec.load(db);
+  loadSqliteVec(db);
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 5000");
   db.pragma("foreign_keys = ON");
@@ -23994,8 +24439,8 @@ function initDatabase() {
 
 // src/heritage.ts
 var DEFAULT_HERITAGE_CUTOFF = "2026-05-01";
-function heritageCutoff(env = process.env) {
-  const raw = env.MEMORY_BANK_INJECT_HERITAGE_CUTOFF;
+function heritageCutoff(env2 = process.env) {
+  const raw = env2.MEMORY_BANK_INJECT_HERITAGE_CUTOFF;
   if (raw === void 0) return DEFAULT_HERITAGE_CUTOFF;
   const v2 = raw.trim();
   if (v2 === "" || v2.toLowerCase() === "off") return null;
@@ -24246,11 +24691,11 @@ function rowToRelation(row) {
 }
 
 // src/search.ts
-import fs4 from "fs";
+import fs5 from "fs";
 import readline from "readline";
 
 // src/archive-io.ts
-import fs3 from "fs";
+import fs4 from "fs";
 import { Readable, Transform, pipeline as pipeline2 } from "node:stream";
 import * as zlib from "node:zlib";
 var ZST_SUFFIX = ".zst";
@@ -24267,7 +24712,7 @@ function resolveArchiveFile(filePath) {
   const variant = filePath.endsWith(ZST_SUFFIX) ? filePath.slice(0, -ZST_SUFFIX.length) : filePath + ZST_SUFFIX;
   const statOrNull = (p) => {
     try {
-      return fs3.statSync(p);
+      return fs4.statSync(p);
     } catch {
       return null;
     }
@@ -24312,7 +24757,7 @@ function readArchiveFile(filePath) {
   if (!resolved) {
     throw Object.assign(new Error(`ENOENT: no such file, open '${filePath}'`), { code: "ENOENT" });
   }
-  const buf = fs3.readFileSync(resolved);
+  const buf = fs4.readFileSync(resolved);
   if (resolved.endsWith(ZST_SUFFIX)) {
     return requireZstdSync()(buf).toString("utf-8");
   }
@@ -24321,27 +24766,27 @@ function readArchiveFile(filePath) {
 function createArchiveReadStream(filePath) {
   const resolved = resolveArchiveFile(filePath);
   if (!resolved) {
-    return fs3.createReadStream(filePath);
+    return fs4.createReadStream(filePath);
   }
   if (resolved.endsWith(ZST_SUFFIX)) {
     if (zstd.createZstdDecompress) {
-      const source = fs3.createReadStream(resolved);
+      const source = fs4.createReadStream(resolved);
       const decompress = zstd.createZstdDecompress();
       const limiter = createByteLimit(maxDecompressedBytes());
       pipeline2(source, decompress, limiter, () => {
       });
       return limiter;
     }
-    const content = requireZstdSync()(fs3.readFileSync(resolved));
+    const content = requireZstdSync()(fs4.readFileSync(resolved));
     return Readable.from([content]);
   }
-  return fs3.createReadStream(resolved);
+  return fs4.createReadStream(resolved);
 }
 function statArchiveFile(filePath) {
   const resolved = resolveArchiveFile(filePath);
   if (!resolved) return null;
   try {
-    return fs3.statSync(resolved);
+    return fs4.statSync(resolved);
   } catch {
     return null;
   }
@@ -24353,7 +24798,7 @@ var cachedSearchDbPath = null;
 var cachedSearchDbIdent = null;
 function fileIdent(p) {
   try {
-    const st = fs4.statSync(p);
+    const st = fs5.statSync(p);
     return `${st.dev}:${st.ino}`;
   } catch {
     return null;
@@ -24931,40 +25376,40 @@ function formatRepeatContext(matches) {
 }
 
 // src/inject-log.ts
-import fs5 from "fs";
-import path3 from "path";
+import fs6 from "fs";
+import path4 from "path";
 var MAX_LOG_BYTES = 5 * 1024 * 1024;
 function getInjectLogPath() {
-  const dir = path3.join(getIndexDir(), "logs");
-  if (!fs5.existsSync(dir)) {
-    fs5.mkdirSync(dir, { recursive: true });
+  const dir = path4.join(getIndexDir(), "logs");
+  if (!fs6.existsSync(dir)) {
+    fs6.mkdirSync(dir, { recursive: true });
   }
-  return path3.join(dir, "inject-context.jsonl");
+  return path4.join(dir, "inject-context.jsonl");
 }
 function appendInjectLog(entry) {
   try {
     const logPath = getInjectLogPath();
     try {
-      const stat = fs5.statSync(logPath);
+      const stat = fs6.statSync(logPath);
       if (stat.size > MAX_LOG_BYTES) {
-        fs5.renameSync(logPath, `${logPath}.old`);
+        fs6.renameSync(logPath, `${logPath}.old`);
       }
     } catch {
     }
     const line = JSON.stringify({ ts: (/* @__PURE__ */ new Date()).toISOString(), ...entry });
-    fs5.appendFileSync(logPath, line + "\n");
+    fs6.appendFileSync(logPath, line + "\n");
   } catch {
   }
 }
 
 // src/inject-ledger.ts
-import fs6 from "node:fs";
-import path4 from "node:path";
+import fs7 from "node:fs";
+import path5 from "node:path";
 var MAX_IDS = 400;
 var TTL_MS = 7 * 24 * 60 * 60 * 1e3;
 var TMP_TTL_MS = 60 * 60 * 1e3;
 function ledgerDir() {
-  return path4.join(getIndexDir(), "state", "inject-ledger");
+  return path5.join(getIndexDir(), "state", "inject-ledger");
 }
 function sanitizeSessionId(sessionId) {
   if (!sessionId) return null;
@@ -24972,13 +25417,13 @@ function sanitizeSessionId(sessionId) {
   return clean.length >= 4 ? clean : null;
 }
 function ledgerPath(cleanId) {
-  return path4.join(ledgerDir(), cleanId + ".json");
+  return path5.join(ledgerDir(), cleanId + ".json");
 }
 function loadLedger(sessionId) {
   const id = sanitizeSessionId(sessionId);
   if (!id) return /* @__PURE__ */ new Set();
   try {
-    const raw = fs6.readFileSync(ledgerPath(id), "utf8");
+    const raw = fs7.readFileSync(ledgerPath(id), "utf8");
     const arr = JSON.parse(raw);
     if (Array.isArray(arr)) return new Set(arr.filter((x2) => typeof x2 === "string"));
   } catch {
@@ -24992,7 +25437,7 @@ function appendLedger(sessionId, existing, newIds) {
   const tmp = `${p}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
   try {
     const dir = ledgerDir();
-    fs6.mkdirSync(dir, { recursive: true });
+    fs7.mkdirSync(dir, { recursive: true });
     const current = loadLedger(id);
     const merged = [...current];
     for (const x2 of [...existing, ...newIds]) {
@@ -25002,12 +25447,12 @@ function appendLedger(sessionId, existing, newIds) {
       }
     }
     const bounded = merged.length > MAX_IDS ? merged.slice(merged.length - MAX_IDS) : merged;
-    fs6.writeFileSync(tmp, JSON.stringify(bounded));
-    fs6.renameSync(tmp, p);
+    fs7.writeFileSync(tmp, JSON.stringify(bounded));
+    fs7.renameSync(tmp, p);
     pruneOldLedgers(dir);
   } catch {
     try {
-      fs6.unlinkSync(tmp);
+      fs7.unlinkSync(tmp);
     } catch {
     }
   }
@@ -25015,14 +25460,14 @@ function appendLedger(sessionId, existing, newIds) {
 function pruneOldLedgers(dir) {
   try {
     const now = Date.now();
-    for (const f of fs6.readdirSync(dir)) {
+    for (const f of fs7.readdirSync(dir)) {
       const isLedger = f.endsWith(".json");
       const isOrphanTmp = f.endsWith(".tmp");
       if (!isLedger && !isOrphanTmp) continue;
-      const fp = path4.join(dir, f);
+      const fp = path5.join(dir, f);
       try {
-        const age = now - fs6.statSync(fp).mtimeMs;
-        if (age > (isLedger ? TTL_MS : TMP_TTL_MS)) fs6.unlinkSync(fp);
+        const age = now - fs7.statSync(fp).mtimeMs;
+        if (age > (isLedger ? TTL_MS : TMP_TTL_MS)) fs7.unlinkSync(fp);
       } catch {
       }
     }
@@ -25041,8 +25486,8 @@ function truncateFact(text) {
   const t = text.replace(/\s+/g, " ").trim();
   return t.length > FACT_CHAR_CAP ? t.slice(0, FACT_CHAR_CAP - 1) + "\u2026" : t;
 }
-function surpriseWeight(env = process.env) {
-  const raw = parseFloat(env.MEMORY_BANK_INJECT_SURPRISE_WEIGHT ?? "");
+function surpriseWeight(env2 = process.env) {
+  const raw = parseFloat(env2.MEMORY_BANK_INJECT_SURPRISE_WEIGHT ?? "");
   return Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0;
 }
 var NOOP_COMMIT = () => {
@@ -25180,7 +25625,7 @@ async function computeInjectContextDeferred(userPrompt, project, via, sessionId)
 
 // src/inject-daemon.ts
 function injectSocketPath() {
-  return path5.join(getIndexDir(), "inject-daemon.sock");
+  return path6.join(getIndexDir(), "inject-daemon.sock");
 }
 function startInjectDaemon() {
   const sockPath = injectSocketPath();
@@ -25243,7 +25688,7 @@ function startInjectDaemon() {
     probe.on("connect", () => probe.destroy());
     probe.on("error", () => {
       try {
-        fs7.unlinkSync(sockPath);
+        fs8.unlinkSync(sockPath);
         server2.listen(sockPath, onListen);
       } catch {
       }
@@ -25251,13 +25696,13 @@ function startInjectDaemon() {
   });
   const onListen = () => {
     try {
-      fs7.chmodSync(sockPath, 384);
-      const st = fs7.statSync(sockPath);
+      fs8.chmodSync(sockPath, 384);
+      const st = fs8.statSync(sockPath);
       if ((st.mode & 511) !== 384 || st.uid !== selfUid) throw new Error("socket perms");
     } catch {
       try {
         server2.close();
-        fs7.unlinkSync(sockPath);
+        fs8.unlinkSync(sockPath);
       } catch {
       }
       return;
@@ -25267,13 +25712,61 @@ function startInjectDaemon() {
   };
   try {
     const dir = getIndexDir();
-    fs7.chmodSync(dir, 448);
-    const dst = fs7.statSync(dir);
+    fs8.chmodSync(dir, 448);
+    const dst = fs8.statSync(dir);
     if ((dst.mode & 511) !== 448 || dst.uid !== selfUid) return;
     server2.listen(sockPath, onListen);
     server2.unref();
   } catch {
   }
+}
+
+// src/native-warm.ts
+function describe(error2) {
+  return error2 instanceof Error ? error2.message : String(error2);
+}
+function publishExistingModel() {
+  relocateModelCache(EMBEDDING_MODEL);
+  return isModelMirrored(EMBEDDING_MODEL);
+}
+function scheduleModelMirrorRetry(publish, intervalMs = 6e4, maxAttempts = 10) {
+  let attempts = 0;
+  const tick = () => {
+    attempts++;
+    let done = false;
+    try {
+      done = publish();
+    } catch {
+      done = false;
+    }
+    if (!done && attempts < maxAttempts) setTimeout(tick, intervalMs).unref();
+  };
+  setTimeout(tick, intervalMs).unref();
+}
+function warmNativeBindings(open = initDatabase, retry = scheduleModelMirrorRetry) {
+  let ok = true;
+  if (!stableSqliteVecPath()) {
+    console.error("native warm-up: sqlite-vec mirror unavailable; connections will load it from the plugin directory");
+    ok = false;
+  }
+  try {
+    allowModelMirroring();
+    if (!isModelMirrored(EMBEDDING_MODEL) && !publishExistingModel()) {
+      console.error("native warm-up: embedding model not mirrored yet (cache incomplete or still downloading); retrying in the background, and the first successful load publishes it");
+      retry(publishExistingModel);
+    }
+  } catch (error2) {
+    console.error("native warm-up: embedding model cache relocation failed:", describe(error2));
+    ok = false;
+  }
+  try {
+    const db = open();
+    db.close();
+  } catch (error2) {
+    console.error("native warm-up skipped (tools will retry on first call):", describe(error2));
+    return false;
+  }
+  return ok;
 }
 
 // ../../../node_modules/marked/lib/marked.esm.js
@@ -26871,8 +27364,8 @@ function annotatePrincipleConflictsForFacts(db, factIds) {
 
 // src/llm.ts
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import fs8 from "node:fs";
-import path7 from "node:path";
+import fs9 from "node:fs";
+import path8 from "node:path";
 import os2 from "node:os";
 
 // src/llm-error-class.ts
@@ -26927,16 +27420,16 @@ function classifyLlmError(err) {
 }
 
 // src/llm.ts
-var LLM_WORKDIR = path7.join(os2.tmpdir(), LLM_WORKDIR_BASENAME);
+var LLM_WORKDIR = path8.join(os2.tmpdir(), LLM_WORKDIR_BASENAME);
 function llmWorkdir() {
   try {
-    fs8.mkdirSync(LLM_WORKDIR, { recursive: true });
+    fs9.mkdirSync(LLM_WORKDIR, { recursive: true });
   } catch {
   }
   pruneLlmTranscripts();
   return LLM_WORKDIR;
 }
-var PRUNE_MARKER = path7.join(LLM_WORKDIR, ".last-transcript-prune");
+var PRUNE_MARKER = path8.join(LLM_WORKDIR, ".last-transcript-prune");
 var PRUNE_THROTTLE_MS = 60 * 60 * 1e3;
 function transcriptTtlMs() {
   const raw = process.env.MEMORY_BANK_LLM_TRANSCRIPT_TTL_HOURS;
@@ -26946,49 +27439,49 @@ function transcriptTtlMs() {
 function pruneLlmTranscripts(now = Date.now()) {
   try {
     try {
-      const markerAge = now - fs8.statSync(PRUNE_MARKER).mtimeMs;
+      const markerAge = now - fs9.statSync(PRUNE_MARKER).mtimeMs;
       if (markerAge >= 0 && markerAge < PRUNE_THROTTLE_MS) return;
     } catch {
     }
     try {
-      fs8.writeFileSync(PRUNE_MARKER, new Date(now).toISOString());
+      fs9.writeFileSync(PRUNE_MARKER, new Date(now).toISOString());
     } catch {
     }
     const projectsDir = getProjectsDir();
     const ttl = transcriptTtlMs();
     let entries;
     try {
-      entries = fs8.readdirSync(projectsDir);
+      entries = fs9.readdirSync(projectsDir);
     } catch {
       return;
     }
     for (const entry of entries) {
       if (entry !== LLM_WORKDIR_BASENAME && !entry.endsWith(`-${LLM_WORKDIR_BASENAME}`)) continue;
-      const dir = path7.join(projectsDir, entry);
+      const dir = path8.join(projectsDir, entry);
       let stat;
       try {
-        stat = fs8.lstatSync(dir);
+        stat = fs9.lstatSync(dir);
       } catch {
         continue;
       }
       if (!stat.isDirectory()) continue;
       let files;
       try {
-        files = fs8.readdirSync(dir);
+        files = fs9.readdirSync(dir);
       } catch {
         continue;
       }
       for (const file of files) {
         if (!file.endsWith(".jsonl") && !file.endsWith("-summary.txt")) continue;
-        const filePath = path7.join(dir, file);
+        const filePath = path8.join(dir, file);
         try {
-          const fstat = fs8.lstatSync(filePath);
-          if (fstat.isFile() && now - fstat.mtimeMs > ttl) fs8.unlinkSync(filePath);
+          const fstat = fs9.lstatSync(filePath);
+          if (fstat.isFile() && now - fstat.mtimeMs > ttl) fs9.unlinkSync(filePath);
         } catch {
         }
       }
       try {
-        fs8.rmdirSync(dir);
+        fs9.rmdirSync(dir);
       } catch {
       }
     }
@@ -27259,8 +27752,8 @@ async function askAvatar(db, question, project) {
 }
 
 // src/mcp-server.ts
-import path8 from "path";
-import fs9 from "fs";
+import path9 from "path";
+import fs10 from "fs";
 import os3 from "os";
 var SearchModeEnum = external_exports.enum(["vector", "text", "both"]);
 var ResponseFormatEnum = external_exports.enum(["markdown", "json"]);
@@ -27599,7 +28092,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
     if (name === "read") {
       const params = ShowConversationInputSchema.parse(args);
-      const resolvedPath = path8.resolve(params.path);
+      const resolvedPath = path9.resolve(params.path);
       if (!resolvedPath.endsWith(".jsonl") && !resolvedPath.endsWith(".jsonl.zst")) {
         throw new Error(`Invalid file type: only .jsonl files are supported`);
       }
@@ -27607,19 +28100,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!resolvedFile) {
         throw new Error(`File not found: ${resolvedPath}`);
       }
-      const realFile = fs9.realpathSync(resolvedFile);
+      const realFile = fs10.realpathSync(resolvedFile);
       const allowedRoots = [
         getArchiveDir(),
-        path8.join(os3.homedir(), ".claude", "projects")
+        path9.join(os3.homedir(), ".claude", "projects")
       ].map((root) => {
         try {
-          return fs9.realpathSync(root);
+          return fs10.realpathSync(root);
         } catch {
-          return path8.resolve(root);
+          return path9.resolve(root);
         }
       });
       const isAllowed = allowedRoots.some(
-        (root) => realFile === root || realFile.startsWith(root + path8.sep)
+        (root) => realFile === root || realFile.startsWith(root + path9.sep)
       );
       if (!isAllowed) {
         throw new Error("Access denied: path is outside the conversation archive");
@@ -28120,6 +28613,9 @@ _Total unique facts discovered: ${allDiscovered.size}_
 });
 async function main() {
   console.error("Episodic Memory MCP server running via stdio");
+  server.oninitialized = () => {
+    warmNativeBindings();
+  };
   startInjectDaemon();
   const transport = new StdioServerTransport();
   await server.connect(transport);

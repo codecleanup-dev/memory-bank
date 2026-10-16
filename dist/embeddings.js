@@ -1,4 +1,5 @@
 import { pipeline } from '@xenova/transformers';
+import { adoptStableModelCache, currentModelCacheDir, notifyModelLoaded } from './runtime-assets.js';
 /**
  * Multilingual retrieval model (Korean/English/100 langs), 384-dim — same
  * dimension as the original all-MiniLM-L6-v2 so vec tables are unchanged.
@@ -48,11 +49,22 @@ export const EMBEDDING_VERSION = modelVersion(EMBEDDING_MODEL);
 let embeddingPipeline = null;
 export async function initEmbeddings() {
     if (!embeddingPipeline) {
+        // Read the model from the stable mirror when a complete one exists, so a
+        // swept plugin directory cannot break this lazy first load. This only
+        // ADOPTS a mirror; it never copies. Mirroring is done by the MCP server's
+        // post-initialize warm-up (see runtime-assets.ts) because this function
+        // also runs before the initialize handshake (inject daemon pre-warm) and
+        // must not block it.
+        adoptStableModelCache(EMBEDDING_MODEL);
+        const cacheDirUsed = currentModelCacheDir();
         // stderr: stdout of hook scripts is injected into the session as context,
         // so progress logs must never go to stdout.
         console.error(`Loading embedding model ${EMBEDDING_MODEL} (first run may take time)...`);
         embeddingPipeline = await pipeline('feature-extraction', EMBEDDING_MODEL);
         console.error('Embedding model loaded');
+        // A built pipeline is the proof that every required file is in that cache
+        // dir: publish it to the stable mirror (now, or after the MCP handshake).
+        notifyModelLoaded(EMBEDDING_MODEL, cacheDirUsed);
     }
 }
 function applyModePrefix(text, mode) {

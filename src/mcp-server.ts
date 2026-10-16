@@ -9,6 +9,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { startInjectDaemon } from './inject-daemon.js';
+import { warmNativeBindings } from './native-warm.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -986,6 +987,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 async function main() {
   console.error('Episodic Memory MCP server running via stdio');
+
+  // Map the native modules (better-sqlite3 + sqlite-vec) and mirror the
+  // path-resolved assets EARLY, while this plugin version's directory still
+  // exists. better-sqlite3 resolves its addon lazily on the first
+  // `new Database()`; once Claude Code sweeps a superseded plugin version, a
+  // long-lived session that never called a tool would otherwise fail on first
+  // use with "Cannot find module 'bindings'". Runs right after the initialize
+  // handshake (not before connect): the warm-up is synchronous and can be slow
+  // in bad cases (model copy when hard links are impossible, DB migrations,
+  // busy_timeout under concurrent starts), and must never eat into the client's
+  // startup timeout. A tool call that lands during the warm-up simply waits.
+  server.oninitialized = () => {
+    warmNativeBindings();
+  };
 
   // Warm inject sidecar BEFORE connecting the transport: it lets the
   // UserPromptSubmit hook reuse this process's loaded embedding model over a

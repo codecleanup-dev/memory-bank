@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import * as sqliteVec from 'sqlite-vec';
+import { loadSqliteVec } from './runtime-assets.js';
 import { getDbPath } from './paths.js';
 import { autoHealScopeProjects } from './project-canon.js';
 import { EMBEDDING_VERSION } from './embeddings.js';
@@ -327,7 +327,7 @@ export function migrateFactsCategoryVocabulary(db) {
  */
 export function openDatabaseReadonly() {
     const db = new Database(getDbPath(), { readonly: true, fileMustExist: true });
-    sqliteVec.load(db);
+    loadSqliteVec(db);
     db.pragma('busy_timeout = 5000');
     return db;
 }
@@ -340,7 +340,7 @@ export function initDatabase() {
     }
     const db = new Database(dbPath);
     // Load sqlite-vec extension
-    sqliteVec.load(db);
+    loadSqliteVec(db);
     // Enable WAL mode for better concurrency
     db.pragma('journal_mode = WAL');
     db.pragma('busy_timeout = 5000');
