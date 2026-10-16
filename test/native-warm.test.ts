@@ -98,18 +98,26 @@ describe('warmNativeBindings', () => {
 describe('startup wiring', () => {
   const read = (file: string) => readFileSync(path.join(SRC, file), 'utf8');
 
-  it('mcp-server main() calls warmNativeBindings() before server.connect()', () => {
+  it('mcp-server main() registers warmNativeBindings() on oninitialized before server.connect()', () => {
     const src = read('mcp-server.ts');
     const mainStart = src.indexOf('async function main()');
     expect(mainStart).toBeGreaterThan(-1);
     const body = src.slice(mainStart);
-    // Only a statement counts: a mention inside a comment (e.g. a commented-out
-    // call) must not satisfy this contract.
-    const warm = /^[ \t]*warmNativeBindings\(\);[ \t]*$/m.exec(body);
+    // The warm-up must run AFTER the initialize handshake (it is synchronous
+    // and may be slow), so it is registered as the oninitialized callback, and
+    // that registration must precede connect(). Only a statement counts: a
+    // mention inside a comment (e.g. a commented-out call) must not satisfy
+    // this contract.
+    const hook = /^[ \t]*server\.oninitialized = \(\) => \{[ \t]*$/m.exec(body);
     const connect = /^[ \t]*await server\.connect\(/m.exec(body);
-    expect(warm, 'warmNativeBindings(); statement missing from main()').not.toBeNull();
+    expect(hook, 'server.oninitialized = () => { missing from main()').not.toBeNull();
     expect(connect, 'await server.connect( missing from main()').not.toBeNull();
-    expect(warm!.index).toBeLessThan(connect!.index);
+    expect(hook!.index).toBeLessThan(connect!.index);
+    const callback = body.slice(hook!.index, body.indexOf('};', hook!.index));
+    expect(callback, 'warmNativeBindings(); statement missing from the oninitialized callback')
+      .toMatch(/^[ \t]*warmNativeBindings\(\);[ \t]*$/m);
+    // and never synchronously before connect
+    expect(body.slice(0, hook!.index)).not.toMatch(/^[ \t]*warmNativeBindings\(\);[ \t]*$/m);
   });
 
   it('db.ts loads sqlite-vec only through loadSqliteVec()', () => {

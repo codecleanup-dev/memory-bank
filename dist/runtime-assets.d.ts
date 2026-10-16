@@ -23,7 +23,13 @@ export declare function mirrorTree(srcDir: string, dstDir: string): boolean;
  * null = mirror unavailable right now (callers use the in-tree path).
  */
 export declare function stableSqliteVecPath(): string | null;
-/** Load sqlite-vec into a connection from the stable mirror, else the in-tree path. */
+/**
+ * Load sqlite-vec into a connection from the stable mirror. If the pinned
+ * mirror has disappeared since it was made (cache cleanup, concurrent
+ * re-mirror), forget it and mirror again before falling back to the in-tree
+ * path — that fallback is the swept path this module exists to avoid, so it is
+ * the last resort, not the second attempt.
+ */
 export declare function loadSqliteVec(db: {
     loadExtension(file: string): void;
 }): void;

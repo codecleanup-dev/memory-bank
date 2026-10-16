@@ -7,8 +7,9 @@ function describe(error: unknown): string {
 }
 
 /**
- * Run once at server start, while this plugin version's directory still
- * exists on disk:
+ * Run once right after the MCP initialize handshake (never before the client
+ * has its answer — this is synchronous and may be slow in bad cases), while
+ * this plugin version's directory still exists on disk:
  *
  *  1. mirror the path-resolved runtime assets (sqlite-vec extension, embedding
  *     model cache) to the stable dir — see runtime-assets.ts for why these

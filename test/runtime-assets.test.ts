@@ -230,6 +230,20 @@ describe('runtime-assets', () => {
       expect(readFileSync(dst, 'utf8')).toBe('{"a":2}');
     });
 
+    it('loadSqliteVec re-mirrors when the pinned mirror has been removed, rather than using the in-tree path', () => {
+      const first = stableSqliteVecPath();
+      expect(first).not.toBeNull();
+      rmSync(first!); // e.g. a cache cleanup deleted the mirror after it was pinned
+
+      const db = new Database(':memory:');
+      expect(() => loadSqliteVec(db)).not.toThrow();
+      expect((db.prepare('select vec_version() as v').get() as { v: string }).v).toMatch(/^v\d/);
+      db.close();
+
+      expect(existsSync(first!)).toBe(true); // mirrored again at the same stable path
+      expect(stableSqliteVecPath()).toBe(first);
+    });
+
     it('stableSqliteVecPath does not pin a transient mirror failure', () => {
       // First call fails: runtime-assets exists as a regular file.
       const assets = path.join(tmp, 'cfg', 'conversation-index', 'runtime-assets');

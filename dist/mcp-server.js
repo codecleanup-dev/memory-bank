@@ -23389,12 +23389,14 @@ function stableSqliteVecPath() {
   return null;
 }
 function loadSqliteVec(db) {
-  const stable = stableSqliteVecPath();
-  if (stable) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const stable = stableSqliteVecPath();
+    if (!stable) break;
     try {
       db.loadExtension(stable);
       return;
     } catch {
+      stableVecPath = void 0;
     }
   }
   sqliteVec.load(db);
@@ -28274,7 +28276,9 @@ _Total unique facts discovered: ${allDiscovered.size}_
 });
 async function main() {
   console.error("Episodic Memory MCP server running via stdio");
-  warmNativeBindings();
+  server.oninitialized = () => {
+    warmNativeBindings();
+  };
   startInjectDaemon();
   const transport = new StdioServerTransport();
   await server.connect(transport);

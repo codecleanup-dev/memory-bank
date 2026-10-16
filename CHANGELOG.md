@@ -21,16 +21,19 @@ import 때가 아니라 첫 `new Database()` 때 `bindings` 로 찾는다(도구
 - **`src/embeddings.ts` `initEmbeddings()`**: pipeline 생성 전에 `relocateModelCache` 를 부른다.
 - **`src/native-warm.ts` `warmNativeBindings()`**: 서버 기동 직후 미러링을 하고 DB 를 한 번 열고 닫아 애드온을 매핑한다.
   실패해도 로그만 남기고 transport 기동은 막지 않는다.
-- **`src/mcp-server.ts` `main()`**: `server.connect()` 전에 `warmNativeBindings()` 를 부른다. 1.12.8 이전 버전으로 떠 있는
+- **`src/mcp-server.ts` `main()`**: `server.oninitialized` 에 `warmNativeBindings()` 를 등록해 initialize 핸드셰이크 직후에
+  돌린다(동기 작업이라 connect 전에 돌리면 느린 경우 클라이언트 기동 타임아웃을 먹는다). 1.12.8 이전 버전으로 떠 있는
   세션에는 소급되지 않으므로 그 세션들은 재시작해야 한다.
+- **`loadSqliteVec`**: 고정해 둔 미러가 나중에 지워졌으면 잊고 다시 미러링한 뒤 로드한다. in-tree 경로 폴백은 마지막 수단.
 
 ### Tests
-- `test/runtime-assets.test.ts` +12 (하드링크 미러·멱등·temp 잔재 없음, 원본 삭제 후 생존, 결측 소스는 false, rename 실패
+- `test/runtime-assets.test.ts` +13 (하드링크 미러·멱등·temp 잔재 없음, 원본 삭제 후 생존, 결측 소스는 false, rename 실패
   시 temp 정리, 트리 미러, 심볼릭 링크 추적·깨진 링크 실패, sqlite-vec 미러 경로·로드, 지워진 경로 dlopen 실패 대조 + 미러
-  성공, 모델 캐시 재배치·시드·sweep 생존, 미러 실패 시 번들 캐시 유지, 같은 길이로 교체된 소스 재미러, sqlite-vec 미러 실패
-  비고정·재시도).
+  성공, 모델 캐시 재배치·시드·sweep 생존, 미러 실패 시 번들 캐시 유지, 같은 길이로 교체된 소스 재미러, 지워진 미러 재미러링,
+  sqlite-vec 미러 실패 비고정·재시도).
 - `test/native-warm.test.ts` +7 (실제 DB 열림·애드온 require 캐시 적재, 미러 생성·cacheDir 전환, open/close 1회, 실패 시
-  throw 없이 false + stderr, main() 배선 순서, db.ts 가 `loadSqliteVec` 만 쓰는지, embeddings 가 pipeline 전에 재배치하는지).
+  throw 없이 false + stderr, main() 이 oninitialized 에 등록하고 connect 전에 동기 호출하지 않는지, db.ts 가 `loadSqliteVec`
+  만 쓰는지, embeddings 가 pipeline 전에 재배치하는지).
 
 ## [1.12.7] - 2026-10-07
 

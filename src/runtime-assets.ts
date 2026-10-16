@@ -158,15 +158,22 @@ export function stableSqliteVecPath(): string | null {
   return null;
 }
 
-/** Load sqlite-vec into a connection from the stable mirror, else the in-tree path. */
+/**
+ * Load sqlite-vec into a connection from the stable mirror. If the pinned
+ * mirror has disappeared since it was made (cache cleanup, concurrent
+ * re-mirror), forget it and mirror again before falling back to the in-tree
+ * path — that fallback is the swept path this module exists to avoid, so it is
+ * the last resort, not the second attempt.
+ */
 export function loadSqliteVec(db: { loadExtension(file: string): void }): void {
-  const stable = stableSqliteVecPath();
-  if (stable) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const stable = stableSqliteVecPath();
+    if (!stable) break;
     try {
       db.loadExtension(stable);
       return;
     } catch {
-      // mirror unreadable — try the in-tree path below
+      stableVecPath = undefined; // re-mirror on the next attempt
     }
   }
   sqliteVec.load(db);
