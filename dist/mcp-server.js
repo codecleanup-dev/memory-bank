@@ -23307,7 +23307,8 @@ function mirrorFile(src, dst) {
     try {
       const have = fs2.statSync(dst);
       const sameInode = have.dev === st.dev && have.ino === st.ino;
-      if (have.isFile() && have.size === st.size && (sameInode || have.mtimeMs === st.mtimeMs)) {
+      const sameStamp = Math.abs(have.mtimeMs - st.mtimeMs) < 2;
+      if (have.isFile() && have.size === st.size && (sameInode || sameStamp)) {
         return true;
       }
     } catch {
@@ -23316,7 +23317,7 @@ function mirrorFile(src, dst) {
     const tmp = `${dst}.${process.pid}.tmp`;
     try {
       try {
-        fs2.linkSync(src, tmp);
+        fs2.linkSync(fs2.realpathSync(src), tmp);
       } catch {
         fs2.copyFileSync(src, tmp);
         fs2.utimesSync(tmp, st.atime, st.mtime);
@@ -23395,7 +23396,9 @@ function loadSqliteVec(db) {
     try {
       db.loadExtension(stable);
       return;
-    } catch {
+    } catch (error2) {
+      const message = error2 instanceof Error ? error2.message : String(error2);
+      console.error(`sqlite-vec: stable mirror failed to load (${message}); re-mirroring`);
       stableVecPath = void 0;
     }
   }
@@ -23404,17 +23407,42 @@ function loadSqliteVec(db) {
 function stableModelCacheDir() {
   return path2.join(runtimeAssetsDir(), "models");
 }
-function relocateModelCache(modelId, fromDir = BUNDLED_MODEL_CACHE_DIR) {
-  const stable = stableModelCacheDir();
-  if (fromDir && path2.resolve(fromDir) !== path2.resolve(stable)) {
-    const src = path2.join(fromDir, modelId);
-    if (fs2.existsSync(src) && !mirrorTree(src, path2.join(stable, modelId))) {
-      transformersEnv.cacheDir = fromDir;
-      return fromDir;
+var MIRROR_COMPLETE_MARKER = ".memory-bank-mirror-complete";
+function adoptStableModelCache(modelId) {
+  const current = transformersEnv.cacheDir;
+  try {
+    const stable = stableModelCacheDir();
+    const stableModel = path2.join(stable, modelId);
+    const complete = fs2.existsSync(path2.join(stableModel, MIRROR_COMPLETE_MARKER));
+    const currentHasModel = typeof current === "string" && fs2.existsSync(path2.join(current, modelId));
+    if (complete || !currentHasModel && fs2.existsSync(stableModel)) {
+      transformersEnv.cacheDir = stable;
+      return stable;
     }
+  } catch {
   }
-  transformersEnv.cacheDir = stable;
-  return stable;
+  return typeof current === "string" ? current : "";
+}
+function relocateModelCache(modelId, fromDir = BUNDLED_MODEL_CACHE_DIR) {
+  try {
+    const stable = stableModelCacheDir();
+    if (fromDir && path2.resolve(fromDir) !== path2.resolve(stable)) {
+      const src = path2.join(fromDir, modelId);
+      if (fs2.existsSync(src)) {
+        const dst = path2.join(stable, modelId);
+        if (!mirrorTree(src, dst)) {
+          transformersEnv.cacheDir = fromDir;
+          return fromDir;
+        }
+        fs2.writeFileSync(path2.join(dst, MIRROR_COMPLETE_MARKER), "");
+      }
+    }
+    transformersEnv.cacheDir = stable;
+    return stable;
+  } catch {
+    const current = transformersEnv.cacheDir;
+    return typeof current === "string" ? current : fromDir ?? "";
+  }
 }
 
 // src/project-canon.ts
@@ -23488,7 +23516,7 @@ var EMBEDDING_VERSION = modelVersion(EMBEDDING_MODEL);
 var embeddingPipeline = null;
 async function initEmbeddings() {
   if (!embeddingPipeline) {
-    relocateModelCache(EMBEDDING_MODEL);
+    adoptStableModelCache(EMBEDDING_MODEL);
     console.error(`Loading embedding model ${EMBEDDING_MODEL} (first run may take time)...`);
     embeddingPipeline = await pipeline(
       "feature-extraction",

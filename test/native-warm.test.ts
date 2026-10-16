@@ -126,15 +126,19 @@ describe('startup wiring', () => {
     expect(src.match(/^[ \t]*loadSqliteVec\(db\);[ \t]*$/gm)?.length).toBe(2);
   });
 
-  it('embeddings.ts relocates the model cache before creating the pipeline', () => {
+  it('embeddings.ts adopts (never mirrors) the stable model cache before creating the pipeline', () => {
     const src = read('embeddings.ts');
     const fn = src.indexOf('export async function initEmbeddings()');
     expect(fn).toBeGreaterThan(-1);
     const body = src.slice(fn);
-    const relocate = /^[ \t]*relocateModelCache\(EMBEDDING_MODEL\);[ \t]*$/m.exec(body);
+    const adopt = /^[ \t]*adoptStableModelCache\(EMBEDDING_MODEL\);[ \t]*$/m.exec(body);
     const create = /await pipeline\(/.exec(body);
-    expect(relocate, 'relocateModelCache(EMBEDDING_MODEL); missing from initEmbeddings()').not.toBeNull();
+    expect(adopt, 'adoptStableModelCache(EMBEDDING_MODEL); missing from initEmbeddings()').not.toBeNull();
     expect(create).not.toBeNull();
-    expect(relocate!.index).toBeLessThan(create!.index);
+    expect(adopt!.index).toBeLessThan(create!.index);
+    // initEmbeddings also runs before the MCP handshake (inject daemon
+    // pre-warm): a synchronous copy there could eat the client's startup
+    // timeout, so the mirroring variant must not be called from this module.
+    expect(src).not.toMatch(/relocateModelCache\(/);
   });
 });

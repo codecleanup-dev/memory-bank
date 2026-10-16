@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
+import fs from 'fs';
 import * as sqliteVec from 'sqlite-vec';
 import * as transformers from '@xenova/transformers';
 import {
@@ -24,6 +25,7 @@ import {
   stableSqliteVecPath,
   loadSqliteVec,
   relocateModelCache,
+  adoptStableModelCache,
   stableModelCacheDir,
   resetRuntimeAssetCacheForTests,
 } from '../src/runtime-assets.js';
@@ -51,6 +53,7 @@ describe('runtime-assets', () => {
     else process.env.MEMORY_BANK_CONFIG_DIR = savedCfg;
     transformersEnv.cacheDir = savedCacheDir;
     resetRuntimeAssetCacheForTests();
+    vi.restoreAllMocks();
     rmSync(tmp, { recursive: true, force: true });
   });
 
@@ -65,8 +68,36 @@ describe('runtime-assets', () => {
       expect(readFileSync(dst, 'utf8')).toBe('abc');
       // Same volume → hard link: both names share one inode.
       expect(statSync(dst).ino).toBe(statSync(src).ino);
+
+      // Second call must not touch the filesystem again.
+      const link = vi.spyOn(fs, 'linkSync');
+      const copy = vi.spyOn(fs, 'copyFileSync');
       expect(mirrorFile(src, dst)).toBe(true);
+      expect(link).not.toHaveBeenCalled();
+      expect(copy).not.toHaveBeenCalled();
       expect(readdirSync(path.join(tmp, 'mirror'))).toEqual(['src.bin']);
+    });
+
+    it('copy fallback (hard link impossible) preserves mtime and is idempotent too', () => {
+      const src = path.join(tmp, 'model.onnx');
+      const dst = path.join(tmp, 'mirror', 'model.onnx');
+      writeFileSync(src, 'weights');
+      vi.spyOn(fs, 'linkSync').mockImplementation(() => {
+        throw Object.assign(new Error('cross-device link'), { code: 'EXDEV' });
+      });
+      const copy = vi.spyOn(fs, 'copyFileSync');
+
+      expect(mirrorFile(src, dst)).toBe(true);
+
+      expect(copy).toHaveBeenCalledTimes(1);
+      expect(readFileSync(dst, 'utf8')).toBe('weights');
+      expect(statSync(dst).ino).not.toBe(statSync(src).ino);
+      expect(Math.abs(statSync(dst).mtimeMs - statSync(src).mtimeMs)).toBeLessThan(2);
+      // Source mtimes carry sub-millisecond fractions utimes() cannot reproduce:
+      // the second call must still be a no-op.
+      expect(mirrorFile(src, dst)).toBe(true);
+      expect(copy).toHaveBeenCalledTimes(1);
+      expect(readdirSync(path.join(tmp, 'mirror'))).toEqual(['model.onnx']);
     });
 
     it('a mirrored file survives deletion of the original', () => {
@@ -114,20 +145,27 @@ describe('runtime-assets', () => {
       expect(readFileSync(path.join(tmp, 'out', 'onnx', 'model_quantized.onnx'), 'utf8')).toBe('weights');
     });
 
-    it('follows symlinked files and directories, and reports a broken link as failure', () => {
+    it('follows symlinked files and directories, and reports a broken link as failure', (ctx) => {
       const real = path.join(tmp, 'real');
       mkdirSync(path.join(real, 'onnx'), { recursive: true });
       writeFileSync(path.join(real, 'onnx', 'model.onnx'), 'weights');
       writeFileSync(path.join(real, 'tokenizer.json'), 'tok');
       const src = path.join(tmp, 'tree');
       mkdirSync(src);
-      symlinkSync(path.join(real, 'tokenizer.json'), path.join(src, 'tokenizer.json'));
-      symlinkSync(path.join(real, 'onnx'), path.join(src, 'onnx'));
+      try {
+        symlinkSync(path.join(real, 'tokenizer.json'), path.join(src, 'tokenizer.json'));
+        symlinkSync(path.join(real, 'onnx'), path.join(src, 'onnx'));
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === 'EPERM') return ctx.skip(); // Windows without symlink privilege
+        throw e;
+      }
 
       expect(mirrorTree(src, path.join(tmp, 'out'))).toBe(true);
 
-      // mirrored as real files, not as links
+      // mirrored as real files (the link TARGET is linked, so the mirror
+      // shares the target's inode and never dangles), not as links
       expect(lstatSync(path.join(tmp, 'out', 'tokenizer.json')).isSymbolicLink()).toBe(false);
+      expect(statSync(path.join(tmp, 'out', 'tokenizer.json')).ino).toBe(statSync(path.join(real, 'tokenizer.json')).ino);
       expect(readFileSync(path.join(tmp, 'out', 'tokenizer.json'), 'utf8')).toBe('tok');
       expect(readFileSync(path.join(tmp, 'out', 'onnx', 'model.onnx'), 'utf8')).toBe('weights');
 
@@ -145,11 +183,16 @@ describe('runtime-assets', () => {
       expect(stable!.startsWith(expectedRoot)).toBe(true);
       expect(statSync(stable!).size).toBe(statSync(sqliteVec.getLoadablePath()).size);
 
-      const db = new Database(':memory:');
-      loadSqliteVec(db);
-      const row = db.prepare('select vec_version() as v').get() as { v: string };
+      // Record which path the connection actually loaded: a silent fallback to
+      // the in-tree path would also make vec_version() work, so that alone
+      // proves nothing.
+      const real = new Database(':memory:');
+      const loaded: string[] = [];
+      loadSqliteVec({ loadExtension: (p: string) => { loaded.push(p); real.loadExtension(p); } });
+      expect(loaded).toEqual([stable]);
+      const row = real.prepare('select vec_version() as v').get() as { v: string };
       expect(row.v).toMatch(/^v\d/);
-      db.close();
+      real.close();
     });
 
     it('a mirrored extension still dlopen()s after its in-tree path is swept', () => {
@@ -159,10 +202,15 @@ describe('runtime-assets', () => {
       mkdirSync(path.dirname(swept), { recursive: true });
       copyFileSync(sqliteVec.getLoadablePath(), swept);
       expect(mirrorFile(swept, stable)).toBe(true);
+      // A connection that already holds the image (as a warmed server would).
+      const holder = new Database(':memory:');
+      holder.loadExtension(swept);
 
       rmSync(path.join(tmp, 'plugin'), { recursive: true, force: true });
 
-      // Control: the swept path is really unusable for a new connection...
+      // Control: the swept path is unusable for a NEW connection even while the
+      // holder keeps the image mapped (dyld stats the path), which is why a
+      // mirror is needed at all...
       const control = new Database(':memory:');
       expect(() => control.loadExtension(swept)).toThrow();
       control.close();
@@ -171,6 +219,7 @@ describe('runtime-assets', () => {
       expect(() => db.loadExtension(stable)).not.toThrow();
       expect((db.prepare('select vec_version() as v').get() as { v: string }).v).toMatch(/^v\d/);
       db.close();
+      holder.close();
     });
   });
 
@@ -193,6 +242,35 @@ describe('runtime-assets', () => {
       expect(readFileSync(path.join(stable, model, 'config.json'), 'utf8')).toBe('{}');
       // Bundled cache gone (post-sweep): still idempotent, still the stable dir.
       expect(relocateModelCache(model, bundled)).toBe(stable);
+      expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(stable));
+    });
+
+    it('adoptStableModelCache uses a complete mirror, ignores a partial one, and never copies', () => {
+      const bundled = path.join(tmp, 'bundled-cache');
+      const model = 'Fake/model';
+      mkdirSync(path.join(bundled, model), { recursive: true });
+      writeFileSync(path.join(bundled, model, 'config.json'), '{}');
+      transformersEnv.cacheDir = bundled;
+      const link = vi.spyOn(fs, 'linkSync');
+      const copy = vi.spyOn(fs, 'copyFileSync');
+
+      // nothing mirrored yet → stays on the bundled cache
+      expect(adoptStableModelCache(model)).toBe(bundled);
+      expect(transformersEnv.cacheDir).toBe(bundled);
+
+      // a partial mirror (no completion marker) is not adopted either
+      mkdirSync(path.join(stableModelCacheDir(), model), { recursive: true });
+      writeFileSync(path.join(stableModelCacheDir(), model, 'config.json'), '{}');
+      expect(adoptStableModelCache(model)).toBe(bundled);
+      expect(link).not.toHaveBeenCalled();
+      expect(copy).not.toHaveBeenCalled();
+
+      // after a complete mirror (post-initialize warm-up) it is adopted, even
+      // once the bundled cache has been swept
+      const stable = relocateModelCache(model, bundled);
+      rmSync(bundled, { recursive: true, force: true });
+      transformersEnv.cacheDir = '/nonexistent/bundled';
+      expect(adoptStableModelCache(model)).toBe(stable);
       expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(stable));
     });
 
@@ -234,12 +312,17 @@ describe('runtime-assets', () => {
       const first = stableSqliteVecPath();
       expect(first).not.toBeNull();
       rmSync(first!); // e.g. a cache cleanup deleted the mirror after it was pinned
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const db = new Database(':memory:');
-      expect(() => loadSqliteVec(db)).not.toThrow();
-      expect((db.prepare('select vec_version() as v').get() as { v: string }).v).toMatch(/^v\d/);
-      db.close();
+      const real = new Database(':memory:');
+      const loaded: string[] = [];
+      expect(() => loadSqliteVec({ loadExtension: (p: string) => { loaded.push(p); real.loadExtension(p); } })).not.toThrow();
+      expect((real.prepare('select vec_version() as v').get() as { v: string }).v).toMatch(/^v\d/);
+      real.close();
 
+      // first attempt (missing mirror) → re-mirror → second attempt succeeds;
+      // the in-tree path is never used
+      expect(loaded).toEqual([first, first]);
       expect(existsSync(first!)).toBe(true); // mirrored again at the same stable path
       expect(stableSqliteVecPath()).toBe(first);
     });

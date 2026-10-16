@@ -46,7 +46,10 @@ export function mirrorFile(src, dst) {
         try {
             const have = fs.statSync(dst);
             const sameInode = have.dev === st.dev && have.ino === st.ino;
-            if (have.isFile() && have.size === st.size && (sameInode || have.mtimeMs === st.mtimeMs)) {
+            // utimes() cannot reproduce a sub-millisecond mtime, so a copied mirror
+            // counts as current when the stamps agree to the millisecond.
+            const sameStamp = Math.abs(have.mtimeMs - st.mtimeMs) < 2;
+            if (have.isFile() && have.size === st.size && (sameInode || sameStamp)) {
                 return true;
             }
         }
@@ -57,7 +60,8 @@ export function mirrorFile(src, dst) {
         const tmp = `${dst}.${process.pid}.tmp`;
         try {
             try {
-                fs.linkSync(src, tmp);
+                // link(2) does not follow symlinks on Linux/Windows: link the target.
+                fs.linkSync(fs.realpathSync(src), tmp);
             }
             catch {
                 fs.copyFileSync(src, tmp);
@@ -171,7 +175,11 @@ export function loadSqliteVec(db) {
             db.loadExtension(stable);
             return;
         }
-        catch {
+        catch (error) {
+            // Say why before falling back, so a broken mirror is not masked by the
+            // in-tree path's own (post-sweep) "no such file" error.
+            const message = error instanceof Error ? error.message : String(error);
+            console.error(`sqlite-vec: stable mirror failed to load (${message}); re-mirroring`);
             stableVecPath = undefined; // re-mirror on the next attempt
         }
     }
@@ -183,6 +191,35 @@ export function loadSqliteVec(db) {
 export function stableModelCacheDir() {
     return path.join(runtimeAssetsDir(), 'models');
 }
+// Written next to a model only after mirrorTree() reported every file mirrored,
+// so a half-finished mirror (failed midway, or being written by another server
+// right now) is never adopted as a cache.
+const MIRROR_COMPLETE_MARKER = '.memory-bank-mirror-complete';
+/**
+ * Use the stable mirror if it already holds a COMPLETE copy of `modelId`;
+ * otherwise leave the cache setting untouched. Never mirrors, never copies:
+ * cheap and safe on paths that run before the MCP initialize handshake (the
+ * inject daemon's pre-warm, hooks, CLI workers). Returns the cache dir in use.
+ */
+export function adoptStableModelCache(modelId) {
+    const current = transformersEnv.cacheDir;
+    try {
+        const stable = stableModelCacheDir();
+        const stableModel = path.join(stable, modelId);
+        const complete = fs.existsSync(path.join(stableModel, MIRROR_COMPLETE_MARKER));
+        // A stable copy that transformers.js downloaded itself has no marker; it is
+        // still the better choice when the configured cache has no model at all.
+        const currentHasModel = typeof current === 'string' && fs.existsSync(path.join(current, modelId));
+        if (complete || (!currentHasModel && fs.existsSync(stableModel))) {
+            transformersEnv.cacheDir = stable;
+            return stable;
+        }
+    }
+    catch {
+        // stable dir unavailable — keep whatever is configured
+    }
+    return typeof current === 'string' ? current : '';
+}
 /**
  * Point transformers.js at the stable cache and seed it with `modelId` from the
  * bundled (in-tree) cache when that still exists. Idempotent and cheap once
@@ -193,16 +230,28 @@ export function stableModelCacheDir() {
  * to download in-tree. Returns the cache dir actually in use.
  */
 export function relocateModelCache(modelId, fromDir = BUNDLED_MODEL_CACHE_DIR) {
-    const stable = stableModelCacheDir();
-    if (fromDir && path.resolve(fromDir) !== path.resolve(stable)) {
-        const src = path.join(fromDir, modelId);
-        if (fs.existsSync(src) && !mirrorTree(src, path.join(stable, modelId))) {
-            transformersEnv.cacheDir = fromDir;
-            return fromDir;
+    try {
+        const stable = stableModelCacheDir();
+        if (fromDir && path.resolve(fromDir) !== path.resolve(stable)) {
+            const src = path.join(fromDir, modelId);
+            if (fs.existsSync(src)) {
+                const dst = path.join(stable, modelId);
+                if (!mirrorTree(src, dst)) {
+                    transformersEnv.cacheDir = fromDir;
+                    return fromDir;
+                }
+                fs.writeFileSync(path.join(dst, MIRROR_COMPLETE_MARKER), '');
+            }
         }
+        transformersEnv.cacheDir = stable;
+        return stable;
     }
-    transformersEnv.cacheDir = stable;
-    return stable;
+    catch {
+        // The stable dir itself cannot be created (read-only or sandboxed HOME):
+        // leave the cache setting exactly as it was.
+        const current = transformersEnv.cacheDir;
+        return typeof current === 'string' ? current : (fromDir ?? '');
+    }
 }
 /** Test hook: forget the process-cached stable path. */
 export function resetRuntimeAssetCacheForTests() {

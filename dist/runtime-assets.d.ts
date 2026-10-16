@@ -35,6 +35,13 @@ export declare function loadSqliteVec(db: {
 }): void;
 export declare function stableModelCacheDir(): string;
 /**
+ * Use the stable mirror if it already holds a COMPLETE copy of `modelId`;
+ * otherwise leave the cache setting untouched. Never mirrors, never copies:
+ * cheap and safe on paths that run before the MCP initialize handshake (the
+ * inject daemon's pre-warm, hooks, CLI workers). Returns the cache dir in use.
+ */
+export declare function adoptStableModelCache(modelId: string): string;
+/**
  * Point transformers.js at the stable cache and seed it with `modelId` from the
  * bundled (in-tree) cache when that still exists. Idempotent and cheap once
  * seeded (per-file inode/mtime check). If the bundled cache has the model but
