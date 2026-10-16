@@ -443,6 +443,29 @@ describe('runtime-assets', () => {
       expect(existsSync(path.join(modelInUseDir(root), String(process.pid)))).toBe(true);
     });
 
+    it('a published version carries a manifest of its files', () => {
+      const root = stableModelCacheRoot();
+      const v1 = relocateModelCache(model, bundled);
+      const manifest = JSON.parse(readFileSync(path.join(root, path.basename(v1), 'manifest.json'), 'utf8')) as Array<{ rel: string; size: number }>;
+
+      expect(manifest.map((f) => f.rel).sort()).toEqual(['config.json', 'onnx/model_quantized.onnx', 'tokenizer.json', 'tokenizer_config.json']);
+      expect(manifest.find((f) => f.rel === 'onnx/model_quantized.onnx')!.size).toBe(onnxBytes('weights').length);
+    });
+
+    it('refuses a snapshot of a version whose files are being deleted one by one (weights already gone)', () => {
+      const root = stableModelCacheRoot();
+      const v1 = relocateModelCache(model, bundled);
+      const fp = path.basename(v1);
+      rmSync(v1, { recursive: true, force: true }); // forget our own snapshot
+      // a pruner's recursive delete has removed the weights but not yet config/manifest
+      rmSync(path.join(root, fp, model, 'onnx'), { recursive: true, force: true });
+      transformersEnv.cacheDir = '/nonexistent/bundled';
+
+      expect(adoptStableModelCache(model)).toBe('/nonexistent/bundled');
+
+      expect(existsSync(path.join(modelInUseDir(root), String(process.pid), fp))).toBe(false);
+    });
+
     it('a staging dir left by a dead process is never adopted and is cleaned up on the next publish', () => {
       const root = stableModelCacheRoot();
       const stale = path.join(root, 'abcdefabcdef.staging-999999');

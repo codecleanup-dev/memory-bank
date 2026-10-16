@@ -23498,8 +23498,9 @@ function modelFilesIntact(dir) {
     return false;
   }
 }
+var MANIFEST = "manifest.json";
 function isPublished(root, fp, modelId) {
-  return fs2.existsSync(path2.join(root, fp, modelId, "config.json"));
+  return fs2.existsSync(path2.join(root, fp, modelId, "config.json")) && fs2.existsSync(path2.join(root, fp, MANIFEST));
 }
 function publishedDirs(root, modelId) {
   let names;
@@ -23554,8 +23555,8 @@ function useVersion(root, fp, modelId) {
   try {
     removeDeadSnapshots(root);
     const src = path2.join(root, fp, modelId);
-    const files = listModelFiles(src);
-    if (files.length === 0) return null;
+    const files = JSON.parse(fs2.readFileSync(path2.join(root, fp, MANIFEST), "utf8"));
+    if (!looksCompleteModel(files)) return null;
     for (const f of files) {
       const from = path2.join(src, f.rel);
       const to = path2.join(dst, f.rel);
@@ -23569,7 +23570,14 @@ function useVersion(root, fp, modelId) {
         fs2.copyFileSync(from, to, fs2.constants.COPYFILE_FICLONE);
       }
     }
-    if (!files.every((f) => fs2.existsSync(path2.join(dst, f.rel)))) throw new Error("incomplete snapshot");
+    const whole = files.every((f) => {
+      try {
+        return fs2.statSync(path2.join(dst, f.rel)).size === f.size;
+      } catch {
+        return false;
+      }
+    });
+    if (!whole) throw new Error("incomplete snapshot");
   } catch {
     fs2.rmSync(snapshot, { recursive: true, force: true });
     return null;
@@ -23667,6 +23675,7 @@ function relocateModelCache(modelId, fromDir = BUNDLED_MODEL_CACHE_DIR, proven =
       const intact = unchanged && modelFilesIntact(path2.join(staging, modelId));
       if (intact) {
         try {
+          fs2.writeFileSync(path2.join(staging, MANIFEST), JSON.stringify(before));
           fs2.renameSync(staging, final);
         } catch {
         }

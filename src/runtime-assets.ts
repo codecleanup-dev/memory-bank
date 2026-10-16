@@ -342,8 +342,15 @@ export function modelFilesIntact(dir: string): boolean {
   }
 }
 
+// Written into every published version at publish time: the authoritative
+// list of its files (relative path + size). A snapshot is accepted only when
+// every manifest entry was linked with the same size — a directory listing
+// taken while a pruner deletes files one by one would miss what is already
+// gone and look complete.
+const MANIFEST = 'manifest.json';
+
 function isPublished(root: string, fp: string, modelId: string): boolean {
-  return fs.existsSync(path.join(root, fp, modelId, 'config.json'));
+  return fs.existsSync(path.join(root, fp, modelId, 'config.json')) && fs.existsSync(path.join(root, fp, MANIFEST));
 }
 
 /** Published fingerprint dirs holding `modelId`, newest first. */
@@ -434,8 +441,8 @@ function useVersion(root: string, fp: string, modelId: string): string | null {
   try {
     removeDeadSnapshots(root); // cheap housekeeping on every new snapshot, not only on publish
     const src = path.join(root, fp, modelId);
-    const files = listModelFiles(src);
-    if (files.length === 0) return null;
+    const files = JSON.parse(fs.readFileSync(path.join(root, fp, MANIFEST), 'utf8')) as ModelFile[];
+    if (!looksCompleteModel(files)) return null;
     for (const f of files) {
       const from = path.join(src, f.rel);
       const to = path.join(dst, f.rel);
@@ -449,8 +456,16 @@ function useVersion(root: string, fp: string, modelId: string): string | null {
         fs.copyFileSync(from, to, fs.constants.COPYFILE_FICLONE); // link unsupported here
       }
     }
-    // every listed file must have made it (a delete may have raced the loop)
-    if (!files.every((f) => fs.existsSync(path.join(dst, f.rel)))) throw new Error('incomplete snapshot');
+    // every manifest entry must have made it, byte-for-byte in size (a delete
+    // may have raced the loop)
+    const whole = files.every((f) => {
+      try {
+        return fs.statSync(path.join(dst, f.rel)).size === f.size;
+      } catch {
+        return false;
+      }
+    });
+    if (!whole) throw new Error('incomplete snapshot');
   } catch {
     fs.rmSync(snapshot, { recursive: true, force: true });
     return null;
@@ -606,6 +621,7 @@ export function relocateModelCache(
       const intact = unchanged && modelFilesIntact(path.join(staging, modelId));
       if (intact) {
         try {
+          fs.writeFileSync(path.join(staging, MANIFEST), JSON.stringify(before));
           fs.renameSync(staging, final); // atomic publish
         } catch {
           // another process published the same fingerprint first — fine
