@@ -23315,13 +23315,18 @@ function mirrorFile(src, dst) {
     fs2.mkdirSync(path2.dirname(dst), { recursive: true });
     const tmp = `${dst}.${process.pid}.tmp`;
     try {
-      fs2.linkSync(src, tmp);
+      try {
+        fs2.linkSync(src, tmp);
+      } catch {
+        fs2.copyFileSync(src, tmp);
+        fs2.utimesSync(tmp, st.atime, st.mtime);
+      }
+      fs2.renameSync(tmp, dst);
+      return true;
     } catch {
-      fs2.copyFileSync(src, tmp);
-      fs2.utimesSync(tmp, st.atime, st.mtime);
+      fs2.rmSync(tmp, { force: true });
+      return false;
     }
-    fs2.renameSync(tmp, dst);
-    return true;
   } catch {
     return false;
   }
@@ -23337,8 +23342,21 @@ function mirrorTree(srcDir, dstDir) {
   for (const entry of entries) {
     const s = path2.join(srcDir, entry.name);
     const d2 = path2.join(dstDir, entry.name);
-    if (entry.isDirectory()) ok = mirrorTree(s, d2) && ok;
-    else if (entry.isFile()) ok = mirrorFile(s, d2) && ok;
+    let isDir = entry.isDirectory();
+    let isFile = entry.isFile();
+    if (entry.isSymbolicLink()) {
+      try {
+        const target = fs2.statSync(s);
+        isDir = target.isDirectory();
+        isFile = target.isFile();
+      } catch {
+        ok = false;
+        continue;
+      }
+    }
+    if (isDir) ok = mirrorTree(s, d2) && ok;
+    else if (isFile) ok = mirrorFile(s, d2) && ok;
+    else ok = false;
   }
   return ok;
 }

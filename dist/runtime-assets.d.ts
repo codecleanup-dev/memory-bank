@@ -8,7 +8,12 @@ export declare function runtimeAssetsDir(): string;
  * cannot be written; callers keep using the in-tree path in that case.
  */
 export declare function mirrorFile(src: string, dst: string): boolean;
-/** Mirror every regular file under srcDir into dstDir with the same layout. */
+/**
+ * Mirror every file under srcDir into dstDir with the same layout. Symlinks are
+ * followed (the target's content is mirrored as a regular file); a broken link
+ * or any entry that cannot be mirrored makes the whole tree report failure so
+ * callers never switch to an incomplete mirror.
+ */
 export declare function mirrorTree(srcDir: string, dstDir: string): boolean;
 /**
  * Stable path of the sqlite-vec extension, mirrored on first use. Only a

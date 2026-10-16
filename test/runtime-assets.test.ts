@@ -13,6 +13,8 @@ import {
   readdirSync,
   copyFileSync,
   utimesSync,
+  symlinkSync,
+  lstatSync,
 } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
@@ -84,6 +86,19 @@ describe('runtime-assets', () => {
       expect(mirrorFile(path.join(tmp, 'nope'), path.join(tmp, 'mirror', 'nope'))).toBe(false);
       expect(existsSync(path.join(tmp, 'mirror'))).toBe(false);
     });
+
+    it('removes its temp file when the final rename fails', () => {
+      const src = path.join(tmp, 'src.bin');
+      writeFileSync(src, 'abc');
+      // A directory where the mirror file must go makes rename() fail.
+      const dst = path.join(tmp, 'mirror', 'src.bin');
+      mkdirSync(dst, { recursive: true });
+
+      expect(mirrorFile(src, dst)).toBe(false);
+
+      expect(readdirSync(path.join(tmp, 'mirror'))).toEqual(['src.bin']);
+      expect(lstatSync(dst).isDirectory()).toBe(true);
+    });
   });
 
   describe('mirrorTree', () => {
@@ -97,6 +112,27 @@ describe('runtime-assets', () => {
 
       expect(readFileSync(path.join(tmp, 'out', 'config.json'), 'utf8')).toBe('{}');
       expect(readFileSync(path.join(tmp, 'out', 'onnx', 'model_quantized.onnx'), 'utf8')).toBe('weights');
+    });
+
+    it('follows symlinked files and directories, and reports a broken link as failure', () => {
+      const real = path.join(tmp, 'real');
+      mkdirSync(path.join(real, 'onnx'), { recursive: true });
+      writeFileSync(path.join(real, 'onnx', 'model.onnx'), 'weights');
+      writeFileSync(path.join(real, 'tokenizer.json'), 'tok');
+      const src = path.join(tmp, 'tree');
+      mkdirSync(src);
+      symlinkSync(path.join(real, 'tokenizer.json'), path.join(src, 'tokenizer.json'));
+      symlinkSync(path.join(real, 'onnx'), path.join(src, 'onnx'));
+
+      expect(mirrorTree(src, path.join(tmp, 'out'))).toBe(true);
+
+      // mirrored as real files, not as links
+      expect(lstatSync(path.join(tmp, 'out', 'tokenizer.json')).isSymbolicLink()).toBe(false);
+      expect(readFileSync(path.join(tmp, 'out', 'tokenizer.json'), 'utf8')).toBe('tok');
+      expect(readFileSync(path.join(tmp, 'out', 'onnx', 'model.onnx'), 'utf8')).toBe('weights');
+
+      symlinkSync(path.join(tmp, 'does-not-exist'), path.join(src, 'broken.onnx'));
+      expect(mirrorTree(src, path.join(tmp, 'out2'))).toBe(false);
     });
   });
 

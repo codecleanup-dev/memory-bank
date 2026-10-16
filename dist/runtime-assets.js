@@ -56,20 +56,32 @@ export function mirrorFile(src, dst) {
         fs.mkdirSync(path.dirname(dst), { recursive: true });
         const tmp = `${dst}.${process.pid}.tmp`;
         try {
-            fs.linkSync(src, tmp);
+            try {
+                fs.linkSync(src, tmp);
+            }
+            catch {
+                fs.copyFileSync(src, tmp);
+                fs.utimesSync(tmp, st.atime, st.mtime);
+            }
+            fs.renameSync(tmp, dst);
+            return true;
         }
         catch {
-            fs.copyFileSync(src, tmp);
-            fs.utimesSync(tmp, st.atime, st.mtime);
+            // never leave a partial copy or a stray hard link behind
+            fs.rmSync(tmp, { force: true });
+            return false;
         }
-        fs.renameSync(tmp, dst);
-        return true;
     }
     catch {
         return false;
     }
 }
-/** Mirror every regular file under srcDir into dstDir with the same layout. */
+/**
+ * Mirror every file under srcDir into dstDir with the same layout. Symlinks are
+ * followed (the target's content is mirrored as a regular file); a broken link
+ * or any entry that cannot be mirrored makes the whole tree report failure so
+ * callers never switch to an incomplete mirror.
+ */
 export function mirrorTree(srcDir, dstDir) {
     let entries;
     try {
@@ -82,10 +94,25 @@ export function mirrorTree(srcDir, dstDir) {
     for (const entry of entries) {
         const s = path.join(srcDir, entry.name);
         const d = path.join(dstDir, entry.name);
-        if (entry.isDirectory())
+        let isDir = entry.isDirectory();
+        let isFile = entry.isFile();
+        if (entry.isSymbolicLink()) {
+            try {
+                const target = fs.statSync(s); // follows the link
+                isDir = target.isDirectory();
+                isFile = target.isFile();
+            }
+            catch {
+                ok = false; // broken link
+                continue;
+            }
+        }
+        if (isDir)
             ok = mirrorTree(s, d) && ok;
-        else if (entry.isFile())
+        else if (isFile)
             ok = mirrorFile(s, d) && ok;
+        else
+            ok = false; // sockets, fifos, devices: not a cache we can mirror
     }
     return ok;
 }

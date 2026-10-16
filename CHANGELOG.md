@@ -15,7 +15,8 @@ import 때가 아니라 첫 `new Database()` 때 `bindings` 로 찾는다(도구
   (하드링크 우선, 실패 시 복사하며 mtime 보존. 같은 inode 이거나 크기·mtime 이 같으면 건너뛰고 temp+rename 으로 원자적).
   `loadSqliteVec(db)` 는 미러에서 확장을 올리고, `relocateModelCache(model)` 은 transformers.js 의 `env.cacheDir` 를 미러로
   돌리면서 번들 캐시에 있는 모델을 심는다. 미러링이 실패하면 번들 캐시를 그대로 쓰고(재다운로드 강제 없음), sqlite-vec 미러
-  실패는 캐시하지 않아 다음 호출에서 재시도한다(적대 리뷰 MEDIUM 3건 반영).
+  실패는 캐시하지 않아 다음 호출에서 재시도한다. 트리 미러는 심볼릭 링크를 따라가 실파일로 미러하고 깨진 링크는 실패로
+  보고하며, 파일 미러는 실패 시 자기 임시 파일을 지운다(적대 리뷰 MEDIUM 5건 반영).
 - **`src/db.ts`**: 두 연결 경로(`initDatabase`·`openDatabaseReadonly`) 모두 `loadSqliteVec` 를 쓴다.
 - **`src/embeddings.ts` `initEmbeddings()`**: pipeline 생성 전에 `relocateModelCache` 를 부른다.
 - **`src/native-warm.ts` `warmNativeBindings()`**: 서버 기동 직후 미러링을 하고 DB 를 한 번 열고 닫아 애드온을 매핑한다.
@@ -24,9 +25,10 @@ import 때가 아니라 첫 `new Database()` 때 `bindings` 로 찾는다(도구
   세션에는 소급되지 않으므로 그 세션들은 재시작해야 한다.
 
 ### Tests
-- `test/runtime-assets.test.ts` +10 (하드링크 미러·멱등·temp 잔재 없음, 원본 삭제 후 생존, 결측 소스는 false, 트리 미러,
-  sqlite-vec 미러 경로·로드, 지워진 경로 dlopen 실패 대조 + 미러 성공, 모델 캐시 재배치·시드·sweep 생존, 미러 실패 시
-  번들 캐시 유지, 같은 길이로 교체된 소스 재미러, sqlite-vec 미러 실패 비고정·재시도).
+- `test/runtime-assets.test.ts` +12 (하드링크 미러·멱등·temp 잔재 없음, 원본 삭제 후 생존, 결측 소스는 false, rename 실패
+  시 temp 정리, 트리 미러, 심볼릭 링크 추적·깨진 링크 실패, sqlite-vec 미러 경로·로드, 지워진 경로 dlopen 실패 대조 + 미러
+  성공, 모델 캐시 재배치·시드·sweep 생존, 미러 실패 시 번들 캐시 유지, 같은 길이로 교체된 소스 재미러, sqlite-vec 미러 실패
+  비고정·재시도).
 - `test/native-warm.test.ts` +7 (실제 DB 열림·애드온 require 캐시 적재, 미러 생성·cacheDir 전환, open/close 1회, 실패 시
   throw 없이 false + stderr, main() 배선 순서, db.ts 가 `loadSqliteVec` 만 쓰는지, embeddings 가 pipeline 전에 재배치하는지).
 
