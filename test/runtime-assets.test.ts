@@ -12,6 +12,7 @@ import {
   readFileSync,
   readdirSync,
   copyFileSync,
+  utimesSync,
 } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
@@ -157,6 +158,55 @@ describe('runtime-assets', () => {
       // Bundled cache gone (post-sweep): still idempotent, still the stable dir.
       expect(relocateModelCache(model, bundled)).toBe(stable);
       expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(stable));
+    });
+
+    it('keeps the bundled cache in use when mirroring fails, instead of forcing a re-download', () => {
+      const bundled = path.join(tmp, 'bundled-cache');
+      const model = 'Fake/model';
+      mkdirSync(path.join(bundled, model), { recursive: true });
+      writeFileSync(path.join(bundled, model, 'config.json'), '{}');
+      // Make the stable models dir unwritable: a regular file where the dir must go.
+      mkdirSync(path.dirname(stableModelCacheDir()), { recursive: true });
+      writeFileSync(stableModelCacheDir(), 'not a directory');
+
+      const inUse = relocateModelCache(model, bundled);
+
+      expect(inUse).toBe(bundled);
+      expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(bundled));
+    });
+  });
+
+  describe('failure handling', () => {
+    it('mirrorFile re-mirrors a replaced source of equal length (new inode, new mtime)', () => {
+      const src = path.join(tmp, 'config.json');
+      const dst = path.join(tmp, 'mirror', 'config.json');
+      writeFileSync(src, '{"a":1}');
+      expect(mirrorFile(src, dst)).toBe(true);
+
+      // Simulate a package update: same path, same length, different content/inode.
+      rmSync(src);
+      writeFileSync(src, '{"a":2}');
+      const past = new Date(Date.now() - 60_000);
+      // utimes gives the replacement a distinct mtime even on coarse filesystems
+      utimesSync(src, past, past);
+      expect(mirrorFile(src, dst)).toBe(true);
+
+      expect(readFileSync(dst, 'utf8')).toBe('{"a":2}');
+    });
+
+    it('stableSqliteVecPath does not pin a transient mirror failure', () => {
+      // First call fails: runtime-assets exists as a regular file.
+      const assets = path.join(tmp, 'cfg', 'conversation-index', 'runtime-assets');
+      mkdirSync(path.dirname(assets), { recursive: true });
+      writeFileSync(assets, 'blocker');
+      expect(stableSqliteVecPath()).toBeNull();
+
+      // Problem fixed: the next call mirrors and caches the path.
+      rmSync(assets);
+      const p = stableSqliteVecPath();
+      expect(p).not.toBeNull();
+      expect(existsSync(p!)).toBe(true);
+      expect(stableSqliteVecPath()).toBe(p);
     });
   });
 });

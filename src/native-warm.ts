@@ -1,6 +1,6 @@
 import { initDatabase } from './db.js';
 import { EMBEDDING_MODEL } from './embeddings.js';
-import { relocateModelCache, stableSqliteVecPath } from './runtime-assets.js';
+import { relocateModelCache, stableModelCacheDir, stableSqliteVecPath } from './runtime-assets.js';
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -36,7 +36,10 @@ export function warmNativeBindings(open: () => { close(): void } = initDatabase)
   }
 
   try {
-    relocateModelCache(EMBEDDING_MODEL);
+    if (relocateModelCache(EMBEDDING_MODEL) !== stableModelCacheDir()) {
+      console.error('native warm-up: embedding model cache mirror failed; keeping the in-tree cache (does not survive a sweep)');
+      ok = false;
+    }
   } catch (error) {
     console.error('native warm-up: embedding model cache relocation failed:', describe(error));
     ok = false;

@@ -23306,7 +23306,10 @@ function mirrorFile(src, dst) {
     if (!st.isFile()) return false;
     try {
       const have = fs2.statSync(dst);
-      if (have.isFile() && have.size === st.size) return true;
+      const sameInode = have.dev === st.dev && have.ino === st.ino;
+      if (have.isFile() && have.size === st.size && (sameInode || have.mtimeMs === st.mtimeMs)) {
+        return true;
+      }
     } catch {
     }
     fs2.mkdirSync(path2.dirname(dst), { recursive: true });
@@ -23315,6 +23318,7 @@ function mirrorFile(src, dst) {
       fs2.linkSync(src, tmp);
     } catch {
       fs2.copyFileSync(src, tmp);
+      fs2.utimesSync(tmp, st.atime, st.mtime);
     }
     fs2.renameSync(tmp, dst);
     return true;
@@ -23349,7 +23353,7 @@ function platformPackageVersion(loadablePath) {
   return "unknown";
 }
 function stableSqliteVecPath() {
-  if (stableVecPath !== void 0) return stableVecPath;
+  if (stableVecPath) return stableVecPath;
   try {
     const src = sqliteVec.getLoadablePath();
     const dst = path2.join(
@@ -23358,11 +23362,13 @@ function stableSqliteVecPath() {
       `${platformPackageVersion(src)}-${process.platform}-${process.arch}`,
       path2.basename(src)
     );
-    stableVecPath = mirrorFile(src, dst) ? dst : null;
+    if (mirrorFile(src, dst)) {
+      stableVecPath = dst;
+      return dst;
+    }
   } catch {
-    stableVecPath = null;
   }
-  return stableVecPath;
+  return null;
 }
 function loadSqliteVec(db) {
   const stable = stableSqliteVecPath();
@@ -23382,7 +23388,10 @@ function relocateModelCache(modelId, fromDir = BUNDLED_MODEL_CACHE_DIR) {
   const stable = stableModelCacheDir();
   if (fromDir && path2.resolve(fromDir) !== path2.resolve(stable)) {
     const src = path2.join(fromDir, modelId);
-    if (fs2.existsSync(src)) mirrorTree(src, path2.join(stable, modelId));
+    if (fs2.existsSync(src) && !mirrorTree(src, path2.join(stable, modelId))) {
+      transformersEnv.cacheDir = fromDir;
+      return fromDir;
+    }
   }
   transformersEnv.cacheDir = stable;
   return stable;
@@ -25385,7 +25394,10 @@ function warmNativeBindings(open = initDatabase) {
     ok = false;
   }
   try {
-    relocateModelCache(EMBEDDING_MODEL);
+    if (relocateModelCache(EMBEDDING_MODEL) !== stableModelCacheDir()) {
+      console.error("native warm-up: embedding model cache mirror failed; keeping the in-tree cache (does not survive a sweep)");
+      ok = false;
+    }
   } catch (error2) {
     console.error("native warm-up: embedding model cache relocation failed:", describe(error2));
     ok = false;
