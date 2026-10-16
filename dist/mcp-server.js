@@ -23423,7 +23423,9 @@ function fingerprintOf(files) {
 var REQUIRED_MODEL_FILES = ["config.json", "tokenizer.json", "tokenizer_config.json"];
 function looksCompleteModel(files) {
   const have = (rel) => files.some((f) => f.rel === rel && f.size > 0);
-  return REQUIRED_MODEL_FILES.every(have) && files.some((f) => f.rel.startsWith("onnx/") && f.rel.endsWith(".onnx") && f.size > 0);
+  return REQUIRED_MODEL_FILES.every(have) && // The weights file a default feature-extraction pipeline (quantized: true)
+  // actually loads — any other .onnx would be re-downloaded, not used.
+  have("onnx/model_quantized.onnx");
 }
 var MODEL_QUIET_MS = 3e4;
 function isQuiescent(files, now = Date.now()) {
@@ -23529,6 +23531,14 @@ var PUBLISH_GRACE_MS = 24 * 60 * 60 * 1e3;
 function modelInUseDir(root) {
   return path2.join(root, "inuse");
 }
+function snapshotMatchesManifest(snapshot, modelId) {
+  try {
+    const files = JSON.parse(fs2.readFileSync(path2.join(snapshot, MANIFEST), "utf8"));
+    return looksCompleteModel(files) && files.every((f) => fs2.statSync(path2.join(snapshot, modelId, f.rel)).size === f.size);
+  } catch {
+    return false;
+  }
+}
 function removeDeadSnapshots(root) {
   try {
     for (const n of fs2.readdirSync(modelInUseDir(root))) {
@@ -23555,7 +23565,7 @@ function useVersion(root, fp, modelId) {
   const snapshot = path2.join(mine, fp);
   const dst = path2.join(snapshot, modelId);
   const marker = path2.join(snapshot, ".complete");
-  if (fs2.existsSync(marker)) {
+  if (fs2.existsSync(marker) && snapshotMatchesManifest(snapshot, modelId)) {
     transformersEnv.cacheDir = snapshot;
     return snapshot;
   }
@@ -23587,6 +23597,12 @@ function useVersion(root, fp, modelId) {
       }
     });
     if (!whole) throw new Error("incomplete snapshot");
+    const manifestCopy = path2.join(snapshot, MANIFEST);
+    try {
+      fs2.linkSync(path2.join(root, fp, MANIFEST), manifestCopy);
+    } catch {
+      fs2.copyFileSync(path2.join(root, fp, MANIFEST), manifestCopy);
+    }
     fs2.writeFileSync(marker, "");
   } catch {
     fs2.rmSync(snapshot, { recursive: true, force: true });
@@ -23626,6 +23642,7 @@ function underStableRoot(dir) {
 }
 var mirroringAllowed = false;
 var provenSource = null;
+var tidiedThisProcess = false;
 function notifyModelLoaded(modelId, cacheDir) {
   if (!cacheDir || underStableRoot(cacheDir)) return;
   provenSource = { modelId, dir: cacheDir };
@@ -23650,13 +23667,20 @@ function adoptStableModelCache(modelId) {
     if (current && !path2.resolve(current).startsWith(path2.resolve(root) + path2.sep)) {
       const src = path2.join(current, modelId);
       if (fs2.existsSync(src)) {
-        const files = listModelFiles(src);
-        const fp = fingerprintOf(files);
-        if (isPublished(root, fp, modelId)) {
-          const dir = useVersion(root, fp, modelId);
-          if (dir) return dir;
+        let files = null;
+        try {
+          files = listModelFiles(src);
+        } catch {
+          files = null;
         }
-        if (looksCompleteModel(files) && modelFilesIntact(src)) return current;
+        if (files) {
+          const fp = fingerprintOf(files);
+          if (isPublished(root, fp, modelId)) {
+            const dir = useVersion(root, fp, modelId);
+            if (dir) return dir;
+          }
+          if (looksCompleteModel(files) && modelFilesIntact(src)) return current;
+        }
       }
     }
     for (const candidate of publishedDirs(root, modelId)) {
@@ -23693,11 +23717,17 @@ function relocateModelCache(modelId, fromDir = BUNDLED_MODEL_CACHE_DIR, proven =
       }
       fs2.rmSync(staging, { recursive: true, force: true });
       if (!isPublished(root, fp, modelId)) return currentCacheDir();
-      const used = useVersion(root, fp, modelId);
+      const used2 = useVersion(root, fp, modelId);
       tidyModelRoot(root, modelId);
-      return used ?? currentCacheDir();
+      tidiedThisProcess = true;
+      return used2 ?? currentCacheDir();
     }
-    return useVersion(root, fp, modelId) ?? currentCacheDir();
+    const used = useVersion(root, fp, modelId);
+    if (!tidiedThisProcess) {
+      tidiedThisProcess = true;
+      tidyModelRoot(root, modelId);
+    }
+    return used ?? currentCacheDir();
   } catch {
     return currentCacheDir();
   }

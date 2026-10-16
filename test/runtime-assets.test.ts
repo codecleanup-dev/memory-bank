@@ -542,6 +542,61 @@ describe('runtime-assets', () => {
       expect(existsSync(path.join(modelInUseDir(root), String(process.pid), fp))).toBe(false);
     });
 
+    it('a broken symlink in the bundled model dir does not stop adoption of a published version', (ctx) => {
+      const v1 = relocateModelCache(model, bundled);
+      try {
+        symlinkSync(path.join(tmp, 'does-not-exist.json'), path.join(bundled, model, 'dangling.json'));
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === 'EPERM') return ctx.skip();
+        throw e;
+      }
+      transformersEnv.cacheDir = bundled;
+
+      expect(adoptStableModelCache(model)).toBe(v1);
+    });
+
+    it('a cache whose weights are not the file the pipeline loads (model_quantized.onnx) is not complete', () => {
+      fs.renameSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'), path.join(bundled, model, 'onnx', 'model.onnx'));
+      backdate(path.join(bundled, model, 'onnx', 'model.onnx'));
+
+      expect(relocateModelCache(model, bundled, true)).toBe(bundled);
+      expect(published()).toEqual([]);
+    });
+
+    it('pruning also runs (once per process) when an existing version is merely reused', () => {
+      const root = stableModelCacheRoot();
+      const v1 = relocateModelCache(model, bundled);
+      const bump = (w: string) => {
+        rmSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'));
+        writeFileSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'), onnxBytes(w));
+        backdate(path.join(bundled, model, 'onnx', 'model_quantized.onnx'));
+        return relocateModelCache(model, bundled);
+      };
+      bump('v2');
+      bump('v3');
+      const v4 = bump('v4');
+      expect(existsSync(path.join(root, path.basename(v1)))).toBe(true); // all recent: nothing pruned yet
+      const old = new Date(Date.now() - PUBLISH_GRACE_MS - 60_000);
+      utimesSync(path.join(root, path.basename(v1)), old, old);
+      resetRuntimeAssetCacheForTests(); // a fresh process that only reuses v4
+
+      expect(relocateModelCache(model, bundled)).toBe(v4);
+
+      expect(existsSync(path.join(root, path.basename(v1)))).toBe(false);
+    });
+
+    it('a completed snapshot damaged afterwards is rebuilt on reuse', () => {
+      const v1 = relocateModelCache(model, bundled);
+      expect(existsSync(path.join(v1, 'manifest.json'))).toBe(true);
+      rmSync(path.join(v1, model, 'onnx', 'model_quantized.onnx')); // weights lost after completion
+      transformersEnv.cacheDir = '/nonexistent/bundled';
+
+      expect(adoptStableModelCache(model)).toBe(v1);
+
+      expect(weightsIn(v1)).toBe('weights');
+      expect(existsSync(path.join(v1, '.complete'))).toBe(true);
+    });
+
     it('a staging dir left by a dead process is never adopted and is cleaned up on the next publish', () => {
       const root = stableModelCacheRoot();
       const stale = path.join(root, 'abcdefabcdef.staging-999999');

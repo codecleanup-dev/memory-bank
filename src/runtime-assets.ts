@@ -242,7 +242,9 @@ function looksCompleteModel(files: ModelFile[]): boolean {
   const have = (rel: string) => files.some((f) => f.rel === rel && f.size > 0);
   return (
     REQUIRED_MODEL_FILES.every(have) &&
-    files.some((f) => f.rel.startsWith('onnx/') && f.rel.endsWith('.onnx') && f.size > 0)
+    // The weights file a default feature-extraction pipeline (quantized: true)
+    // actually loads — any other .onnx would be re-downloaded, not used.
+    have('onnx/model_quantized.onnx')
   );
 }
 
@@ -402,6 +404,19 @@ export function modelInUseDir(root: string): string {
   return path.join(root, 'inuse');
 }
 
+/** Every entry of the snapshot's own manifest copy is present with the recorded size. */
+function snapshotMatchesManifest(snapshot: string, modelId: string): boolean {
+  try {
+    const files = JSON.parse(fs.readFileSync(path.join(snapshot, MANIFEST), 'utf8')) as ModelFile[];
+    return (
+      looksCompleteModel(files) &&
+      files.every((f) => fs.statSync(path.join(snapshot, modelId, f.rel)).size === f.size)
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Snapshots of processes that are gone (a SIGKILL/SIGTERM skips the exit hook). Hard links only: no space, just names. */
 function removeDeadSnapshots(root: string): void {
   try {
@@ -445,11 +460,11 @@ function useVersion(root: string, fp: string, modelId: string): string | null {
   // under a reused pid, which removeDeadSnapshots cannot tell apart — and is
   // rebuilt from scratch.
   const marker = path.join(snapshot, '.complete');
-  if (fs.existsSync(marker)) {
+  if (fs.existsSync(marker) && snapshotMatchesManifest(snapshot, modelId)) {
     transformersEnv.cacheDir = snapshot;
     return snapshot;
   }
-  fs.rmSync(snapshot, { recursive: true, force: true });
+  fs.rmSync(snapshot, { recursive: true, force: true }); // partial, or damaged after completion
   try {
     removeDeadSnapshots(root); // cheap housekeeping on every new snapshot, not only on publish
     const src = path.join(root, fp, modelId);
@@ -482,6 +497,14 @@ function useVersion(root: string, fp: string, modelId: string): string | null {
       }
     });
     if (!whole) throw new Error('incomplete snapshot');
+    // keep the manifest with the snapshot so a later reuse can be verified
+    // even after the published version itself was pruned
+    const manifestCopy = path.join(snapshot, MANIFEST);
+    try {
+      fs.linkSync(path.join(root, fp, MANIFEST), manifestCopy);
+    } catch {
+      fs.copyFileSync(path.join(root, fp, MANIFEST), manifestCopy);
+    }
     fs.writeFileSync(marker, ''); // last: marks the snapshot complete
   } catch {
     fs.rmSync(snapshot, { recursive: true, force: true });
@@ -538,6 +561,7 @@ function underStableRoot(dir: string): boolean {
 
 let mirroringAllowed = false;
 let provenSource: { modelId: string; dir: string } | null = null;
+let tidiedThisProcess = false;
 
 /** Called after a pipeline was created successfully from `cacheDir`. */
 export function notifyModelLoaded(modelId: string, cacheDir: string): void {
@@ -579,20 +603,27 @@ export function adoptStableModelCache(modelId: string): string {
     if (current && !path.resolve(current).startsWith(path.resolve(root) + path.sep)) {
       const src = path.join(current, modelId);
       if (fs.existsSync(src)) {
-        const files = listModelFiles(src);
-        const fp = fingerprintOf(files);
-        if (isPublished(root, fp, modelId)) {
-          const dir = useVersion(root, fp, modelId);
-          if (dir) return dir;
+        let files: ModelFile[] | null = null;
+        try {
+          files = listModelFiles(src);
+        } catch {
+          files = null; // unreadable source (broken link, racing delete): no reason to skip the published versions
         }
-        // A complete, intact source without a published twin stays in use: an
-        // older published version must never shadow a newer (or repaired)
-        // source, and the next warm-up publishes this one. An INCOMPLETE or
-        // CORRUPT source (partial download, partial delete, truncated write)
-        // must not shadow a complete published version either, so it falls
-        // through to the candidates. The structural check runs only on this
-        // path, i.e. once per machine until the source gets published.
-        if (looksCompleteModel(files) && modelFilesIntact(src)) return current;
+        if (files) {
+          const fp = fingerprintOf(files);
+          if (isPublished(root, fp, modelId)) {
+            const dir = useVersion(root, fp, modelId);
+            if (dir) return dir;
+          }
+          // A complete, intact source without a published twin stays in use:
+          // an older published version must never shadow a newer (or
+          // repaired) source, and the next warm-up publishes this one. An
+          // INCOMPLETE or CORRUPT source (partial download, partial delete,
+          // truncated write) must not shadow a complete published version
+          // either, so it falls through to the candidates. The structural
+          // check runs only here, i.e. until the source gets published.
+          if (looksCompleteModel(files) && modelFilesIntact(src)) return current;
+        }
       }
     }
     for (const candidate of publishedDirs(root, modelId)) {
@@ -651,11 +682,19 @@ export function relocateModelCache(
       }
       fs.rmSync(staging, { recursive: true, force: true });
       if (!isPublished(root, fp, modelId)) return currentCacheDir(); // keep the bundled cache
-      const used = useVersion(root, fp, modelId); // lease first: our own version is never a prune candidate
+      const used = useVersion(root, fp, modelId);
       tidyModelRoot(root, modelId);
+      tidiedThisProcess = true;
       return used ?? currentCacheDir();
     }
-    return useVersion(root, fp, modelId) ?? currentCacheDir();
+    const used = useVersion(root, fp, modelId);
+    // Reusing an existing version publishes nothing, so without this a root
+    // that only ever reuses would never be pruned. Once per process is enough.
+    if (!tidiedThisProcess) {
+      tidiedThisProcess = true;
+      tidyModelRoot(root, modelId);
+    }
+    return used ?? currentCacheDir();
   } catch {
     // stable root unavailable (read-only or sandboxed HOME): leave the cache setting as it was
     return currentCacheDir();
@@ -667,4 +706,5 @@ export function resetRuntimeAssetCacheForTests(): void {
   stableVecPath = undefined;
   mirroringAllowed = false;
   provenSource = null;
+  tidiedThisProcess = false;
 }
