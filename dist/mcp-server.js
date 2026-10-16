@@ -23293,6 +23293,7 @@ import fs3 from "fs";
 // src/runtime-assets.ts
 import fs2 from "fs";
 import path2 from "path";
+import { createHash } from "crypto";
 import * as sqliteVec from "sqlite-vec";
 import * as transformers from "@xenova/transformers";
 var transformersEnv = transformers.env;
@@ -23316,12 +23317,8 @@ function mirrorFile(src, dst) {
     fs2.mkdirSync(path2.dirname(dst), { recursive: true });
     const tmp = `${dst}.${process.pid}.tmp`;
     try {
-      try {
-        fs2.linkSync(fs2.realpathSync(src), tmp);
-      } catch {
-        fs2.copyFileSync(src, tmp);
-        fs2.utimesSync(tmp, st.atime, st.mtime);
-      }
+      fs2.copyFileSync(src, tmp, fs2.constants.COPYFILE_FICLONE);
+      fs2.utimesSync(tmp, st.atime, st.mtime);
       fs2.renameSync(tmp, dst);
       return true;
     } catch {
@@ -23404,44 +23401,221 @@ function loadSqliteVec(db) {
   }
   sqliteVec.load(db);
 }
-function stableModelCacheDir() {
+function stableModelCacheRoot() {
   return path2.join(runtimeAssetsDir(), "models");
 }
-var MIRROR_COMPLETE_MARKER = ".memory-bank-mirror-complete";
-function adoptStableModelCache(modelId) {
-  const current = transformersEnv.cacheDir;
+var FINGERPRINT_RE = /^[0-9a-f]{12}$/;
+var STAGING_RE = /^([0-9a-f]{12})\.staging-(\d+)$/;
+function listModelFiles(dir, base = dir, out = []) {
+  for (const entry of fs2.readdirSync(dir, { withFileTypes: true })) {
+    const full = path2.join(dir, entry.name);
+    const st = fs2.statSync(full);
+    if (st.isDirectory()) listModelFiles(full, base, out);
+    else if (st.isFile()) {
+      out.push({ rel: path2.relative(base, full).split(path2.sep).join("/"), size: st.size, mtime: Math.floor(st.mtimeMs) });
+    }
+  }
+  return out.sort((a, b2) => a.rel < b2.rel ? -1 : a.rel > b2.rel ? 1 : 0);
+}
+function fingerprintOf(files) {
+  return createHash("sha1").update(JSON.stringify(files)).digest("hex").slice(0, 12);
+}
+var REQUIRED_MODEL_FILES = ["config.json", "tokenizer.json", "tokenizer_config.json"];
+function looksCompleteModel(files) {
+  const have = (rel) => files.some((f) => f.rel === rel && f.size > 0);
+  return REQUIRED_MODEL_FILES.every(have) && files.some((f) => f.rel.startsWith("onnx/") && f.rel.endsWith(".onnx") && f.size > 0);
+}
+var MODEL_QUIET_MS = 3e4;
+function isQuiescent(files, now = Date.now()) {
+  return files.every((f) => now - f.mtime >= MODEL_QUIET_MS);
+}
+function readVarint(fd, pos, size) {
+  const buf = Buffer.alloc(10);
+  const n = fs2.readSync(fd, buf, 0, Math.min(10, size - pos), pos);
+  let value = 0n;
+  for (let i = 0; i < n; i++) {
+    value |= BigInt(buf[i] & 127) << BigInt(7 * i);
+    if ((buf[i] & 128) === 0) return { value, next: pos + i + 1 };
+  }
+  return null;
+}
+function onnxLooksComplete(file) {
+  let fd = null;
   try {
-    const stable = stableModelCacheDir();
-    const stableModel = path2.join(stable, modelId);
-    const complete = fs2.existsSync(path2.join(stableModel, MIRROR_COMPLETE_MARKER));
-    const currentHasModel = typeof current === "string" && fs2.existsSync(path2.join(current, modelId));
-    if (complete || !currentHasModel && fs2.existsSync(stableModel)) {
-      transformersEnv.cacheDir = stable;
-      return stable;
+    const size = fs2.statSync(file).size;
+    if (size === 0) return false;
+    fd = fs2.openSync(file, "r");
+    let pos = 0;
+    let sawGraph = false;
+    while (pos < size) {
+      const tag = readVarint(fd, pos, size);
+      if (!tag) return false;
+      pos = tag.next;
+      const field = Number(tag.value >> 3n);
+      const wireType = Number(tag.value & 7n);
+      if (wireType === 0) {
+        const v2 = readVarint(fd, pos, size);
+        if (!v2) return false;
+        pos = v2.next;
+      } else if (wireType === 1) {
+        pos += 8;
+      } else if (wireType === 5) {
+        pos += 4;
+      } else if (wireType === 2) {
+        const len = readVarint(fd, pos, size);
+        if (!len) return false;
+        pos = len.next + Number(len.value);
+        if (field === 7) sawGraph = true;
+      } else {
+        return false;
+      }
+      if (pos > size) return false;
+    }
+    return pos === size && sawGraph;
+  } catch {
+    return false;
+  } finally {
+    if (fd !== null) fs2.closeSync(fd);
+  }
+}
+function jsonLooksComplete(file) {
+  try {
+    JSON.parse(fs2.readFileSync(file, "utf8"));
+    return true;
+  } catch {
+    return false;
+  }
+}
+function modelFilesIntact(dir) {
+  try {
+    return listModelFiles(dir).every((f) => {
+      const full = path2.join(dir, f.rel);
+      if (f.rel.endsWith(".onnx")) return onnxLooksComplete(full);
+      if (f.rel.endsWith(".json")) return jsonLooksComplete(full);
+      return f.size > 0;
+    });
+  } catch {
+    return false;
+  }
+}
+function isPublished(root, fp, modelId) {
+  return fs2.existsSync(path2.join(root, fp, modelId, "config.json"));
+}
+function publishedDirs(root, modelId) {
+  let names;
+  try {
+    names = fs2.readdirSync(root);
+  } catch {
+    return [];
+  }
+  return names.filter((n) => FINGERPRINT_RE.test(n) && isPublished(root, n, modelId)).map((n) => ({ dir: path2.join(root, n), mtime: fs2.statSync(path2.join(root, n)).mtimeMs })).sort((a, b2) => b2.mtime - a.mtime).map((x2) => x2.dir);
+}
+function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+}
+function tidyModelRoot(root, modelId, keep = 3) {
+  try {
+    for (const n of fs2.readdirSync(root)) {
+      const m2 = STAGING_RE.exec(n);
+      if (m2 && !pidAlive(Number(m2[2]))) fs2.rmSync(path2.join(root, n), { recursive: true, force: true });
+    }
+    for (const dir of publishedDirs(root, modelId).slice(keep)) fs2.rmSync(dir, { recursive: true, force: true });
+  } catch {
+  }
+}
+function currentCacheDir() {
+  const c = transformersEnv.cacheDir;
+  return typeof c === "string" ? c : "";
+}
+function currentModelCacheDir() {
+  return currentCacheDir();
+}
+function underStableRoot(dir) {
+  try {
+    return path2.resolve(dir).startsWith(path2.resolve(stableModelCacheRoot()) + path2.sep);
+  } catch {
+    return false;
+  }
+}
+var mirroringAllowed = false;
+var provenSource = null;
+function notifyModelLoaded(modelId, cacheDir) {
+  if (!cacheDir || underStableRoot(cacheDir)) return;
+  provenSource = { modelId, dir: cacheDir };
+  if (mirroringAllowed) publishProvenModel();
+}
+function allowModelMirroring() {
+  mirroringAllowed = true;
+  publishProvenModel();
+}
+function publishProvenModel() {
+  if (!provenSource) return null;
+  return relocateModelCache(provenSource.modelId, provenSource.dir, true);
+}
+function isModelMirrored(modelId) {
+  const dir = currentCacheDir();
+  return underStableRoot(dir) && fs2.existsSync(path2.join(dir, modelId, "config.json"));
+}
+function adoptStableModelCache(modelId) {
+  const current = currentCacheDir();
+  try {
+    const root = stableModelCacheRoot();
+    if (current && !path2.resolve(current).startsWith(path2.resolve(root) + path2.sep)) {
+      const src = path2.join(current, modelId);
+      if (fs2.existsSync(src)) {
+        const fp = fingerprintOf(listModelFiles(src));
+        if (isPublished(root, fp, modelId)) {
+          transformersEnv.cacheDir = path2.join(root, fp);
+          return path2.join(root, fp);
+        }
+        return current;
+      }
+    }
+    const newest = publishedDirs(root, modelId)[0];
+    if (newest) {
+      transformersEnv.cacheDir = newest;
+      return newest;
     }
   } catch {
   }
-  return typeof current === "string" ? current : "";
+  return current;
 }
-function relocateModelCache(modelId, fromDir = BUNDLED_MODEL_CACHE_DIR) {
+function relocateModelCache(modelId, fromDir = BUNDLED_MODEL_CACHE_DIR, proven = false) {
   try {
-    const stable = stableModelCacheDir();
-    if (fromDir && path2.resolve(fromDir) !== path2.resolve(stable)) {
-      const src = path2.join(fromDir, modelId);
-      if (fs2.existsSync(src)) {
-        const dst = path2.join(stable, modelId);
-        if (!mirrorTree(src, dst)) {
-          transformersEnv.cacheDir = fromDir;
-          return fromDir;
-        }
-        fs2.writeFileSync(path2.join(dst, MIRROR_COMPLETE_MARKER), "");
-      }
+    const root = stableModelCacheRoot();
+    const src = fromDir ? path2.join(fromDir, modelId) : null;
+    if (!src || !fs2.existsSync(src) || path2.resolve(src).startsWith(path2.resolve(root) + path2.sep)) {
+      return adoptStableModelCache(modelId);
     }
-    transformersEnv.cacheDir = stable;
-    return stable;
+    const before = listModelFiles(src);
+    if (!looksCompleteModel(before) || !proven && !isQuiescent(before)) return currentCacheDir();
+    const fp = fingerprintOf(before);
+    const final = path2.join(root, fp);
+    if (!isPublished(root, fp, modelId)) {
+      const staging = path2.join(root, `${fp}.staging-${process.pid}`);
+      fs2.rmSync(staging, { recursive: true, force: true });
+      const mirrored = mirrorTree(src, path2.join(staging, modelId));
+      const unchanged = mirrored && fingerprintOf(listModelFiles(src)) === fp;
+      const intact = unchanged && modelFilesIntact(path2.join(staging, modelId));
+      if (intact) {
+        try {
+          fs2.renameSync(staging, final);
+        } catch {
+        }
+      }
+      fs2.rmSync(staging, { recursive: true, force: true });
+      if (!isPublished(root, fp, modelId)) return currentCacheDir();
+      tidyModelRoot(root, modelId);
+    }
+    transformersEnv.cacheDir = final;
+    return final;
   } catch {
-    const current = transformersEnv.cacheDir;
-    return typeof current === "string" ? current : fromDir ?? "";
+    return currentCacheDir();
   }
 }
 
@@ -23517,12 +23691,14 @@ var embeddingPipeline = null;
 async function initEmbeddings() {
   if (!embeddingPipeline) {
     adoptStableModelCache(EMBEDDING_MODEL);
+    const cacheDirUsed = currentModelCacheDir();
     console.error(`Loading embedding model ${EMBEDDING_MODEL} (first run may take time)...`);
     embeddingPipeline = await pipeline(
       "feature-extraction",
       EMBEDDING_MODEL
     );
     console.error("Embedding model loaded");
+    notifyModelLoaded(EMBEDDING_MODEL, cacheDirUsed);
   }
 }
 function applyModePrefix(text, mode) {
@@ -25442,9 +25618,9 @@ function warmNativeBindings(open = initDatabase) {
     ok = false;
   }
   try {
-    if (relocateModelCache(EMBEDDING_MODEL) !== stableModelCacheDir()) {
-      console.error("native warm-up: embedding model cache mirror failed; keeping the in-tree cache (does not survive a sweep)");
-      ok = false;
+    allowModelMirroring();
+    if (!isModelMirrored(EMBEDDING_MODEL)) {
+      console.error("native warm-up: embedding model not mirrored yet; it is published after its first successful load");
     }
   } catch (error2) {
     console.error("native warm-up: embedding model cache relocation failed:", describe(error2));

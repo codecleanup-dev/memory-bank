@@ -3,10 +3,12 @@
  * has its answer — this is synchronous and may be slow in bad cases), while
  * this plugin version's directory still exists on disk:
  *
- *  1. mirror the path-resolved runtime assets (sqlite-vec extension, embedding
- *     model cache) to the stable dir — see runtime-assets.ts for why these
- *     cannot simply be "loaded once";
- *  2. open and close the database so better-sqlite3's lazily required
+ *  1. mirror the sqlite-vec extension to the stable dir — see
+ *     runtime-assets.ts for why it cannot simply be "loaded once";
+ *  2. allow embedding-model mirroring: a model that transformers.js already
+ *     loaded in this process (inject daemon pre-warm) is published now, and
+ *     any model loaded later is published right after that load;
+ *  3. open and close the database so better-sqlite3's lazily required
  *     `bindings` + native addon are mapped into this process.
  *
  * Why: Claude Code sweeps superseded plugin versions after an update, but a

@@ -26,9 +26,21 @@ import {
   loadSqliteVec,
   relocateModelCache,
   adoptStableModelCache,
-  stableModelCacheDir,
+  stableModelCacheRoot,
   resetRuntimeAssetCacheForTests,
+  MODEL_QUIET_MS,
+  notifyModelLoaded,
+  allowModelMirroring,
+  publishProvenModel,
+  isModelMirrored,
+  onnxLooksComplete,
+  modelFilesIntact,
 } from '../src/runtime-assets.js';
+
+// Minimal but structurally complete ONNX ModelProto: ir_version (field 1,
+// varint) followed by graph (field 7, length-delimited) carrying `payload`.
+const onnxBytes = (payload: string) =>
+  Buffer.concat([Buffer.from([0x08, 0x07]), Buffer.from([0x3a, payload.length]), Buffer.from(payload)]);
 
 const transformersEnv = (transformers as unknown as { env: { cacheDir?: unknown } }).env;
 
@@ -66,38 +78,30 @@ describe('runtime-assets', () => {
       expect(mirrorFile(src, dst)).toBe(true);
 
       expect(readFileSync(dst, 'utf8')).toBe('abc');
-      // Same volume → hard link: both names share one inode.
-      expect(statSync(dst).ino).toBe(statSync(src).ino);
+      // An independent file (clone or copy) that keeps the source mtime.
+      expect(statSync(dst).ino).not.toBe(statSync(src).ino);
+      expect(Math.abs(statSync(dst).mtimeMs - statSync(src).mtimeMs)).toBeLessThan(2);
 
-      // Second call must not touch the filesystem again.
-      const link = vi.spyOn(fs, 'linkSync');
+      // Second call must not touch the filesystem again (source mtimes carry
+      // sub-millisecond fractions utimes() cannot reproduce).
       const copy = vi.spyOn(fs, 'copyFileSync');
       expect(mirrorFile(src, dst)).toBe(true);
-      expect(link).not.toHaveBeenCalled();
       expect(copy).not.toHaveBeenCalled();
       expect(readdirSync(path.join(tmp, 'mirror'))).toEqual(['src.bin']);
     });
 
-    it('copy fallback (hard link impossible) preserves mtime and is idempotent too', () => {
+    it('a mirror is an independent snapshot: rewriting or truncating the source later does not touch it', () => {
       const src = path.join(tmp, 'model.onnx');
       const dst = path.join(tmp, 'mirror', 'model.onnx');
-      writeFileSync(src, 'weights');
-      vi.spyOn(fs, 'linkSync').mockImplementation(() => {
-        throw Object.assign(new Error('cross-device link'), { code: 'EXDEV' });
-      });
-      const copy = vi.spyOn(fs, 'copyFileSync');
-
+      writeFileSync(src, 'weights-v1');
       expect(mirrorFile(src, dst)).toBe(true);
 
-      expect(copy).toHaveBeenCalledTimes(1);
-      expect(readFileSync(dst, 'utf8')).toBe('weights');
-      expect(statSync(dst).ino).not.toBe(statSync(src).ino);
-      expect(Math.abs(statSync(dst).mtimeMs - statSync(src).mtimeMs)).toBeLessThan(2);
-      // Source mtimes carry sub-millisecond fractions utimes() cannot reproduce:
-      // the second call must still be a no-op.
-      expect(mirrorFile(src, dst)).toBe(true);
-      expect(copy).toHaveBeenCalledTimes(1);
-      expect(readdirSync(path.join(tmp, 'mirror'))).toEqual(['model.onnx']);
+      // in-place rewrite (same inode), then truncation — what a failing or
+      // racing cache writer does to the source
+      writeFileSync(src, 'weights-v2');
+      expect(readFileSync(dst, 'utf8')).toBe('weights-v1');
+      fs.truncateSync(src, 3);
+      expect(readFileSync(dst, 'utf8')).toBe('weights-v1');
     });
 
     it('a mirrored file survives deletion of the original', () => {
@@ -162,10 +166,8 @@ describe('runtime-assets', () => {
 
       expect(mirrorTree(src, path.join(tmp, 'out'))).toBe(true);
 
-      // mirrored as real files (the link TARGET is linked, so the mirror
-      // shares the target's inode and never dangles), not as links
+      // mirrored as real files (the link target's content), never as links
       expect(lstatSync(path.join(tmp, 'out', 'tokenizer.json')).isSymbolicLink()).toBe(false);
-      expect(statSync(path.join(tmp, 'out', 'tokenizer.json')).ino).toBe(statSync(path.join(real, 'tokenizer.json')).ino);
       expect(readFileSync(path.join(tmp, 'out', 'tokenizer.json'), 'utf8')).toBe('tok');
       expect(readFileSync(path.join(tmp, 'out', 'onnx', 'model.onnx'), 'utf8')).toBe('weights');
 
@@ -223,70 +225,293 @@ describe('runtime-assets', () => {
     });
   });
 
-  describe('relocateModelCache', () => {
-    it('points transformers.js at the stable dir, seeds it from the bundled cache, and survives the sweep', () => {
-      const bundled = path.join(tmp, 'bundled-cache');
-      const model = 'Fake/model';
-      mkdirSync(path.join(bundled, model, 'onnx'), { recursive: true });
-      writeFileSync(path.join(bundled, model, 'config.json'), '{}');
-      writeFileSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'), 'weights');
+  describe('relocateModelCache / adoptStableModelCache', () => {
+    const model = 'Fake/model';
+    let bundled: string;
+    // A publishable source must have been quiet for MODEL_QUIET_MS.
+    const backdate = (file: string) => {
+      const past = new Date(Date.now() - MODEL_QUIET_MS - 60_000);
+      utimesSync(file, past, past);
+    };
+    const seed = (dir: string, weights = 'weights') => {
+      mkdirSync(path.join(dir, model, 'onnx'), { recursive: true });
+      const files: Array<[string, Buffer | string]> = [
+        ['config.json', '{}'],
+        ['tokenizer.json', '{"t":1}'],
+        ['tokenizer_config.json', '{"c":1}'],
+        [path.join('onnx', 'model_quantized.onnx'), onnxBytes(weights)],
+      ];
+      for (const [rel, content] of files) {
+        writeFileSync(path.join(dir, model, rel), content);
+        backdate(path.join(dir, model, rel));
+      }
+    };
+    const weightsIn = (dir: string) =>
+      readFileSync(path.join(dir, model, 'onnx', 'model_quantized.onnx')).subarray(4).toString();
+    const published = () =>
+      existsSync(stableModelCacheRoot())
+        ? readdirSync(stableModelCacheRoot()).filter((n) => /^[0-9a-f]{12}$/.test(n)).sort()
+        : [];
+    const staging = () =>
+      existsSync(stableModelCacheRoot())
+        ? readdirSync(stableModelCacheRoot()).filter((n) => n.includes('.staging-'))
+        : [];
 
-      const stable = relocateModelCache(model, bundled);
+    beforeEach(() => {
+      bundled = path.join(tmp, 'bundled-cache');
+      seed(bundled);
+      transformersEnv.cacheDir = bundled;
+    });
 
-      expect(stable).toBe(stableModelCacheDir());
-      expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(stable));
-      expect(readFileSync(path.join(stable, model, 'onnx', 'model_quantized.onnx'), 'utf8')).toBe('weights');
+    it('publishes an immutable fingerprint dir, points transformers.js at it, and survives the sweep', () => {
+      const dir = relocateModelCache(model, bundled);
+
+      expect(path.dirname(dir)).toBe(stableModelCacheRoot());
+      expect(path.basename(dir)).toMatch(/^[0-9a-f]{12}$/);
+      expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(dir));
+      expect(weightsIn(dir)).toBe('weights');
+      expect(staging()).toEqual([]);
 
       rmSync(bundled, { recursive: true, force: true });
 
-      expect(readFileSync(path.join(stable, model, 'config.json'), 'utf8')).toBe('{}');
-      // Bundled cache gone (post-sweep): still idempotent, still the stable dir.
-      expect(relocateModelCache(model, bundled)).toBe(stable);
-      expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(stable));
+      expect(readFileSync(path.join(dir, model, 'config.json'), 'utf8')).toBe('{}');
+      // source gone (swept): the published mirror is what gets used
+      expect(relocateModelCache(model, bundled)).toBe(dir);
+      transformersEnv.cacheDir = '/nonexistent/bundled';
+      expect(adoptStableModelCache(model)).toBe(dir);
     });
 
-    it('adoptStableModelCache uses a complete mirror, ignores a partial one, and never copies', () => {
-      const bundled = path.join(tmp, 'bundled-cache');
-      const model = 'Fake/model';
-      mkdirSync(path.join(bundled, model), { recursive: true });
-      writeFileSync(path.join(bundled, model, 'config.json'), '{}');
-      transformersEnv.cacheDir = bundled;
+    it('is idempotent: an already published fingerprint is reused without touching the filesystem', () => {
+      const dir = relocateModelCache(model, bundled);
       const link = vi.spyOn(fs, 'linkSync');
       const copy = vi.spyOn(fs, 'copyFileSync');
 
-      // nothing mirrored yet → stays on the bundled cache
-      expect(adoptStableModelCache(model)).toBe(bundled);
-      expect(transformersEnv.cacheDir).toBe(bundled);
+      expect(relocateModelCache(model, bundled)).toBe(dir);
 
-      // a partial mirror (no completion marker) is not adopted either
-      mkdirSync(path.join(stableModelCacheDir(), model), { recursive: true });
-      writeFileSync(path.join(stableModelCacheDir(), model, 'config.json'), '{}');
-      expect(adoptStableModelCache(model)).toBe(bundled);
       expect(link).not.toHaveBeenCalled();
       expect(copy).not.toHaveBeenCalled();
-
-      // after a complete mirror (post-initialize warm-up) it is adopted, even
-      // once the bundled cache has been swept
-      const stable = relocateModelCache(model, bundled);
-      rmSync(bundled, { recursive: true, force: true });
-      transformersEnv.cacheDir = '/nonexistent/bundled';
-      expect(adoptStableModelCache(model)).toBe(stable);
-      expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(stable));
+      expect(published()).toEqual([path.basename(dir)]);
     });
 
-    it('keeps the bundled cache in use when mirroring fails, instead of forcing a re-download', () => {
-      const bundled = path.join(tmp, 'bundled-cache');
-      const model = 'Fake/model';
-      mkdirSync(path.join(bundled, model), { recursive: true });
-      writeFileSync(path.join(bundled, model, 'config.json'), '{}');
-      // Make the stable models dir unwritable: a regular file where the dir must go.
-      mkdirSync(path.dirname(stableModelCacheDir()), { recursive: true });
-      writeFileSync(stableModelCacheDir(), 'not a directory');
+    it('a changed source gets a new fingerprint dir and the old one is left intact', () => {
+      const first = relocateModelCache(model, bundled);
+      rmSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'));
+      writeFileSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'), onnxBytes('weights-v2'));
+      backdate(path.join(bundled, model, 'onnx', 'model_quantized.onnx'));
 
-      const inUse = relocateModelCache(model, bundled);
+      const second = relocateModelCache(model, bundled);
 
-      expect(inUse).toBe(bundled);
+      expect(second).not.toBe(first);
+      expect(weightsIn(first)).toBe('weights');
+      expect(weightsIn(second)).toBe('weights-v2');
+      // adoption prefers the mirror of the configured source over the newest
+      transformersEnv.cacheDir = bundled;
+      expect(adoptStableModelCache(model)).toBe(second);
+    });
+
+    it('does not publish while the download is still in progress (no onnx weights yet)', () => {
+      rmSync(path.join(bundled, model, 'onnx'), { recursive: true, force: true });
+
+      expect(relocateModelCache(model, bundled)).toBe(bundled);
+
       expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(bundled));
+      expect(published()).toEqual([]);
+      expect(adoptStableModelCache(model)).toBe(bundled);
+    });
+
+    it('does not publish files written less than MODEL_QUIET_MS ago (write in flight or paused)', () => {
+      const weights = path.join(bundled, model, 'onnx', 'model_quantized.onnx');
+      const now = new Date();
+      utimesSync(weights, now, now);
+
+      expect(relocateModelCache(model, bundled)).toBe(bundled);
+      expect(published()).toEqual([]);
+
+      backdate(weights);
+      expect(path.dirname(relocateModelCache(model, bundled))).toBe(stableModelCacheRoot());
+    });
+
+    it('adoption keeps a complete but unpublished bundled model over an older published mirror', () => {
+      const first = relocateModelCache(model, bundled);
+      rmSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'));
+      writeFileSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'), onnxBytes('weights-v2'));
+      backdate(path.join(bundled, model, 'onnx', 'model_quantized.onnx'));
+      transformersEnv.cacheDir = bundled;
+
+      expect(adoptStableModelCache(model)).toBe(bundled);
+
+      expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(bundled));
+      expect(existsSync(first)).toBe(true); // untouched, just not preferred
+    });
+
+    it('does not publish a source that changed while it was being mirrored', () => {
+      const weights = path.join(bundled, model, 'onnx', 'model_quantized.onnx');
+      const realCopy = fs.copyFileSync;
+      vi.spyOn(fs, 'copyFileSync').mockImplementation((src, dst, mode) => {
+        // the download replaces the weights while we are mirroring
+        rmSync(weights);
+        writeFileSync(weights, onnxBytes('weights-complete-now'));
+        return realCopy(src, dst, mode);
+      });
+
+      expect(relocateModelCache(model, bundled)).toBe(bundled);
+
+      expect(published()).toEqual([]);
+      expect(staging()).toEqual([]);
+    });
+
+    it('a staging dir left by a dead process is never adopted and is cleaned up on the next publish', () => {
+      const root = stableModelCacheRoot();
+      const stale = path.join(root, 'abcdefabcdef.staging-999999');
+      mkdirSync(path.join(stale, model), { recursive: true });
+      writeFileSync(path.join(stale, model, 'config.json'), '{}');
+      transformersEnv.cacheDir = '/nonexistent/bundled';
+
+      expect(adoptStableModelCache(model)).toBe('/nonexistent/bundled');
+      const dir = relocateModelCache(model, bundled);
+
+      expect(path.dirname(dir)).toBe(root);
+      expect(existsSync(stale)).toBe(false);
+    });
+
+    it('adoptStableModelCache never links or copies', () => {
+      relocateModelCache(model, bundled);
+      const link = vi.spyOn(fs, 'linkSync');
+      const copy = vi.spyOn(fs, 'copyFileSync');
+      transformersEnv.cacheDir = bundled;
+
+      expect(path.dirname(adoptStableModelCache(model))).toBe(stableModelCacheRoot());
+
+      expect(link).not.toHaveBeenCalled();
+      expect(copy).not.toHaveBeenCalled();
+    });
+
+    it('refuses to publish when a required file is missing even with proof (cache write failed under the pipeline)', () => {
+      rmSync(path.join(bundled, model, 'onnx'), { recursive: true, force: true }); // onnx dir never got created
+      expect(relocateModelCache(model, bundled, true)).toBe(bundled);
+      expect(published()).toEqual([]);
+
+      seed(bundled);
+      rmSync(path.join(bundled, model, 'tokenizer_config.json'));
+      expect(relocateModelCache(model, bundled, true)).toBe(bundled);
+      expect(published()).toEqual([]);
+    });
+
+    it('a published mirror is unaffected by later in-place corruption of the source', () => {
+      const dir = relocateModelCache(model, bundled);
+      const srcWeights = path.join(bundled, model, 'onnx', 'model_quantized.onnx');
+      fs.truncateSync(srcWeights, 4); // a racing writer damages the source in place
+      rmSync(bundled, { recursive: true, force: true });
+
+      expect(modelFilesIntact(path.join(dir, model))).toBe(true);
+      expect(weightsIn(dir)).toBe('weights');
+    });
+
+    it('refuses to publish a truncated onnx or json even with proof (cache write failed under the pipeline)', () => {
+      const weights = path.join(bundled, model, 'onnx', 'model_quantized.onnx');
+      const whole = readFileSync(weights);
+      writeFileSync(weights, whole.subarray(0, whole.length - 3)); // write died mid-file
+      backdate(weights);
+
+      expect(relocateModelCache(model, bundled, true)).toBe(bundled);
+      expect(published()).toEqual([]);
+      expect(staging()).toEqual([]);
+
+      writeFileSync(weights, whole);
+      backdate(weights);
+      writeFileSync(path.join(bundled, model, 'config.json'), '{"architectures": ["Bert'); // truncated JSON
+      backdate(path.join(bundled, model, 'config.json'));
+      expect(relocateModelCache(model, bundled, true)).toBe(bundled);
+      expect(published()).toEqual([]);
+    });
+
+    it('a proven source (pipeline built from it) is published even when its files are fresh', () => {
+      // files just written by the download: the heuristic path refuses them...
+      const now = new Date();
+      utimesSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'), now, now);
+      expect(relocateModelCache(model, bundled)).toBe(bundled);
+      expect(published()).toEqual([]);
+
+      // ...but a built pipeline is the proof that they are complete
+      expect(path.dirname(relocateModelCache(model, bundled, true))).toBe(stableModelCacheRoot());
+      expect(published()).toHaveLength(1);
+    });
+
+    it('notifyModelLoaded defers publishing until allowModelMirroring() and then publishes once', () => {
+      expect(publishProvenModel()).toBeNull(); // nothing proven yet
+
+      notifyModelLoaded(model, bundled);
+      expect(published()).toEqual([]); // handshake not done: deferred
+      expect(isModelMirrored(model)).toBe(false);
+
+      const copy = vi.spyOn(fs, 'copyFileSync');
+      allowModelMirroring();
+      expect(published()).toHaveLength(1);
+      expect(isModelMirrored(model)).toBe(true);
+      expect(copy).toHaveBeenCalled();
+
+      // a later load from the same source is a no-op
+      copy.mockClear();
+      notifyModelLoaded(model, bundled);
+      expect(copy).not.toHaveBeenCalled();
+      expect(published()).toHaveLength(1);
+    });
+
+    it('notifyModelLoaded ignores a load that was already served from the stable mirror', () => {
+      const dir = relocateModelCache(model, bundled);
+      resetRuntimeAssetCacheForTests();
+      allowModelMirroring();
+
+      notifyModelLoaded(model, dir);
+
+      expect(publishProvenModel()).toBeNull();
+      expect(published()).toEqual([path.basename(dir)]);
+    });
+
+    it('keeps the bundled cache in use when the stable root cannot be written', () => {
+      // a regular file where the models root must go
+      mkdirSync(path.dirname(stableModelCacheRoot()), { recursive: true });
+      writeFileSync(stableModelCacheRoot(), 'not a directory');
+
+      expect(relocateModelCache(model, bundled)).toBe(bundled);
+
+      expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(bundled));
+    });
+  });
+
+  describe('model file integrity', () => {
+    it('onnxLooksComplete walks the top-level protobuf fields to exactly EOF and requires a graph', () => {
+      const ok = path.join(tmp, 'ok.onnx');
+      writeFileSync(ok, onnxBytes('graph-bytes'));
+      expect(onnxLooksComplete(ok)).toBe(true);
+
+      const truncated = path.join(tmp, 'truncated.onnx');
+      writeFileSync(truncated, onnxBytes('graph-bytes').subarray(0, 8));
+      expect(onnxLooksComplete(truncated)).toBe(false);
+
+      const noGraph = path.join(tmp, 'nograph.onnx');
+      writeFileSync(noGraph, Buffer.from([0x08, 0x07])); // ir_version only
+      expect(onnxLooksComplete(noGraph)).toBe(false);
+
+      const empty = path.join(tmp, 'empty.onnx');
+      writeFileSync(empty, '');
+      expect(onnxLooksComplete(empty)).toBe(false);
+
+      const text = path.join(tmp, 'text.onnx');
+      writeFileSync(text, 'weights'); // not a protobuf at all
+      expect(onnxLooksComplete(text)).toBe(false);
+    });
+
+    it('modelFilesIntact checks every file by type', () => {
+      const dir = path.join(tmp, 'model');
+      mkdirSync(path.join(dir, 'onnx'), { recursive: true });
+      writeFileSync(path.join(dir, 'config.json'), '{"a":1}');
+      writeFileSync(path.join(dir, 'tokenizer.json'), '{"b":[1,2]}');
+      writeFileSync(path.join(dir, 'onnx', 'model_quantized.onnx'), onnxBytes('g'));
+      expect(modelFilesIntact(dir)).toBe(true);
+
+      writeFileSync(path.join(dir, 'tokenizer.json'), '{"b":[1,2');
+      expect(modelFilesIntact(dir)).toBe(false);
     });
   });
 

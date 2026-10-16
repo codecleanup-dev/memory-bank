@@ -14,12 +14,15 @@
  *    (default: node_modules/@xenova/transformers/.cache) when the pipeline is
  *    first created, which for most sessions is the first `search` call.
  *
- * Mirroring = hard link when possible (same volume: instant, no extra space,
- * survives deletion of the original directory entry), copy otherwise. The
- * mirror lives under the conversation-index dir, which no plugin update touches.
+ * Mirroring = reflink clone when the filesystem supports it (APFS: instant, no
+ * extra space until either side changes), plain copy otherwise. Never a hard
+ * link: the mirror must stay intact when the source is later rewritten in
+ * place or truncated. The mirror lives under the conversation-index dir, which
+ * no plugin update touches.
  */
 import fs from 'fs';
 import path from 'path';
+import { createHash } from 'crypto';
 import * as sqliteVec from 'sqlite-vec';
 import * as transformers from '@xenova/transformers';
 import { getIndexDir } from './paths.js';
@@ -37,12 +40,13 @@ export function runtimeAssetsDir(): string {
 }
 
 /**
- * Mirror one regular file. Idempotent: an existing mirror is left alone when it
- * is the same inode (hard link) or has the same size AND mtime (copy fallback
- * preserves the source mtime), so a replaced source of equal length is still
- * re-mirrored. Atomic (temp name + rename, so a concurrent reader never sees a
- * partial file). Returns false when the source is unreadable or the mirror
- * cannot be written; callers keep using the in-tree path in that case.
+ * Mirror one regular file as an independent snapshot (reflink clone where the
+ * filesystem supports it, plain copy otherwise). Idempotent: an existing mirror
+ * is left alone when it has the same size AND mtime (the mirror keeps the
+ * source mtime), so a replaced source of equal length is still re-mirrored.
+ * Atomic (temp name + rename, so a concurrent reader never sees a partial
+ * file). Returns false when the source is unreadable or the mirror cannot be
+ * written; callers keep using the in-tree path in that case.
  */
 export function mirrorFile(src: string, dst: string): boolean {
   try {
@@ -63,13 +67,13 @@ export function mirrorFile(src: string, dst: string): boolean {
     fs.mkdirSync(path.dirname(dst), { recursive: true });
     const tmp = `${dst}.${process.pid}.tmp`;
     try {
-      try {
-        // link(2) does not follow symlinks on Linux/Windows: link the target.
-        fs.linkSync(fs.realpathSync(src), tmp);
-      } catch {
-        fs.copyFileSync(src, tmp);
-        fs.utimesSync(tmp, st.atime, st.mtime);
-      }
+      // Clone (reflink) when the filesystem supports it — instant and free on
+      // APFS/Btrfs/XFS — else a plain copy. Never a hard link: a mirror must be
+      // an independent snapshot that a later in-place rewrite or truncation of
+      // the source cannot reach. copyFile follows symlinks, so a linked source
+      // is mirrored as the real file.
+      fs.copyFileSync(src, tmp, fs.constants.COPYFILE_FICLONE);
+      fs.utimesSync(tmp, st.atime, st.mtime);
       fs.renameSync(tmp, dst);
       return true;
     } catch {
@@ -190,78 +194,345 @@ export function loadSqliteVec(db: { loadExtension(file: string): void }): void {
 // ---------------------------------------------------------------------------
 // embedding model cache
 // ---------------------------------------------------------------------------
+//
+// Layout: <runtime-assets>/models/<fingerprint>/<modelId>/...
+//
+// Every published <fingerprint> directory is immutable and complete: it is
+// mirrored into a staging directory first, and only renamed into place
+// (atomic) when every file mirrored AND the source did not change meanwhile
+// AND the source looks like a finished model (config + onnx weights). A
+// download still in progress (transformers.js writes files one by one) or a
+// mirror that failed halfway is therefore never visible to another process,
+// and a changed source gets a new fingerprint instead of overwriting files
+// under an old one.
 
-export function stableModelCacheDir(): string {
+export function stableModelCacheRoot(): string {
   return path.join(runtimeAssetsDir(), 'models');
 }
 
-// Written next to a model only after mirrorTree() reported every file mirrored,
-// so a half-finished mirror (failed midway, or being written by another server
-// right now) is never adopted as a cache.
-const MIRROR_COMPLETE_MARKER = '.memory-bank-mirror-complete';
+type ModelFile = { rel: string; size: number; mtime: number };
 
-/**
- * Use the stable mirror if it already holds a COMPLETE copy of `modelId`;
- * otherwise leave the cache setting untouched. Never mirrors, never copies:
- * cheap and safe on paths that run before the MCP initialize handshake (the
- * inject daemon's pre-warm, hooks, CLI workers). Returns the cache dir in use.
- */
-export function adoptStableModelCache(modelId: string): string {
-  const current = transformersEnv.cacheDir;
-  try {
-    const stable = stableModelCacheDir();
-    const stableModel = path.join(stable, modelId);
-    const complete = fs.existsSync(path.join(stableModel, MIRROR_COMPLETE_MARKER));
-    // A stable copy that transformers.js downloaded itself has no marker; it is
-    // still the better choice when the configured cache has no model at all.
-    const currentHasModel = typeof current === 'string' && fs.existsSync(path.join(current, modelId));
-    if (complete || (!currentHasModel && fs.existsSync(stableModel))) {
-      transformersEnv.cacheDir = stable;
-      return stable;
+const FINGERPRINT_RE = /^[0-9a-f]{12}$/;
+const STAGING_RE = /^([0-9a-f]{12})\.staging-(\d+)$/;
+
+function listModelFiles(dir: string, base = dir, out: ModelFile[] = []): ModelFile[] {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    const st = fs.statSync(full); // follows symlinks
+    if (st.isDirectory()) listModelFiles(full, base, out);
+    else if (st.isFile()) {
+      out.push({ rel: path.relative(base, full).split(path.sep).join('/'), size: st.size, mtime: Math.floor(st.mtimeMs) });
     }
-  } catch {
-    // stable dir unavailable — keep whatever is configured
   }
-  return typeof current === 'string' ? current : '';
+  return out.sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
+}
+
+function fingerprintOf(files: ModelFile[]): string {
+  return createHash('sha1').update(JSON.stringify(files)).digest('hex').slice(0, 12);
+}
+
+// What a transformers.js feature-extraction pipeline reads for the models this
+// plugin uses (Xenova/* ONNX exports): model config, tokenizer vocabulary and
+// settings, and the ONNX weights. A cache missing any of these is incomplete
+// no matter what a pipeline built from the in-memory download says.
+const REQUIRED_MODEL_FILES = ['config.json', 'tokenizer.json', 'tokenizer_config.json'];
+
+/** A transformers.js model dir that is safe to publish: every required file present and non-empty. */
+function looksCompleteModel(files: ModelFile[]): boolean {
+  const have = (rel: string) => files.some((f) => f.rel === rel && f.size > 0);
+  return (
+    REQUIRED_MODEL_FILES.every(have) &&
+    files.some((f) => f.rel.startsWith('onnx/') && f.rel.endsWith('.onnx') && f.size > 0)
+  );
+}
+
+// transformers.js writes each cached file in one writeFile() after the whole
+// download is buffered, so a file that has not been touched for this long is
+// neither in flight nor a paused write. The post-mirror fingerprint check
+// covers a write that starts during the mirror itself.
+export const MODEL_QUIET_MS = 30_000;
+
+function isQuiescent(files: ModelFile[], now = Date.now()): boolean {
+  return files.every((f) => now - f.mtime >= MODEL_QUIET_MS);
+}
+
+// ---- structural integrity of cached model files ------------------------------
+//
+// A built pipeline proves the files were downloaded, not that they were
+// written: transformers.js' FileCache only warns when writeFile fails (disk
+// full, killed mid-write) and the pipeline carries on from its in-memory
+// buffer, leaving a truncated file in the cache. So before anything is
+// published, every mirrored file is checked for structural completeness —
+// JSON must parse, and an ONNX file must be a complete protobuf: walking its
+// top-level fields has to land exactly on the end of the file, and a `graph`
+// field (7) must be present. A truncation anywhere inside the (huge) graph
+// field declares a length past EOF and is caught immediately.
+
+function readVarint(fd: number, pos: number, size: number): { value: bigint; next: number } | null {
+  const buf = Buffer.alloc(10);
+  const n = fs.readSync(fd, buf, 0, Math.min(10, size - pos), pos);
+  let value = 0n;
+  for (let i = 0; i < n; i++) {
+    value |= BigInt(buf[i] & 0x7f) << BigInt(7 * i);
+    if ((buf[i] & 0x80) === 0) return { value, next: pos + i + 1 };
+  }
+  return null; // ran off the end mid-varint
+}
+
+export function onnxLooksComplete(file: string): boolean {
+  let fd: number | null = null;
+  try {
+    const size = fs.statSync(file).size;
+    if (size === 0) return false;
+    fd = fs.openSync(file, 'r');
+    let pos = 0;
+    let sawGraph = false;
+    while (pos < size) {
+      const tag = readVarint(fd, pos, size);
+      if (!tag) return false;
+      pos = tag.next;
+      const field = Number(tag.value >> 3n);
+      const wireType = Number(tag.value & 7n);
+      if (wireType === 0) {
+        const v = readVarint(fd, pos, size);
+        if (!v) return false;
+        pos = v.next;
+      } else if (wireType === 1) {
+        pos += 8;
+      } else if (wireType === 5) {
+        pos += 4;
+      } else if (wireType === 2) {
+        const len = readVarint(fd, pos, size);
+        if (!len) return false;
+        pos = len.next + Number(len.value);
+        if (field === 7) sawGraph = true;
+      } else {
+        return false; // groups / unknown wire types do not occur in ModelProto
+      }
+      if (pos > size) return false; // declared length runs past EOF: truncated
+    }
+    return pos === size && sawGraph;
+  } catch {
+    return false;
+  } finally {
+    if (fd !== null) fs.closeSync(fd);
+  }
+}
+
+function jsonLooksComplete(file: string): boolean {
+  try {
+    JSON.parse(fs.readFileSync(file, 'utf8'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Every file under a mirrored model dir passes its structural check. */
+export function modelFilesIntact(dir: string): boolean {
+  try {
+    return listModelFiles(dir).every((f) => {
+      const full = path.join(dir, f.rel);
+      if (f.rel.endsWith('.onnx')) return onnxLooksComplete(full);
+      if (f.rel.endsWith('.json')) return jsonLooksComplete(full);
+      return f.size > 0;
+    });
+  } catch {
+    return false;
+  }
+}
+
+function isPublished(root: string, fp: string, modelId: string): boolean {
+  return fs.existsSync(path.join(root, fp, modelId, 'config.json'));
+}
+
+/** Published fingerprint dirs holding `modelId`, newest first. */
+function publishedDirs(root: string, modelId: string): string[] {
+  let names: string[];
+  try {
+    names = fs.readdirSync(root);
+  } catch {
+    return [];
+  }
+  return names
+    .filter((n) => FINGERPRINT_RE.test(n) && isPublished(root, n, modelId))
+    .map((n) => ({ dir: path.join(root, n), mtime: fs.statSync(path.join(root, n)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime)
+    .map((x) => x.dir);
+}
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** Remove staging dirs of dead processes and keep only the newest published versions. */
+function tidyModelRoot(root: string, modelId: string, keep = 3): void {
+  try {
+    for (const n of fs.readdirSync(root)) {
+      const m = STAGING_RE.exec(n);
+      if (m && !pidAlive(Number(m[2]))) fs.rmSync(path.join(root, n), { recursive: true, force: true });
+    }
+    for (const dir of publishedDirs(root, modelId).slice(keep)) fs.rmSync(dir, { recursive: true, force: true });
+  } catch {
+    // housekeeping only
+  }
+}
+
+function currentCacheDir(): string {
+  const c = transformersEnv.cacheDir;
+  return typeof c === 'string' ? c : '';
+}
+
+/** The transformers.js cache dir currently configured ('' when unset). */
+export function currentModelCacheDir(): string {
+  return currentCacheDir();
+}
+
+function underStableRoot(dir: string): boolean {
+  try {
+    return path.resolve(dir).startsWith(path.resolve(stableModelCacheRoot()) + path.sep);
+  } catch {
+    return false;
+  }
+}
+
+// ---- proof-based publishing -------------------------------------------------
+//
+// A source is only known to be complete once transformers.js has actually
+// built a pipeline from it (every required file was read). initEmbeddings()
+// reports that with notifyModelLoaded(); publishing is then immediate if the
+// MCP server has passed its initialize handshake, or deferred until
+// allowModelMirroring() is called from the oninitialized warm-up — the mirror
+// work is synchronous and must never land inside the handshake.
+
+let mirroringAllowed = false;
+let provenSource: { modelId: string; dir: string } | null = null;
+
+/** Called after a pipeline was created successfully from `cacheDir`. */
+export function notifyModelLoaded(modelId: string, cacheDir: string): void {
+  if (!cacheDir || underStableRoot(cacheDir)) return; // already served from a mirror
+  provenSource = { modelId, dir: cacheDir };
+  if (mirroringAllowed) publishProvenModel();
+}
+
+/** Called once the MCP initialize handshake is done; publishes a pending proof. */
+export function allowModelMirroring(): void {
+  mirroringAllowed = true;
+  publishProvenModel();
+}
+
+/** Publish the proven source (if any). Returns the cache dir in use, or null when nothing is proven yet. */
+export function publishProvenModel(): string | null {
+  if (!provenSource) return null;
+  return relocateModelCache(provenSource.modelId, provenSource.dir, true);
+}
+
+/** True when `modelId` is currently served from a published mirror that exists on disk. */
+export function isModelMirrored(modelId: string): boolean {
+  const dir = currentCacheDir();
+  return underStableRoot(dir) && fs.existsSync(path.join(dir, modelId, 'config.json'));
 }
 
 /**
- * Point transformers.js at the stable cache and seed it with `modelId` from the
- * bundled (in-tree) cache when that still exists. Idempotent and cheap once
- * seeded (per-file inode/mtime check). If the bundled cache has the model but
- * mirroring fails (permissions, disk space), the bundled cache stays in use —
- * a cache known to work is never traded for a re-download. If neither cache has
- * the model, transformers.js downloads into the stable dir exactly as it used
- * to download in-tree. Returns the cache dir actually in use.
+ * Use a published (complete, immutable) mirror of `modelId` if one exists —
+ * the one matching the configured source when that source can still be
+ * fingerprinted, else the newest — and otherwise leave the cache setting
+ * untouched. Never mirrors, never copies: cheap and safe on paths that run
+ * before the MCP initialize handshake (inject daemon pre-warm, hooks, CLI
+ * workers). Returns the cache dir in use.
+ */
+export function adoptStableModelCache(modelId: string): string {
+  const current = currentCacheDir();
+  try {
+    const root = stableModelCacheRoot();
+    if (current && !path.resolve(current).startsWith(path.resolve(root) + path.sep)) {
+      const src = path.join(current, modelId);
+      if (fs.existsSync(src)) {
+        const fp = fingerprintOf(listModelFiles(src));
+        if (isPublished(root, fp, modelId)) {
+          transformersEnv.cacheDir = path.join(root, fp);
+          return path.join(root, fp);
+        }
+        // The configured cache has this model but no published twin yet: keep
+        // using it. An older published version must never shadow a newer (or
+        // repaired) source; the next warm-up publishes this one.
+        return current;
+      }
+    }
+    const newest = publishedDirs(root, modelId)[0];
+    if (newest) {
+      transformersEnv.cacheDir = newest;
+      return newest;
+    }
+  } catch {
+    // stable root unavailable — keep whatever is configured
+  }
+  return current;
+}
+
+/**
+ * Publish `modelId` from the bundled (in-tree) cache into an immutable
+ * fingerprint dir under the stable root and point transformers.js at it.
+ * Nothing is published while the source is incomplete (download in progress)
+ * or changes during the mirror; the bundled cache then stays in use, exactly
+ * as before this feature, and the next warm-up tries again. If the source is
+ * gone (swept) the newest published mirror is adopted. If neither exists the
+ * cache setting is left untouched so transformers.js downloads where it
+ * always did. Returns the cache dir actually in use.
  */
 export function relocateModelCache(
   modelId: string,
-  fromDir: string | null = BUNDLED_MODEL_CACHE_DIR
+  fromDir: string | null = BUNDLED_MODEL_CACHE_DIR,
+  proven = false
 ): string {
   try {
-    const stable = stableModelCacheDir();
-    if (fromDir && path.resolve(fromDir) !== path.resolve(stable)) {
-      const src = path.join(fromDir, modelId);
-      if (fs.existsSync(src)) {
-        const dst = path.join(stable, modelId);
-        if (!mirrorTree(src, dst)) {
-          transformersEnv.cacheDir = fromDir;
-          return fromDir;
-        }
-        fs.writeFileSync(path.join(dst, MIRROR_COMPLETE_MARKER), '');
-      }
+    const root = stableModelCacheRoot();
+    const src = fromDir ? path.join(fromDir, modelId) : null;
+    if (!src || !fs.existsSync(src) || path.resolve(src).startsWith(path.resolve(root) + path.sep)) {
+      return adoptStableModelCache(modelId);
     }
-    transformersEnv.cacheDir = stable;
-    return stable;
+    const before = listModelFiles(src);
+    // Every required file must be present regardless of proof: a pipeline can
+    // succeed from the in-memory download while a cache write (even a whole
+    // directory) failed. Without proof the source must also have been quiet
+    // for a while. Otherwise the bundled cache stays in use.
+    if (!looksCompleteModel(before) || (!proven && !isQuiescent(before))) return currentCacheDir();
+    const fp = fingerprintOf(before);
+    const final = path.join(root, fp);
+    if (!isPublished(root, fp, modelId)) {
+      const staging = path.join(root, `${fp}.staging-${process.pid}`);
+      fs.rmSync(staging, { recursive: true, force: true });
+      const mirrored = mirrorTree(src, path.join(staging, modelId));
+      const unchanged = mirrored && fingerprintOf(listModelFiles(src)) === fp;
+      // Proof or not, the bytes on disk are checked independently (see above).
+      const intact = unchanged && modelFilesIntact(path.join(staging, modelId));
+      if (intact) {
+        try {
+          fs.renameSync(staging, final); // atomic publish
+        } catch {
+          // another process published the same fingerprint first — fine
+        }
+      }
+      fs.rmSync(staging, { recursive: true, force: true });
+      if (!isPublished(root, fp, modelId)) return currentCacheDir(); // keep the bundled cache
+      tidyModelRoot(root, modelId);
+    }
+    transformersEnv.cacheDir = final;
+    return final;
   } catch {
-    // The stable dir itself cannot be created (read-only or sandboxed HOME):
-    // leave the cache setting exactly as it was.
-    const current = transformersEnv.cacheDir;
-    return typeof current === 'string' ? current : (fromDir ?? '');
+    // stable root unavailable (read-only or sandboxed HOME): leave the cache setting as it was
+    return currentCacheDir();
   }
 }
 
-/** Test hook: forget the process-cached stable path. */
+/** Test hook: forget the process-cached stable path and the model-mirroring state. */
 export function resetRuntimeAssetCacheForTests(): void {
   stableVecPath = undefined;
+  mirroringAllowed = false;
+  provenSource = null;
 }

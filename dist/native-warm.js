@@ -1,6 +1,6 @@
 import { initDatabase } from './db.js';
 import { EMBEDDING_MODEL } from './embeddings.js';
-import { relocateModelCache, stableModelCacheDir, stableSqliteVecPath } from './runtime-assets.js';
+import { allowModelMirroring, isModelMirrored, stableSqliteVecPath } from './runtime-assets.js';
 function describe(error) {
     return error instanceof Error ? error.message : String(error);
 }
@@ -9,10 +9,12 @@ function describe(error) {
  * has its answer — this is synchronous and may be slow in bad cases), while
  * this plugin version's directory still exists on disk:
  *
- *  1. mirror the path-resolved runtime assets (sqlite-vec extension, embedding
- *     model cache) to the stable dir — see runtime-assets.ts for why these
- *     cannot simply be "loaded once";
- *  2. open and close the database so better-sqlite3's lazily required
+ *  1. mirror the sqlite-vec extension to the stable dir — see
+ *     runtime-assets.ts for why it cannot simply be "loaded once";
+ *  2. allow embedding-model mirroring: a model that transformers.js already
+ *     loaded in this process (inject daemon pre-warm) is published now, and
+ *     any model loaded later is published right after that load;
+ *  3. open and close the database so better-sqlite3's lazily required
  *     `bindings` + native addon are mapped into this process.
  *
  * Why: Claude Code sweeps superseded plugin versions after an update, but a
@@ -33,9 +35,11 @@ export function warmNativeBindings(open = initDatabase) {
         ok = false;
     }
     try {
-        if (relocateModelCache(EMBEDDING_MODEL) !== stableModelCacheDir()) {
-            console.error('native warm-up: embedding model cache mirror failed; keeping the in-tree cache (does not survive a sweep)');
-            ok = false;
+        allowModelMirroring();
+        if (!isModelMirrored(EMBEDDING_MODEL)) {
+            // Informational: no model has been loaded in this process yet, so there
+            // is no proof to publish. The first successful load publishes it.
+            console.error('native warm-up: embedding model not mirrored yet; it is published after its first successful load');
         }
     }
     catch (error) {

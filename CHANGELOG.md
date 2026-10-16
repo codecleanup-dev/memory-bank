@@ -12,34 +12,49 @@ import 때가 아니라 첫 `new Database()` 때 `bindings` 로 찾는다(도구
 
 ### Fixed
 - **`src/runtime-assets.ts`**: sqlite-vec 확장과 임베딩 모델 캐시를 `conversation-index/runtime-assets/` 아래로 미러링한다
-  (하드링크 우선, 실패 시 복사하며 mtime 보존. 같은 inode 이거나 크기·mtime 이 같으면 건너뛰고 temp+rename 으로 원자적).
-  `loadSqliteVec(db)` 는 미러에서 확장을 올리고, `relocateModelCache(model)` 은 transformers.js 의 `env.cacheDir` 를 미러로
-  돌리면서 번들 캐시에 있는 모델을 심는다. 미러링이 실패하면 번들 캐시를 그대로 쓰고(재다운로드 강제 없음), sqlite-vec 미러
-  실패는 캐시하지 않아 다음 호출에서 재시도한다. 트리 미러는 심볼릭 링크를 따라가 실파일로 미러하고(링크 대상의 realpath 를
+  (reflink 클론 우선(APFS 즉시·무비용), 미지원 FS 는 복사. 하드링크는 쓰지 않는다. 원본이 나중에 제자리에서 덮어써지거나
+  잘려도 미러는 독립 스냅샷으로 남아야 하기 때문. mtime 보존, 크기·mtime 이 같으면 건너뛰고 temp+rename 으로 원자적).
+  `loadSqliteVec(db)` 는 미러에서 확장을 올린다. 모델 캐시는 `relocateModelCache(model)` 이 소스 지문(파일명·크기·mtime)별
+  **불변 디렉토리** `models/<지문>/` 로 게시한다. staging 에 전부 미러한 뒤 소스가 그동안 변하지 않았고 완성 형태(config.json
+  + tokenizer.json + tokenizer_config.json + onnx 가중치. 증거 없는 경로는 모든 파일이 30초 이상 조용함까지)일 때만 rename
+  으로 원자 게시하므로, 다운로드 중·쓰기 중·멈춘 쓰기·중간에
+  실패한 미러는 다른 프로세스에 보이지 않고, 바뀐 소스는 덮어쓰기 대신 새 지문 디렉토리를 얻는다(죽은 프로세스의 staging 정리,
+  최신 3개 유지). **게시의 정상 경로는 증거 기반이다**: transformers.js 가 pipeline 을 성공적으로 만들면(필수 파일을 전부
+  읽었다는 증거) `initEmbeddings` 가 `notifyModelLoaded` 로 그 캐시 디렉토리를 보고하고, MCP 서버가 핸드셰이크를 마친 뒤
+  (`allowModelMirroring`) 그 소스를 게시한다. 핸드셰이크 전에 로드됐으면(inject 데몬 사전 적재) 보류했다가 워밍에서 게시한다.
+  증거가 있으면 정지 휴리스틱만 생략한다(필수 파일 존재는 항상 요구). 증거 유무와 무관하게 게시 직전에 미러된 파일의
+  구조적 완전성을 독립 검증한다(JSON 은 파싱, onnx 는 protobuf 최상위 필드를 EOF 까지 걸어 선언 길이가 맞고 graph 필드가
+  있는지. transformers.js 의 FileCache 는 쓰기 실패를 경고만 하고 메모리 버퍼로 pipeline 을 완성하므로 로드 성공이 디스크
+  완성을 보장하지 않는다). 게시되지 않으면 번들 캐시를 그대로 쓴다(재다운로드 강제 없음). 채택은 번들 캐시가 완성돼 있는데 게시 전이면 오래된 게시본 대신 번들을 쓴다. sqlite-vec 미러 실패는 캐시하지
+  않아 다음 호출에서 재시도한다. 트리 미러는 심볼릭 링크를 따라가 실파일로 미러하고(링크 대상의 realpath 를
   하드링크. Linux/Windows 의 link(2) 는 링크를 따라가지 않는다) 깨진 링크는 실패로 보고하며, 파일 미러는 실패 시 자기 임시
   파일을 지운다. 복사 폴백의 mtime 비교는 ms 단위 허용 오차를 두고(utimes 는 ms 미만을 재현 못 해 매번 재복사되던 문제),
   안정 디렉토리를 만들 수 없으면 캐시 설정을 건드리지 않는다(적대 리뷰 MEDIUM 5건 + 자체 리뷰 MEDIUM 3·LOW 2 반영).
 - **`src/db.ts`**: 두 연결 경로(`initDatabase`·`openDatabaseReadonly`) 모두 `loadSqliteVec` 를 쓴다.
-- **`src/embeddings.ts` `initEmbeddings()`**: pipeline 생성 전에 `adoptStableModelCache` 를 부른다. 완성 마커가 있는 미러만
-  채택하고 복사는 하지 않는다. 이 함수는 inject 데몬의 사전 적재로 initialize 핸드셰이크 전에도 돌기 때문에, 미러링(복사 가능)은
-  핸드셰이크 뒤 워밍(`relocateModelCache`)에서만 한다.
-- **`src/native-warm.ts` `warmNativeBindings()`**: 서버 기동 직후 미러링을 하고 DB 를 한 번 열고 닫아 애드온을 매핑한다.
-  실패해도 로그만 남기고 transport 기동은 막지 않는다.
+- **`src/embeddings.ts` `initEmbeddings()`**: pipeline 생성 전에 `adoptStableModelCache` 를 부르고(게시된 미러만 채택,
+  복사 없음), 생성 뒤에 `notifyModelLoaded` 로 증거를 보고한다. 이 함수는 inject 데몬의 사전 적재로 initialize 핸드셰이크
+  전에도 돌기 때문에, 미러링(복사 가능)은 핸드셰이크 뒤에만 일어난다.
+- **`src/native-warm.ts` `warmNativeBindings()`**: sqlite-vec 를 미러링하고, 모델 미러링을 허용(보류된 증거 게시)하고, DB 를
+  한 번 열고 닫아 애드온을 매핑한다. 실패해도 로그만 남기고 transport 기동은 막지 않는다.
 - **`src/mcp-server.ts` `main()`**: `server.oninitialized` 에 `warmNativeBindings()` 를 등록해 initialize 핸드셰이크 직후에
   돌린다(동기 작업이라 connect 전에 돌리면 느린 경우 클라이언트 기동 타임아웃을 먹는다). 1.12.8 이전 버전으로 떠 있는
   세션에는 소급되지 않으므로 그 세션들은 재시작해야 한다.
 - **`loadSqliteVec`**: 고정해 둔 미러가 나중에 지워졌으면 잊고 다시 미러링한 뒤 로드한다. in-tree 경로 폴백은 마지막 수단.
 
 ### Tests
-- `test/runtime-assets.test.ts` +15 (하드링크 미러·멱등(2회째 link/copy 호출 없음)·temp 잔재 없음, 복사 폴백 mtime 보존·멱등,
-  완성 미러만 채택·부분 미러 무시·채택은 복사하지 않음,
+- `test/runtime-assets.test.ts` +30 (onnx protobuf 완전성·JSON 파싱 검증, 증거가 있어도 잘린 onnx·JSON 은 미게시, 증거가
+  있어도 필수 파일(onnx 디렉토리·tokenizer_config) 결측이면 미게시, 게시 뒤 원본 제자리 손상이 미러에 번지지 않음,
+  독립 스냅샷 미러·mtime 보존·멱등(2회째 copy 호출 없음)·temp 잔재 없음, 원본 제자리 덮어쓰기·truncate 뒤 미러 불변,
   원본 삭제 후 생존, 결측 소스는 false, rename 실패 시 temp 정리, 트리 미러, 심볼릭 링크 추적(대상 inode 공유)·깨진 링크
   실패, sqlite-vec 미러 경로·로드(실제 로드된 경로 기록으로 폴백 배제), 이미지를 잡은 연결이 있어도 지워진 경로 dlopen 실패
-  대조 + 미러 성공, 모델 캐시 재배치·시드·sweep 생존, 미러 실패 시 번들 캐시 유지, 같은 길이로 교체된 소스 재미러, 지워진
-  미러 재미러링(in-tree 미사용 확인), sqlite-vec 미러 실패 비고정·재시도).
-- `test/native-warm.test.ts` +7 (실제 DB 열림·애드온 require 캐시 적재, 미러 생성·cacheDir 전환, open/close 1회, 실패 시
-  throw 없이 false + stderr, main() 이 oninitialized 에 등록하고 connect 전에 동기 호출하지 않는지, db.ts 가 `loadSqliteVec`
-  만 쓰는지, embeddings 가 pipeline 전에 재배치하는지).
+  대조 + 미러 성공, 모델 지문 디렉토리 게시·sweep 생존·멱등·소스 변경 시 새 지문·다운로드 중 미게시·30초 미만 파일 미게시·
+  미러 중 변경 시 미게시·죽은 프로세스 staging 정리·채택은 복사하지 않음·완성된 번들은 오래된 게시본보다 우선·증거 있는
+  소스는 fresh 파일이어도 게시·증거 보고는 핸드셰이크까지 보류 뒤 1회 게시·미러에서 로드된 증거는 무시·안정 루트 쓰기 불가
+  시 번들 유지, 같은 길이로 교체된 소스 재미러, 지워진 미러 재미러링(in-tree 미사용 확인), sqlite-vec 미러 실패 비고정·재시도).
+- `test/native-warm.test.ts` +8 (실제 DB 열림·애드온 require 캐시 적재, sqlite-vec 미러 생성, 핸드셰이크 전에 로드된 모델을
+  워밍에서 게시, 핸드셰이크 뒤 로드는 즉시 게시, open/close 1회, 실패 시 throw 없이 false + stderr, main() 이 oninitialized 에
+  등록하고 connect 전에 동기 호출하지 않는지, db.ts 가 `loadSqliteVec` 만 쓰는지, embeddings 가 pipeline 전에 채택만 하고
+  뒤에 증거를 보고하는지).
 
 ## [1.12.7] - 2026-10-07
 

@@ -1,11 +1,12 @@
 export declare function runtimeAssetsDir(): string;
 /**
- * Mirror one regular file. Idempotent: an existing mirror is left alone when it
- * is the same inode (hard link) or has the same size AND mtime (copy fallback
- * preserves the source mtime), so a replaced source of equal length is still
- * re-mirrored. Atomic (temp name + rename, so a concurrent reader never sees a
- * partial file). Returns false when the source is unreadable or the mirror
- * cannot be written; callers keep using the in-tree path in that case.
+ * Mirror one regular file as an independent snapshot (reflink clone where the
+ * filesystem supports it, plain copy otherwise). Idempotent: an existing mirror
+ * is left alone when it has the same size AND mtime (the mirror keeps the
+ * source mtime), so a replaced source of equal length is still re-mirrored.
+ * Atomic (temp name + rename, so a concurrent reader never sees a partial
+ * file). Returns false when the source is unreadable or the mirror cannot be
+ * written; callers keep using the in-tree path in that case.
  */
 export declare function mirrorFile(src: string, dst: string): boolean;
 /**
@@ -33,23 +34,40 @@ export declare function stableSqliteVecPath(): string | null;
 export declare function loadSqliteVec(db: {
     loadExtension(file: string): void;
 }): void;
-export declare function stableModelCacheDir(): string;
+export declare function stableModelCacheRoot(): string;
+export declare const MODEL_QUIET_MS = 30000;
+export declare function onnxLooksComplete(file: string): boolean;
+/** Every file under a mirrored model dir passes its structural check. */
+export declare function modelFilesIntact(dir: string): boolean;
+/** The transformers.js cache dir currently configured ('' when unset). */
+export declare function currentModelCacheDir(): string;
+/** Called after a pipeline was created successfully from `cacheDir`. */
+export declare function notifyModelLoaded(modelId: string, cacheDir: string): void;
+/** Called once the MCP initialize handshake is done; publishes a pending proof. */
+export declare function allowModelMirroring(): void;
+/** Publish the proven source (if any). Returns the cache dir in use, or null when nothing is proven yet. */
+export declare function publishProvenModel(): string | null;
+/** True when `modelId` is currently served from a published mirror that exists on disk. */
+export declare function isModelMirrored(modelId: string): boolean;
 /**
- * Use the stable mirror if it already holds a COMPLETE copy of `modelId`;
- * otherwise leave the cache setting untouched. Never mirrors, never copies:
- * cheap and safe on paths that run before the MCP initialize handshake (the
- * inject daemon's pre-warm, hooks, CLI workers). Returns the cache dir in use.
+ * Use a published (complete, immutable) mirror of `modelId` if one exists —
+ * the one matching the configured source when that source can still be
+ * fingerprinted, else the newest — and otherwise leave the cache setting
+ * untouched. Never mirrors, never copies: cheap and safe on paths that run
+ * before the MCP initialize handshake (inject daemon pre-warm, hooks, CLI
+ * workers). Returns the cache dir in use.
  */
 export declare function adoptStableModelCache(modelId: string): string;
 /**
- * Point transformers.js at the stable cache and seed it with `modelId` from the
- * bundled (in-tree) cache when that still exists. Idempotent and cheap once
- * seeded (per-file inode/mtime check). If the bundled cache has the model but
- * mirroring fails (permissions, disk space), the bundled cache stays in use —
- * a cache known to work is never traded for a re-download. If neither cache has
- * the model, transformers.js downloads into the stable dir exactly as it used
- * to download in-tree. Returns the cache dir actually in use.
+ * Publish `modelId` from the bundled (in-tree) cache into an immutable
+ * fingerprint dir under the stable root and point transformers.js at it.
+ * Nothing is published while the source is incomplete (download in progress)
+ * or changes during the mirror; the bundled cache then stays in use, exactly
+ * as before this feature, and the next warm-up tries again. If the source is
+ * gone (swept) the newest published mirror is adopted. If neither exists the
+ * cache setting is left untouched so transformers.js downloads where it
+ * always did. Returns the cache dir actually in use.
  */
-export declare function relocateModelCache(modelId: string, fromDir?: string | null): string;
-/** Test hook: forget the process-cached stable path. */
+export declare function relocateModelCache(modelId: string, fromDir?: string | null, proven?: boolean): string;
+/** Test hook: forget the process-cached stable path and the model-mirroring state. */
 export declare function resetRuntimeAssetCacheForTests(): void;

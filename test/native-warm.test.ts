@@ -1,16 +1,23 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createRequire } from 'module';
 import * as transformers from '@xenova/transformers';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { warmNativeBindings } from '../src/native-warm.js';
-import { resetRuntimeAssetCacheForTests, stableModelCacheDir } from '../src/runtime-assets.js';
+import {
+  resetRuntimeAssetCacheForTests,
+  stableModelCacheRoot,
+  notifyModelLoaded,
+  isModelMirrored,
+} from '../src/runtime-assets.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const SRC = path.join(__dirname, '..', 'src');
+// Minimal structurally complete ONNX ModelProto (ir_version + graph).
+const ONNX = Buffer.concat([Buffer.from([0x08, 0x07]), Buffer.from([0x3a, 7]), Buffer.from('weights')]);
 const transformersEnv = (transformers as unknown as { env: { cacheDir?: unknown } }).env;
 
 // better-sqlite3 loads its native addon lazily inside `new Database()`. If the
@@ -58,13 +65,53 @@ describe('warmNativeBindings', () => {
     expect(loaded.length).toBeGreaterThan(0);
   });
 
-  it('mirrors the sqlite-vec extension and points the model cache at the stable dir', () => {
+  it('mirrors the sqlite-vec extension under runtime-assets', () => {
     expect(warmNativeBindings()).toBe(true);
 
     const assets = path.join(tmp, 'cfg', 'conversation-index', 'runtime-assets');
     expect(existsSync(path.join(assets, 'sqlite-vec'))).toBe(true);
-    expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(stableModelCacheDir()));
-    expect(stableModelCacheDir().startsWith(assets)).toBe(true);
+  });
+
+  it('publishes a model that was loaded before the handshake (inject daemon pre-warm)', () => {
+    const model = 'Fake/model';
+    const bundled = path.join(tmp, 'bundled-cache');
+    mkdirSync(path.join(bundled, model, 'onnx'), { recursive: true });
+    writeFileSync(path.join(bundled, model, 'config.json'), '{}');
+    writeFileSync(path.join(bundled, model, 'tokenizer_config.json'), '{"c":1}');
+    writeFileSync(path.join(bundled, model, 'tokenizer.json'), '{"tok":1}');
+    writeFileSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'), ONNX);
+    transformersEnv.cacheDir = bundled;
+
+    // pipeline built → proof, but mirroring is not allowed yet: nothing published
+    notifyModelLoaded(model, bundled);
+    expect(existsSync(stableModelCacheRoot())).toBe(false);
+    expect(isModelMirrored(model)).toBe(false);
+
+    expect(warmNativeBindings()).toBe(true);
+
+    // the warm-up allowed mirroring and published the pending proof
+    expect(isModelMirrored(model)).toBe(true);
+    const published = readdirSync(stableModelCacheRoot()).filter((n) => /^[0-9a-f]{12}$/.test(n));
+    expect(published).toHaveLength(1);
+    expect(readFileSync(path.join(stableModelCacheRoot(), published[0], model, 'tokenizer.json'), 'utf8')).toBe('{"tok":1}');
+  });
+
+  it('publishes a model loaded after the handshake immediately', () => {
+    const model = 'Fake/model';
+    const bundled = path.join(tmp, 'bundled-cache');
+    mkdirSync(path.join(bundled, model, 'onnx'), { recursive: true });
+    writeFileSync(path.join(bundled, model, 'config.json'), '{}');
+    writeFileSync(path.join(bundled, model, 'tokenizer_config.json'), '{"c":1}');
+    writeFileSync(path.join(bundled, model, 'tokenizer.json'), '{"tok":1}');
+    writeFileSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'), ONNX);
+    transformersEnv.cacheDir = bundled;
+
+    expect(warmNativeBindings()).toBe(true);
+    expect(isModelMirrored(model)).toBe(false); // nothing loaded yet
+
+    notifyModelLoaded(model, bundled);
+
+    expect(isModelMirrored(model)).toBe(true);
   });
 
   it('closes the handle it opened and returns true', () => {
@@ -93,8 +140,8 @@ describe('warmNativeBindings', () => {
 });
 
 // Wiring contracts: the guarantee above only reaches production if the entry
-// point warms before the transport connects and every connection / model load
-// goes through the stable-mirror helpers.
+// point warms after the handshake, every connection goes through the
+// stable-mirror loader, and every successful model load reports its proof.
 describe('startup wiring', () => {
   const read = (file: string) => readFileSync(path.join(SRC, file), 'utf8');
 
@@ -126,16 +173,19 @@ describe('startup wiring', () => {
     expect(src.match(/^[ \t]*loadSqliteVec\(db\);[ \t]*$/gm)?.length).toBe(2);
   });
 
-  it('embeddings.ts adopts (never mirrors) the stable model cache before creating the pipeline', () => {
+  it('embeddings.ts adopts (never mirrors) before creating the pipeline and reports the proof after', () => {
     const src = read('embeddings.ts');
     const fn = src.indexOf('export async function initEmbeddings()');
     expect(fn).toBeGreaterThan(-1);
     const body = src.slice(fn);
     const adopt = /^[ \t]*adoptStableModelCache\(EMBEDDING_MODEL\);[ \t]*$/m.exec(body);
     const create = /await pipeline\(/.exec(body);
+    const notify = /^[ \t]*notifyModelLoaded\(EMBEDDING_MODEL, cacheDirUsed\);[ \t]*$/m.exec(body);
     expect(adopt, 'adoptStableModelCache(EMBEDDING_MODEL); missing from initEmbeddings()').not.toBeNull();
     expect(create).not.toBeNull();
+    expect(notify, 'notifyModelLoaded(EMBEDDING_MODEL, cacheDirUsed); missing from initEmbeddings()').not.toBeNull();
     expect(adopt!.index).toBeLessThan(create!.index);
+    expect(create!.index).toBeLessThan(notify!.index);
     // initEmbeddings also runs before the MCP handshake (inject daemon
     // pre-warm): a synchronous copy there could eat the client's startup
     // timeout, so the mirroring variant must not be called from this module.

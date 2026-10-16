@@ -1,5 +1,5 @@
 import { pipeline, FeatureExtractionPipeline } from '@xenova/transformers';
-import { adoptStableModelCache } from './runtime-assets.js';
+import { adoptStableModelCache, currentModelCacheDir, notifyModelLoaded } from './runtime-assets.js';
 
 /**
  * Multilingual retrieval model (Korean/English/100 langs), 384-dim — same
@@ -64,6 +64,7 @@ export async function initEmbeddings(): Promise<void> {
     // also runs before the initialize handshake (inject daemon pre-warm) and
     // must not block it.
     adoptStableModelCache(EMBEDDING_MODEL);
+    const cacheDirUsed = currentModelCacheDir();
     // stderr: stdout of hook scripts is injected into the session as context,
     // so progress logs must never go to stdout.
     console.error(`Loading embedding model ${EMBEDDING_MODEL} (first run may take time)...`);
@@ -72,6 +73,9 @@ export async function initEmbeddings(): Promise<void> {
       EMBEDDING_MODEL
     );
     console.error('Embedding model loaded');
+    // A built pipeline is the proof that every required file is in that cache
+    // dir: publish it to the stable mirror (now, or after the MCP handshake).
+    notifyModelLoaded(EMBEDDING_MODEL, cacheDirUsed);
   }
 }
 
