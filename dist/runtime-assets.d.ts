@@ -39,6 +39,8 @@ export declare const MODEL_QUIET_MS = 30000;
 export declare function onnxLooksComplete(file: string): boolean;
 /** Every file under a mirrored model dir passes its structural check. */
 export declare function modelFilesIntact(dir: string): boolean;
+export declare const PUBLISH_GRACE_MS: number;
+export declare function modelInUseDir(root: string): string;
 /** The transformers.js cache dir currently configured ('' when unset). */
 export declare function currentModelCacheDir(): string;
 /** Called after a pipeline was created successfully from `cacheDir`. */

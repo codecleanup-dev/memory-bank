@@ -23518,13 +23518,77 @@ function pidAlive(pid) {
     return e.code === "EPERM";
   }
 }
-function tidyModelRoot(root, modelId, keep = 3) {
+var PUBLISH_GRACE_MS = 24 * 60 * 60 * 1e3;
+function modelInUseDir(root) {
+  return path2.join(root, "inuse");
+}
+function removeDeadSnapshots(root) {
+  try {
+    for (const n of fs2.readdirSync(modelInUseDir(root))) {
+      if (/^\d+$/.test(n) && !pidAlive(Number(n))) {
+        fs2.rmSync(path2.join(modelInUseDir(root), n), { recursive: true, force: true });
+      }
+    }
+  } catch {
+  }
+}
+var exitCleanupRegistered = false;
+function registerExitCleanup(dir) {
+  if (exitCleanupRegistered) return;
+  exitCleanupRegistered = true;
+  process.on("exit", () => {
+    try {
+      fs2.rmSync(dir, { recursive: true, force: true });
+    } catch {
+    }
+  });
+}
+function useVersion(root, fp, modelId) {
+  const mine = path2.join(modelInUseDir(root), String(process.pid));
+  const snapshot = path2.join(mine, fp);
+  const dst = path2.join(snapshot, modelId);
+  if (fs2.existsSync(path2.join(dst, "config.json"))) {
+    transformersEnv.cacheDir = snapshot;
+    return snapshot;
+  }
+  try {
+    removeDeadSnapshots(root);
+    const src = path2.join(root, fp, modelId);
+    const files = listModelFiles(src);
+    if (files.length === 0) return null;
+    for (const f of files) {
+      const from = path2.join(src, f.rel);
+      const to = path2.join(dst, f.rel);
+      fs2.mkdirSync(path2.dirname(to), { recursive: true });
+      try {
+        fs2.linkSync(from, to);
+      } catch (e) {
+        const code = e.code;
+        if (code === "EEXIST") continue;
+        if (code === "ENOENT") throw e;
+        fs2.copyFileSync(from, to, fs2.constants.COPYFILE_FICLONE);
+      }
+    }
+    if (!files.every((f) => fs2.existsSync(path2.join(dst, f.rel)))) throw new Error("incomplete snapshot");
+  } catch {
+    fs2.rmSync(snapshot, { recursive: true, force: true });
+    return null;
+  }
+  registerExitCleanup(mine);
+  transformersEnv.cacheDir = snapshot;
+  return snapshot;
+}
+function tidyModelRoot(root, modelId, keep = 3, now = Date.now()) {
   try {
     for (const n of fs2.readdirSync(root)) {
       const m2 = STAGING_RE.exec(n);
       if (m2 && !pidAlive(Number(m2[2]))) fs2.rmSync(path2.join(root, n), { recursive: true, force: true });
     }
-    for (const dir of publishedDirs(root, modelId).slice(keep)) fs2.rmSync(dir, { recursive: true, force: true });
+    removeDeadSnapshots(root);
+    for (const dir of publishedDirs(root, modelId).slice(keep)) {
+      if (now - fs2.statSync(dir).mtimeMs < PUBLISH_GRACE_MS) continue;
+      fs2.rmSync(dir, { recursive: true, force: true });
+    }
   } catch {
   }
 }
@@ -23570,16 +23634,15 @@ function adoptStableModelCache(modelId) {
       if (fs2.existsSync(src)) {
         const fp = fingerprintOf(listModelFiles(src));
         if (isPublished(root, fp, modelId)) {
-          transformersEnv.cacheDir = path2.join(root, fp);
-          return path2.join(root, fp);
+          const dir = useVersion(root, fp, modelId);
+          if (dir) return dir;
         }
         return current;
       }
     }
-    const newest = publishedDirs(root, modelId)[0];
-    if (newest) {
-      transformersEnv.cacheDir = newest;
-      return newest;
+    for (const candidate of publishedDirs(root, modelId)) {
+      const dir = useVersion(root, path2.basename(candidate), modelId);
+      if (dir) return dir;
     }
   } catch {
   }
@@ -23610,10 +23673,11 @@ function relocateModelCache(modelId, fromDir = BUNDLED_MODEL_CACHE_DIR, proven =
       }
       fs2.rmSync(staging, { recursive: true, force: true });
       if (!isPublished(root, fp, modelId)) return currentCacheDir();
+      const used = useVersion(root, fp, modelId);
       tidyModelRoot(root, modelId);
+      return used ?? currentCacheDir();
     }
-    transformersEnv.cacheDir = final;
-    return final;
+    return useVersion(root, fp, modelId) ?? currentCacheDir();
   } catch {
     return currentCacheDir();
   }
@@ -25611,7 +25675,25 @@ function startInjectDaemon() {
 function describe(error2) {
   return error2 instanceof Error ? error2.message : String(error2);
 }
-function warmNativeBindings(open = initDatabase) {
+function publishExistingModel() {
+  relocateModelCache(EMBEDDING_MODEL);
+  return isModelMirrored(EMBEDDING_MODEL);
+}
+function scheduleModelMirrorRetry(publish, intervalMs = 6e4, maxAttempts = 10) {
+  let attempts = 0;
+  const tick = () => {
+    attempts++;
+    let done = false;
+    try {
+      done = publish();
+    } catch {
+      done = false;
+    }
+    if (!done && attempts < maxAttempts) setTimeout(tick, intervalMs).unref();
+  };
+  setTimeout(tick, intervalMs).unref();
+}
+function warmNativeBindings(open = initDatabase, retry = scheduleModelMirrorRetry) {
   let ok = true;
   if (!stableSqliteVecPath()) {
     console.error("native warm-up: sqlite-vec mirror unavailable; connections will load it from the plugin directory");
@@ -25619,8 +25701,9 @@ function warmNativeBindings(open = initDatabase) {
   }
   try {
     allowModelMirroring();
-    if (!isModelMirrored(EMBEDDING_MODEL)) {
-      console.error("native warm-up: embedding model not mirrored yet; it is published after its first successful load");
+    if (!isModelMirrored(EMBEDDING_MODEL) && !publishExistingModel()) {
+      console.error("native warm-up: embedding model not mirrored yet (cache incomplete or still downloading); retrying in the background, and the first successful load publishes it");
+      retry(publishExistingModel);
     }
   } catch (error2) {
     console.error("native warm-up: embedding model cache relocation failed:", describe(error2));

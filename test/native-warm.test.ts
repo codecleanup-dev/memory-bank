@@ -5,13 +5,14 @@ import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync
 import { tmpdir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { warmNativeBindings } from '../src/native-warm.js';
+import { warmNativeBindings, scheduleModelMirrorRetry } from '../src/native-warm.js';
 import {
   resetRuntimeAssetCacheForTests,
   stableModelCacheRoot,
   notifyModelLoaded,
   isModelMirrored,
 } from '../src/runtime-assets.js';
+import { EMBEDDING_MODEL } from '../src/embeddings.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -87,13 +88,15 @@ describe('warmNativeBindings', () => {
     expect(existsSync(stableModelCacheRoot())).toBe(false);
     expect(isModelMirrored(model)).toBe(false);
 
-    expect(warmNativeBindings()).toBe(true);
+    expect(warmNativeBindings(undefined, vi.fn())).toBe(true);
 
-    // the warm-up allowed mirroring and published the pending proof
-    expect(isModelMirrored(model)).toBe(true);
+    // the warm-up allowed mirroring and published the pending proof (a
+    // version dir holding the fake model exists; the warm-up then also
+    // published the plugin's real model, so the fake is not the one in use)
     const published = readdirSync(stableModelCacheRoot()).filter((n) => /^[0-9a-f]{12}$/.test(n));
-    expect(published).toHaveLength(1);
-    expect(readFileSync(path.join(stableModelCacheRoot(), published[0], model, 'tokenizer.json'), 'utf8')).toBe('{"tok":1}');
+    const fakeVersion = published.find((n) => existsSync(path.join(stableModelCacheRoot(), n, model, 'tokenizer.json')));
+    expect(fakeVersion).toBeDefined();
+    expect(readFileSync(path.join(stableModelCacheRoot(), fakeVersion!, model, 'tokenizer.json'), 'utf8')).toBe('{"tok":1}');
   });
 
   it('publishes a model loaded after the handshake immediately', () => {
@@ -106,19 +109,47 @@ describe('warmNativeBindings', () => {
     writeFileSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'), ONNX);
     transformersEnv.cacheDir = bundled;
 
-    expect(warmNativeBindings()).toBe(true);
-    expect(isModelMirrored(model)).toBe(false); // nothing loaded yet
+    expect(warmNativeBindings(undefined, vi.fn())).toBe(true);
+    expect(isModelMirrored(model)).toBe(false); // the fake model was never loaded
 
     notifyModelLoaded(model, bundled);
 
     expect(isModelMirrored(model)).toBe(true);
   });
 
+  it('without proof, validates and publishes the bundled model already on disk after the handshake', () => {
+    const retry = vi.fn();
+    expect(isModelMirrored(EMBEDDING_MODEL)).toBe(false);
+
+    // the plugin's own node_modules cache holds the real model (complete and
+    // quiet): the heuristic path publishes it, so no retry is needed
+    expect(warmNativeBindings(undefined, retry)).toBe(true);
+
+    expect(isModelMirrored(EMBEDDING_MODEL)).toBe(true);
+    expect(retry).not.toHaveBeenCalled();
+    const cacheDir = path.resolve(String(transformersEnv.cacheDir));
+    expect(cacheDir.startsWith(path.resolve(stableModelCacheRoot()) + path.sep)).toBe(true);
+    expect(existsSync(path.join(cacheDir, EMBEDDING_MODEL, 'tokenizer.json'))).toBe(true);
+  });
+
+  it('schedules background retries when the bundled model is incomplete and nothing was loaded', () => {
+    const retry = vi.fn();
+    // make the stable root unwritable so neither path can publish
+    mkdirSync(path.dirname(stableModelCacheRoot()), { recursive: true });
+    writeFileSync(stableModelCacheRoot(), 'not a directory');
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    warmNativeBindings(undefined, retry);
+
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(err.mock.calls.map((c) => c.join(' ')).join('\n')).toContain('not mirrored yet');
+  });
+
   it('closes the handle it opened and returns true', () => {
     const close = vi.fn();
     const open = vi.fn(() => ({ close }));
 
-    expect(warmNativeBindings(open)).toBe(true);
+    expect(warmNativeBindings(open, vi.fn())).toBe(true);
 
     expect(open).toHaveBeenCalledTimes(1);
     expect(close).toHaveBeenCalledTimes(1);
@@ -136,6 +167,41 @@ describe('warmNativeBindings', () => {
     expect(err).toHaveBeenCalled();
     const joined = err.mock.calls.map((c) => c.join(' ')).join('\n');
     expect(joined).toContain("Cannot find module 'bindings'");
+  });
+});
+
+describe('scheduleModelMirrorRetry', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('retries on the interval until the publish succeeds, then stops', () => {
+    vi.useFakeTimers();
+    const publish = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(false).mockReturnValue(true);
+
+    scheduleModelMirrorRetry(publish, 1000, 10);
+
+    expect(publish).not.toHaveBeenCalled(); // nothing synchronous
+    vi.advanceTimersByTime(1000);
+    expect(publish).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1000);
+    expect(publish).toHaveBeenCalledTimes(2);
+    vi.advanceTimersByTime(1000);
+    expect(publish).toHaveBeenCalledTimes(3);
+    vi.advanceTimersByTime(60_000);
+    expect(publish).toHaveBeenCalledTimes(3);
+  });
+
+  it('gives up after maxAttempts and tolerates a throwing publish', () => {
+    vi.useFakeTimers();
+    const publish = vi.fn(() => {
+      throw new Error('boom');
+    });
+
+    scheduleModelMirrorRetry(publish, 100, 3);
+    vi.advanceTimersByTime(10_000);
+
+    expect(publish).toHaveBeenCalledTimes(3);
   });
 });
 

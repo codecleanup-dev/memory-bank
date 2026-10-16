@@ -18,8 +18,12 @@ import 때가 아니라 첫 `new Database()` 때 `bindings` 로 찾는다(도구
   **불변 디렉토리** `models/<지문>/` 로 게시한다. staging 에 전부 미러한 뒤 소스가 그동안 변하지 않았고 완성 형태(config.json
   + tokenizer.json + tokenizer_config.json + onnx 가중치. 증거 없는 경로는 모든 파일이 30초 이상 조용함까지)일 때만 rename
   으로 원자 게시하므로, 다운로드 중·쓰기 중·멈춘 쓰기·중간에
-  실패한 미러는 다른 프로세스에 보이지 않고, 바뀐 소스는 덮어쓰기 대신 새 지문 디렉토리를 얻는다(죽은 프로세스의 staging 정리,
-  최신 3개 유지). **게시의 정상 경로는 증거 기반이다**: transformers.js 가 pipeline 을 성공적으로 만들면(필수 파일을 전부
+  실패한 미러는 다른 프로세스에 보이지 않고, 바뀐 소스는 덮어쓰기 대신 새 지문 디렉토리를 얻는다. **프로세스는 게시본을
+  제자리에서 읽지 않는다.** `models/inuse/<pid>/<지문>/` 에 게시본 파일의 하드링크 스냅샷을 떠서 그쪽을 cacheDir 로 쓴다
+  (게시본은 불변이라 하드링크가 안전하고, 같은 볼륨이라 즉시·무비용. 링크 불가 FS 는 클론/복사). 디렉토리 삭제는 이름만
+  지우므로 스냅샷의 inode 는 살아 있고, 정리에는 잠금도 임대도 필요 없다. 정리는 최신 3개 밖이면서 게시 24시간이 지난
+  버전을 지우고, 링크 도중 삭제된 버전은 ENOENT 로 포기해 부분 스냅샷을 치우고 다음 버전을 쓴다. 스냅샷을 쓸 수 없으면
+  채택하지 않는다(현재 캐시 유지). 죽은 프로세스의 staging·스냅샷은 정리 때 치우고, 자기 스냅샷은 정상 종료 때 지운다. **게시의 정상 경로는 증거 기반이다**: transformers.js 가 pipeline 을 성공적으로 만들면(필수 파일을 전부
   읽었다는 증거) `initEmbeddings` 가 `notifyModelLoaded` 로 그 캐시 디렉토리를 보고하고, MCP 서버가 핸드셰이크를 마친 뒤
   (`allowModelMirroring`) 그 소스를 게시한다. 핸드셰이크 전에 로드됐으면(inject 데몬 사전 적재) 보류했다가 워밍에서 게시한다.
   증거가 있으면 정지 휴리스틱만 생략한다(필수 파일 존재는 항상 요구). 증거 유무와 무관하게 게시 직전에 미러된 파일의
@@ -34,8 +38,10 @@ import 때가 아니라 첫 `new Database()` 때 `bindings` 로 찾는다(도구
 - **`src/embeddings.ts` `initEmbeddings()`**: pipeline 생성 전에 `adoptStableModelCache` 를 부르고(게시된 미러만 채택,
   복사 없음), 생성 뒤에 `notifyModelLoaded` 로 증거를 보고한다. 이 함수는 inject 데몬의 사전 적재로 initialize 핸드셰이크
   전에도 돌기 때문에, 미러링(복사 가능)은 핸드셰이크 뒤에만 일어난다.
-- **`src/native-warm.ts` `warmNativeBindings()`**: sqlite-vec 를 미러링하고, 모델 미러링을 허용(보류된 증거 게시)하고, DB 를
-  한 번 열고 닫아 애드온을 매핑한다. 실패해도 로그만 남기고 transport 기동은 막지 않는다.
+- **`src/native-warm.ts` `warmNativeBindings()`**: sqlite-vec 를 미러링하고, 모델 미러링을 허용(보류된 증거 게시)하고, 증거가
+  없으면(다른 서버가 inject 소켓을 잡아 이 프로세스에 사전 적재가 없는 경우) 디스크의 기존 캐시를 검증 경로로 게시하며 아직
+  미완성이면 60초 간격·최대 10회 백그라운드 재시도한다. DB 를 한 번 열고 닫아 애드온을 매핑한다. 실패해도 로그만 남기고
+  transport 기동은 막지 않는다.
 - **`src/mcp-server.ts` `main()`**: `server.oninitialized` 에 `warmNativeBindings()` 를 등록해 initialize 핸드셰이크 직후에
   돌린다(동기 작업이라 connect 전에 돌리면 느린 경우 클라이언트 기동 타임아웃을 먹는다). 1.12.8 이전 버전으로 떠 있는
   세션에는 소급되지 않으므로 그 세션들은 재시작해야 한다.
@@ -51,10 +57,14 @@ import 때가 아니라 첫 `new Database()` 때 `bindings` 로 찾는다(도구
   미러 중 변경 시 미게시·죽은 프로세스 staging 정리·채택은 복사하지 않음·완성된 번들은 오래된 게시본보다 우선·증거 있는
   소스는 fresh 파일이어도 게시·증거 보고는 핸드셰이크까지 보류 뒤 1회 게시·미러에서 로드된 증거는 무시·안정 루트 쓰기 불가
   시 번들 유지, 같은 길이로 교체된 소스 재미러, 지워진 미러 재미러링(in-tree 미사용 확인), sqlite-vec 미러 실패 비고정·재시도).
-- `test/native-warm.test.ts` +8 (실제 DB 열림·애드온 require 캐시 적재, sqlite-vec 미러 생성, 핸드셰이크 전에 로드된 모델을
-  워밍에서 게시, 핸드셰이크 뒤 로드는 즉시 게시, open/close 1회, 실패 시 throw 없이 false + stderr, main() 이 oninitialized 에
-  등록하고 connect 전에 동기 호출하지 않는지, db.ts 가 `loadSqliteVec` 만 쓰는지, embeddings 가 pipeline 전에 채택만 하고
-  뒤에 증거를 보고하는지).
+- `test/native-warm.test.ts` +11 (실제 DB 열림·애드온 require 캐시 적재, sqlite-vec 미러 생성, 핸드셰이크 전에 로드된 모델을
+  워밍에서 게시, 핸드셰이크 뒤 로드는 즉시 게시, 증거 없을 때 검증 경로 게시 시도·재시도 예약, 재시도 타이머가 성공까지
+  반복·상한에서 중단·예외 허용, open/close 1회, 실패 시 throw 없이 false + stderr, main() 이 oninitialized 에 등록하고 connect
+  전에 동기 호출하지 않는지, db.ts 가 `loadSqliteVec` 만 쓰는지, embeddings 가 pipeline 전에 채택만 하고 뒤에 증거를
+  보고하는지).
+- `test/runtime-assets.test.ts` 스냅샷·정리 +5 (게시본 사용 시 프로세스별 하드링크 스냅샷이 게시 디렉토리 삭제 뒤에도 온전,
+  조회와 링크 사이에 삭제된 버전은 부분 스냅샷 없이 건너뜀, 최신 3개 밖·24시간 지난 버전만 정리되고 기존 스냅샷은 유지,
+  스냅샷을 쓸 수 없으면 채택 안 함, 죽은 pid 의 스냅샷 정리).
 
 ## [1.12.7] - 2026-10-07
 

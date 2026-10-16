@@ -367,16 +367,112 @@ function pidAlive(pid) {
         return e.code === 'EPERM';
     }
 }
-/** Remove staging dirs of dead processes and keep only the newest published versions. */
-function tidyModelRoot(root, modelId, keep = 3) {
+// ---- per-process snapshots: nothing a process reads can be deleted ----------
+//
+// A process never reads a published version in place. It takes a SNAPSHOT:
+// hard links of the version's files under <root>/inuse/<pid>/<fingerprint>/
+// (same filesystem, so link() is instant and free; a clone/copy is the
+// fallback). Published versions are immutable, so a hard link can never
+// observe a change, and deleting a published directory only removes names —
+// the snapshot's inodes live on. That makes pruning safe without any lock or
+// lease: an adopter that lists a version just before it is deleted fails at
+// link() with ENOENT, discards its partial snapshot and tries the next
+// version. Snapshots of dead pids are removed on tidy; a process removes its
+// own on normal exit.
+export const PUBLISH_GRACE_MS = 24 * 60 * 60 * 1000;
+export function modelInUseDir(root) {
+    return path.join(root, 'inuse');
+}
+/** Snapshots of processes that are gone (a SIGKILL/SIGTERM skips the exit hook). Hard links only: no space, just names. */
+function removeDeadSnapshots(root) {
+    try {
+        for (const n of fs.readdirSync(modelInUseDir(root))) {
+            if (/^\d+$/.test(n) && !pidAlive(Number(n))) {
+                fs.rmSync(path.join(modelInUseDir(root), n), { recursive: true, force: true });
+            }
+        }
+    }
+    catch {
+        // no snapshots yet
+    }
+}
+let exitCleanupRegistered = false;
+function registerExitCleanup(dir) {
+    if (exitCleanupRegistered)
+        return;
+    exitCleanupRegistered = true;
+    process.on('exit', () => {
+        try {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+        catch {
+            // best effort; tidy removes it once the pid is gone
+        }
+    });
+}
+/**
+ * Point transformers.js at this process's private snapshot of a published
+ * version, creating it on first use. Returns null when the snapshot cannot be
+ * made (the version vanished between look-up and link, or the inuse dir is
+ * unwritable), so the caller can try another version or keep the configured
+ * cache.
+ */
+function useVersion(root, fp, modelId) {
+    const mine = path.join(modelInUseDir(root), String(process.pid));
+    const snapshot = path.join(mine, fp);
+    const dst = path.join(snapshot, modelId);
+    if (fs.existsSync(path.join(dst, 'config.json'))) {
+        transformersEnv.cacheDir = snapshot;
+        return snapshot;
+    }
+    try {
+        removeDeadSnapshots(root); // cheap housekeeping on every new snapshot, not only on publish
+        const src = path.join(root, fp, modelId);
+        const files = listModelFiles(src);
+        if (files.length === 0)
+            return null;
+        for (const f of files) {
+            const from = path.join(src, f.rel);
+            const to = path.join(dst, f.rel);
+            fs.mkdirSync(path.dirname(to), { recursive: true });
+            try {
+                fs.linkSync(from, to);
+            }
+            catch (e) {
+                const code = e.code;
+                if (code === 'EEXIST')
+                    continue;
+                if (code === 'ENOENT')
+                    throw e; // the version is being deleted under us
+                fs.copyFileSync(from, to, fs.constants.COPYFILE_FICLONE); // link unsupported here
+            }
+        }
+        // every listed file must have made it (a delete may have raced the loop)
+        if (!files.every((f) => fs.existsSync(path.join(dst, f.rel))))
+            throw new Error('incomplete snapshot');
+    }
+    catch {
+        fs.rmSync(snapshot, { recursive: true, force: true });
+        return null;
+    }
+    registerExitCleanup(mine);
+    transformersEnv.cacheDir = snapshot;
+    return snapshot;
+}
+/** Remove leftovers of dead processes and prune old published versions beyond the newest few. */
+function tidyModelRoot(root, modelId, keep = 3, now = Date.now()) {
     try {
         for (const n of fs.readdirSync(root)) {
             const m = STAGING_RE.exec(n);
             if (m && !pidAlive(Number(m[2])))
                 fs.rmSync(path.join(root, n), { recursive: true, force: true });
         }
-        for (const dir of publishedDirs(root, modelId).slice(keep))
-            fs.rmSync(dir, { recursive: true, force: true });
+        removeDeadSnapshots(root);
+        for (const dir of publishedDirs(root, modelId).slice(keep)) {
+            if (now - fs.statSync(dir).mtimeMs < PUBLISH_GRACE_MS)
+                continue;
+            fs.rmSync(dir, { recursive: true, force: true }); // live snapshots keep their inodes
+        }
     }
     catch {
         // housekeeping only
@@ -449,8 +545,9 @@ export function adoptStableModelCache(modelId) {
             if (fs.existsSync(src)) {
                 const fp = fingerprintOf(listModelFiles(src));
                 if (isPublished(root, fp, modelId)) {
-                    transformersEnv.cacheDir = path.join(root, fp);
-                    return path.join(root, fp);
+                    const dir = useVersion(root, fp, modelId);
+                    if (dir)
+                        return dir;
                 }
                 // The configured cache has this model but no published twin yet: keep
                 // using it. An older published version must never shadow a newer (or
@@ -458,10 +555,10 @@ export function adoptStableModelCache(modelId) {
                 return current;
             }
         }
-        const newest = publishedDirs(root, modelId)[0];
-        if (newest) {
-            transformersEnv.cacheDir = newest;
-            return newest;
+        for (const candidate of publishedDirs(root, modelId)) {
+            const dir = useVersion(root, path.basename(candidate), modelId);
+            if (dir)
+                return dir;
         }
     }
     catch {
@@ -513,10 +610,11 @@ export function relocateModelCache(modelId, fromDir = BUNDLED_MODEL_CACHE_DIR, p
             fs.rmSync(staging, { recursive: true, force: true });
             if (!isPublished(root, fp, modelId))
                 return currentCacheDir(); // keep the bundled cache
+            const used = useVersion(root, fp, modelId); // lease first: our own version is never a prune candidate
             tidyModelRoot(root, modelId);
+            return used ?? currentCacheDir();
         }
-        transformersEnv.cacheDir = final;
-        return final;
+        return useVersion(root, fp, modelId) ?? currentCacheDir();
     }
     catch {
         // stable root unavailable (read-only or sandboxed HOME): leave the cache setting as it was

@@ -34,7 +34,8 @@ import {
   publishProvenModel,
   isModelMirrored,
   onnxLooksComplete,
-  modelFilesIntact,
+  modelFilesIntact, modelInUseDir,
+  PUBLISH_GRACE_MS,
 } from '../src/runtime-assets.js';
 
 // Minimal but structurally complete ONNX ModelProto: ir_version (field 1,
@@ -266,7 +267,7 @@ describe('runtime-assets', () => {
     it('publishes an immutable fingerprint dir, points transformers.js at it, and survives the sweep', () => {
       const dir = relocateModelCache(model, bundled);
 
-      expect(path.dirname(dir)).toBe(stableModelCacheRoot());
+      expect(path.dirname(path.dirname(dir))).toBe(modelInUseDir(stableModelCacheRoot()));
       expect(path.basename(dir)).toMatch(/^[0-9a-f]{12}$/);
       expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(dir));
       expect(weightsIn(dir)).toBe('weights');
@@ -328,7 +329,7 @@ describe('runtime-assets', () => {
       expect(published()).toEqual([]);
 
       backdate(weights);
-      expect(path.dirname(relocateModelCache(model, bundled))).toBe(stableModelCacheRoot());
+      expect(relocateModelCache(model, bundled)).not.toBe(bundled);
     });
 
     it('adoption keeps a complete but unpublished bundled model over an older published mirror', () => {
@@ -360,6 +361,88 @@ describe('runtime-assets', () => {
       expect(staging()).toEqual([]);
     });
 
+    it('using a published version takes a private hard-link snapshot that outlives the published dir', () => {
+      const root = stableModelCacheRoot();
+      const v1 = relocateModelCache(model, bundled);
+
+      // v1 = <root>/inuse/<pid>/<fingerprint>
+      expect(path.dirname(path.dirname(v1))).toBe(modelInUseDir(root));
+      expect(path.basename(path.dirname(v1))).toBe(String(process.pid));
+      const fp = path.basename(v1);
+      const published = path.join(root, fp, model, 'onnx', 'model_quantized.onnx');
+      const snap = path.join(v1, model, 'onnx', 'model_quantized.onnx');
+      expect(statSync(snap).ino).toBe(statSync(published).ino); // same volume → hard link
+
+      rmSync(path.join(root, fp), { recursive: true, force: true }); // pruned by some other process
+
+      expect(modelFilesIntact(path.join(v1, model))).toBe(true);
+      expect(weightsIn(v1)).toBe('weights');
+    });
+
+    it('a version deleted between look-up and snapshot is skipped without leaving a partial snapshot', () => {
+      const root = stableModelCacheRoot();
+      const v1 = relocateModelCache(model, bundled);
+      const fp = path.basename(v1);
+      rmSync(v1, { recursive: true, force: true }); // forget our own snapshot
+      const realLink = fs.linkSync;
+      vi.spyOn(fs, 'linkSync').mockImplementation((from, to) => {
+        rmSync(path.join(root, fp), { recursive: true, force: true }); // pruner wins the race
+        return realLink(from, to);
+      });
+      transformersEnv.cacheDir = '/nonexistent/bundled';
+
+      expect(adoptStableModelCache(model)).toBe('/nonexistent/bundled');
+
+      expect(existsSync(path.join(modelInUseDir(root), String(process.pid), fp))).toBe(false);
+    });
+
+    it('pruning removes old versions beyond the newest three; existing snapshots keep working', () => {
+      const root = stableModelCacheRoot();
+      const old = new Date(Date.now() - PUBLISH_GRACE_MS - 60_000);
+      const v1 = relocateModelCache(model, bundled);
+      const fp1 = path.basename(v1);
+      utimesSync(path.join(root, fp1), old, old);
+      const bump = (w: string) => {
+        rmSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'));
+        writeFileSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'), onnxBytes(w));
+        backdate(path.join(bundled, model, 'onnx', 'model_quantized.onnx'));
+        return relocateModelCache(model, bundled);
+      };
+      bump('v2');
+      bump('v3');
+      expect(existsSync(path.join(root, fp1))).toBe(true); // still within the newest three
+
+      bump('v4');
+
+      expect(existsSync(path.join(root, fp1))).toBe(false); // old and beyond the newest three: pruned
+      expect(weightsIn(v1)).toBe('weights'); // our snapshot of it is untouched
+      bump('v5');
+      // recent versions survive beyond the newest three (grace period)
+      expect(readdirSync(root).filter((n) => /^[0-9a-f]{12}$/.test(n))).toHaveLength(4);
+    });
+
+    it('a version is not used when its snapshot cannot be written', () => {
+      const root = stableModelCacheRoot();
+      const v1 = relocateModelCache(model, bundled);
+      rmSync(modelInUseDir(root), { recursive: true, force: true });
+      writeFileSync(modelInUseDir(root), 'not a directory');
+      transformersEnv.cacheDir = '/nonexistent/bundled';
+
+      expect(adoptStableModelCache(model)).toBe('/nonexistent/bundled');
+
+      expect(existsSync(path.join(root, path.basename(v1)))).toBe(true); // untouched, just not used
+    });
+
+    it('snapshots of dead processes are removed when a snapshot is made', () => {
+      const root = stableModelCacheRoot();
+      mkdirSync(path.join(modelInUseDir(root), '999999', 'abcdefabcdef'), { recursive: true });
+
+      relocateModelCache(model, bundled); // publishes and takes a snapshot
+
+      expect(existsSync(path.join(modelInUseDir(root), '999999'))).toBe(false);
+      expect(existsSync(path.join(modelInUseDir(root), String(process.pid)))).toBe(true);
+    });
+
     it('a staging dir left by a dead process is never adopted and is cleaned up on the next publish', () => {
       const root = stableModelCacheRoot();
       const stale = path.join(root, 'abcdefabcdef.staging-999999');
@@ -370,7 +453,7 @@ describe('runtime-assets', () => {
       expect(adoptStableModelCache(model)).toBe('/nonexistent/bundled');
       const dir = relocateModelCache(model, bundled);
 
-      expect(path.dirname(dir)).toBe(root);
+      expect(existsSync(path.join(root, path.basename(dir)))).toBe(true);
       expect(existsSync(stale)).toBe(false);
     });
 
@@ -380,7 +463,7 @@ describe('runtime-assets', () => {
       const copy = vi.spyOn(fs, 'copyFileSync');
       transformersEnv.cacheDir = bundled;
 
-      expect(path.dirname(adoptStableModelCache(model))).toBe(stableModelCacheRoot());
+      expect(path.dirname(path.dirname(adoptStableModelCache(model)))).toBe(modelInUseDir(stableModelCacheRoot()));
 
       expect(link).not.toHaveBeenCalled();
       expect(copy).not.toHaveBeenCalled();
@@ -433,7 +516,7 @@ describe('runtime-assets', () => {
       expect(published()).toEqual([]);
 
       // ...but a built pipeline is the proof that they are complete
-      expect(path.dirname(relocateModelCache(model, bundled, true))).toBe(stableModelCacheRoot());
+      expect(relocateModelCache(model, bundled, true)).not.toBe(bundled);
       expect(published()).toHaveLength(1);
     });
 
