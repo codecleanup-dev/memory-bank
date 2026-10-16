@@ -23650,12 +23650,13 @@ function adoptStableModelCache(modelId) {
     if (current && !path2.resolve(current).startsWith(path2.resolve(root) + path2.sep)) {
       const src = path2.join(current, modelId);
       if (fs2.existsSync(src)) {
-        const fp = fingerprintOf(listModelFiles(src));
+        const files = listModelFiles(src);
+        const fp = fingerprintOf(files);
         if (isPublished(root, fp, modelId)) {
           const dir = useVersion(root, fp, modelId);
           if (dir) return dir;
         }
-        return current;
+        if (looksCompleteModel(files) && modelFilesIntact(src)) return current;
       }
     }
     for (const candidate of publishedDirs(root, modelId)) {

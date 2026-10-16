@@ -443,6 +443,28 @@ describe('runtime-assets', () => {
       expect(existsSync(path.join(modelInUseDir(root), String(process.pid)))).toBe(true);
     });
 
+    it('an incomplete bundled model (weights gone) does not shadow a complete published version', () => {
+      const v1 = relocateModelCache(model, bundled);
+      rmSync(path.join(bundled, model, 'onnx'), { recursive: true, force: true }); // partial delete / partial download
+      transformersEnv.cacheDir = bundled;
+
+      expect(adoptStableModelCache(model)).toBe(v1);
+
+      expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(v1));
+    });
+
+    it('a corrupt bundled model (truncated weights, non-empty) does not shadow a complete published version', () => {
+      const v1 = relocateModelCache(model, bundled);
+      const weights = path.join(bundled, model, 'onnx', 'model_quantized.onnx');
+      fs.truncateSync(weights, 4); // a write that died mid-file
+      backdate(weights);
+      transformersEnv.cacheDir = bundled;
+
+      expect(adoptStableModelCache(model)).toBe(v1);
+
+      expect(path.resolve(String(transformersEnv.cacheDir))).toBe(path.resolve(v1));
+    });
+
     it('a partial snapshot without the completion marker is rebuilt, never adopted as is', () => {
       const root = stableModelCacheRoot();
       const v1 = relocateModelCache(model, bundled);

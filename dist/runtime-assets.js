@@ -577,16 +577,22 @@ export function adoptStableModelCache(modelId) {
         if (current && !path.resolve(current).startsWith(path.resolve(root) + path.sep)) {
             const src = path.join(current, modelId);
             if (fs.existsSync(src)) {
-                const fp = fingerprintOf(listModelFiles(src));
+                const files = listModelFiles(src);
+                const fp = fingerprintOf(files);
                 if (isPublished(root, fp, modelId)) {
                     const dir = useVersion(root, fp, modelId);
                     if (dir)
                         return dir;
                 }
-                // The configured cache has this model but no published twin yet: keep
-                // using it. An older published version must never shadow a newer (or
-                // repaired) source; the next warm-up publishes this one.
-                return current;
+                // A complete, intact source without a published twin stays in use: an
+                // older published version must never shadow a newer (or repaired)
+                // source, and the next warm-up publishes this one. An INCOMPLETE or
+                // CORRUPT source (partial download, partial delete, truncated write)
+                // must not shadow a complete published version either, so it falls
+                // through to the candidates. The structural check runs only on this
+                // path, i.e. once per machine until the source gets published.
+                if (looksCompleteModel(files) && modelFilesIntact(src))
+                    return current;
             }
         }
         for (const candidate of publishedDirs(root, modelId)) {

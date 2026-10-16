@@ -30,6 +30,8 @@ import 때가 아니라 첫 `new Database()` 때 `bindings` 로 찾는다(도구
   (현재 캐시 유지). 죽은 프로세스의 staging·스냅샷은 스냅샷 생성·게시 때 치우고, 자기 스냅샷은 정상 종료 때 지운다. **게시의 정상 경로는 증거 기반이다**: transformers.js 가 pipeline 을 성공적으로 만들면(필수 파일을 전부
   읽었다는 증거) `initEmbeddings` 가 `notifyModelLoaded` 로 그 캐시 디렉토리를 보고하고, MCP 서버가 핸드셰이크를 마친 뒤
   (`allowModelMirroring`) 그 소스를 게시한다. 핸드셰이크 전에 로드됐으면(inject 데몬 사전 적재) 보류했다가 워밍에서 게시한다.
+  채택은 번들 캐시가 완성 형태이고 구조 검증(JSON 파싱·onnx protobuf)까지 통과할 때만 번들을 우선하고, 불완전하거나
+  손상됐으면(부분 다운로드·부분 삭제·잘린 쓰기) 완성된 게시본으로 넘어간다.
   증거가 있으면 정지 휴리스틱만 생략한다(필수 파일 존재는 항상 요구). 증거 유무와 무관하게 게시 직전에 미러된 파일의
   구조적 완전성을 독립 검증한다(JSON 은 파싱, onnx 는 protobuf 최상위 필드를 EOF 까지 걸어 선언 길이가 맞고 graph 필드가
   있는지. transformers.js 의 FileCache 는 쓰기 실패를 경고만 하고 메모리 버퍼로 pipeline 을 완성하므로 로드 성공이 디스크
@@ -66,7 +68,8 @@ import 때가 아니라 첫 `new Database()` 때 `bindings` 로 찾는다(도구
   반복·상한에서 중단·예외 허용, open/close 1회, 실패 시 throw 없이 false + stderr, main() 이 oninitialized 에 등록하고 connect
   전에 동기 호출하지 않는지, db.ts 가 `loadSqliteVec` 만 쓰는지, embeddings 가 pipeline 전에 채택만 하고 뒤에 증거를
   보고하는지).
-- `test/runtime-assets.test.ts` 스냅샷·정리 +10 (게시본 사용 시 프로세스별 하드링크 스냅샷이 게시 디렉토리 삭제 뒤에도 온전,
+- `test/runtime-assets.test.ts` 스냅샷·정리 +12 (불완전하거나 손상된 번들은 완성 게시본을 가리지 않음, 게시본 사용 시 프로세스별
+  하드링크 스냅샷이 게시 디렉토리 삭제 뒤에도 온전,
   조회와 링크 사이에 삭제된 버전은 부분 스냅샷 없이 건너뜀, 파일 단위 삭제가 진행 중인 게시본(가중치만 사라짐)은 manifest
   대조로 거부, 완료 마커 없는 부분 스냅샷은 재구축, 나열과 stat 사이에 사라진 후보는 건너뛰고 다음 후보 사용, 핸드셰이크 전
   복사 필요 스냅샷은 미채택·뒤에는 복사 채택, 게시본에 manifest 동봉, 최신 3개 밖·24시간 지난 버전만 정리되고 기존 스냅샷은
