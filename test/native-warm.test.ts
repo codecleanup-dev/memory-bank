@@ -117,7 +117,13 @@ describe('warmNativeBindings', () => {
     expect(isModelMirrored(model)).toBe(true);
   });
 
-  it('without proof, validates and publishes the bundled model already on disk after the handshake', () => {
+  // Needs the plugin's own node_modules model cache (present after a first run
+  // on this machine); a clean checkout has nothing to publish yet.
+  const bundledModelPresent = () =>
+    typeof savedCacheDir === 'string' && existsSync(path.join(savedCacheDir, EMBEDDING_MODEL, 'onnx'));
+
+  it('without proof, validates and publishes the bundled model already on disk after the handshake', (ctx) => {
+    if (!bundledModelPresent()) return ctx.skip();
     const retry = vi.fn();
     expect(isModelMirrored(EMBEDDING_MODEL)).toBe(false);
 

@@ -23509,7 +23509,13 @@ function publishedDirs(root, modelId) {
   } catch {
     return [];
   }
-  return names.filter((n) => FINGERPRINT_RE.test(n) && isPublished(root, n, modelId)).map((n) => ({ dir: path2.join(root, n), mtime: fs2.statSync(path2.join(root, n)).mtimeMs })).sort((a, b2) => b2.mtime - a.mtime).map((x2) => x2.dir);
+  return names.filter((n) => FINGERPRINT_RE.test(n) && isPublished(root, n, modelId)).flatMap((n) => {
+    try {
+      return [{ dir: path2.join(root, n), mtime: fs2.statSync(path2.join(root, n)).mtimeMs }];
+    } catch {
+      return [];
+    }
+  }).sort((a, b2) => b2.mtime - a.mtime).map((x2) => x2.dir);
 }
 function pidAlive(pid) {
   try {
@@ -23548,10 +23554,12 @@ function useVersion(root, fp, modelId) {
   const mine = path2.join(modelInUseDir(root), String(process.pid));
   const snapshot = path2.join(mine, fp);
   const dst = path2.join(snapshot, modelId);
-  if (fs2.existsSync(path2.join(dst, "config.json"))) {
+  const marker = path2.join(snapshot, ".complete");
+  if (fs2.existsSync(marker)) {
     transformersEnv.cacheDir = snapshot;
     return snapshot;
   }
+  fs2.rmSync(snapshot, { recursive: true, force: true });
   try {
     removeDeadSnapshots(root);
     const src = path2.join(root, fp, modelId);
@@ -23567,6 +23575,7 @@ function useVersion(root, fp, modelId) {
         const code = e.code;
         if (code === "EEXIST") continue;
         if (code === "ENOENT") throw e;
+        if (!mirroringAllowed) throw e;
         fs2.copyFileSync(from, to, fs2.constants.COPYFILE_FICLONE);
       }
     }
@@ -23578,6 +23587,7 @@ function useVersion(root, fp, modelId) {
       }
     });
     if (!whole) throw new Error("incomplete snapshot");
+    fs2.writeFileSync(marker, "");
   } catch {
     fs2.rmSync(snapshot, { recursive: true, force: true });
     return null;

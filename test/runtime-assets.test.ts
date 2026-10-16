@@ -443,6 +443,60 @@ describe('runtime-assets', () => {
       expect(existsSync(path.join(modelInUseDir(root), String(process.pid)))).toBe(true);
     });
 
+    it('a partial snapshot without the completion marker is rebuilt, never adopted as is', () => {
+      const root = stableModelCacheRoot();
+      const v1 = relocateModelCache(model, bundled);
+      expect(existsSync(path.join(v1, '.complete'))).toBe(true);
+      // an interrupted link run under this (reused) pid left config.json only
+      rmSync(path.join(v1, '.complete'));
+      rmSync(path.join(v1, model, 'onnx'), { recursive: true, force: true });
+      transformersEnv.cacheDir = '/nonexistent/bundled';
+
+      expect(adoptStableModelCache(model)).toBe(v1);
+
+      expect(existsSync(path.join(v1, '.complete'))).toBe(true);
+      expect(weightsIn(v1)).toBe('weights'); // rebuilt from the published version
+    });
+
+    it('a candidate pruned between the listing and its stat is skipped, the next one is used', () => {
+      const root = stableModelCacheRoot();
+      const v1 = relocateModelCache(model, bundled);
+      rmSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'));
+      writeFileSync(path.join(bundled, model, 'onnx', 'model_quantized.onnx'), onnxBytes('weights-v2'));
+      backdate(path.join(bundled, model, 'onnx', 'model_quantized.onnx'));
+      const v2 = relocateModelCache(model, bundled);
+      const realStat = fs.statSync;
+      vi.spyOn(fs, 'statSync').mockImplementation(((p: fs.PathLike, o?: fs.StatSyncOptions) => {
+        if (String(p) === path.join(root, path.basename(v2))) {
+          throw Object.assign(new Error('gone'), { code: 'ENOENT' });
+        }
+        return realStat(p, o);
+      }) as typeof fs.statSync);
+      transformersEnv.cacheDir = '/nonexistent/bundled';
+
+      expect(adoptStableModelCache(model)).toBe(v1);
+    });
+
+    it('before the handshake, a snapshot that would need a copy (no hard links) is not taken', () => {
+      const root = stableModelCacheRoot();
+      const v1 = relocateModelCache(model, bundled); // publishes; our own snapshot via link
+      rmSync(path.join(modelInUseDir(root), String(process.pid)), { recursive: true, force: true });
+      resetRuntimeAssetCacheForTests(); // mirroring not allowed yet (pre-handshake)
+      vi.spyOn(fs, 'linkSync').mockImplementation(() => {
+        throw Object.assign(new Error('no hard links here'), { code: 'EPERM' });
+      });
+      const copy = vi.spyOn(fs, 'copyFileSync');
+      transformersEnv.cacheDir = '/nonexistent/bundled';
+
+      expect(adoptStableModelCache(model)).toBe('/nonexistent/bundled');
+      expect(copy).not.toHaveBeenCalled();
+
+      allowModelMirroring(); // after the handshake the copy is acceptable
+      expect(adoptStableModelCache(model)).toBe(v1);
+      expect(copy).toHaveBeenCalled();
+      expect(weightsIn(v1)).toBe('weights');
+    });
+
     it('a published version carries a manifest of its files', () => {
       const root = stableModelCacheRoot();
       const v1 = relocateModelCache(model, bundled);

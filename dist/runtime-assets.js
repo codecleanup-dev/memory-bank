@@ -360,7 +360,14 @@ function publishedDirs(root, modelId) {
     }
     return names
         .filter((n) => FINGERPRINT_RE.test(n) && isPublished(root, n, modelId))
-        .map((n) => ({ dir: path.join(root, n), mtime: fs.statSync(path.join(root, n)).mtimeMs }))
+        .flatMap((n) => {
+        try {
+            return [{ dir: path.join(root, n), mtime: fs.statSync(path.join(root, n)).mtimeMs }];
+        }
+        catch {
+            return []; // pruned between the listing and the stat: just not a candidate
+        }
+    })
         .sort((a, b) => b.mtime - a.mtime)
         .map((x) => x.dir);
 }
@@ -427,10 +434,16 @@ function useVersion(root, fp, modelId) {
     const mine = path.join(modelInUseDir(root), String(process.pid));
     const snapshot = path.join(mine, fp);
     const dst = path.join(snapshot, modelId);
-    if (fs.existsSync(path.join(dst, 'config.json'))) {
+    // A snapshot is reused only when its completion marker (written last) is
+    // there; anything else is a leftover of an interrupted link run — possibly
+    // under a reused pid, which removeDeadSnapshots cannot tell apart — and is
+    // rebuilt from scratch.
+    const marker = path.join(snapshot, '.complete');
+    if (fs.existsSync(marker)) {
         transformersEnv.cacheDir = snapshot;
         return snapshot;
     }
+    fs.rmSync(snapshot, { recursive: true, force: true });
     try {
         removeDeadSnapshots(root); // cheap housekeeping on every new snapshot, not only on publish
         const src = path.join(root, fp, modelId);
@@ -450,7 +463,12 @@ function useVersion(root, fp, modelId) {
                     continue;
                 if (code === 'ENOENT')
                     throw e; // the version is being deleted under us
-                fs.copyFileSync(from, to, fs.constants.COPYFILE_FICLONE); // link unsupported here
+                // Hard links unsupported here (exFAT, some network filesystems): a
+                // copy is the only way, and a large one must not land inside the MCP
+                // initialize handshake, so before it the snapshot is simply not taken.
+                if (!mirroringAllowed)
+                    throw e;
+                fs.copyFileSync(from, to, fs.constants.COPYFILE_FICLONE);
             }
         }
         // every manifest entry must have made it, byte-for-byte in size (a delete
@@ -465,6 +483,7 @@ function useVersion(root, fp, modelId) {
         });
         if (!whole)
             throw new Error('incomplete snapshot');
+        fs.writeFileSync(marker, ''); // last: marks the snapshot complete
     }
     catch {
         fs.rmSync(snapshot, { recursive: true, force: true });
