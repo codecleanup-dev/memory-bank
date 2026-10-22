@@ -286,10 +286,16 @@ export function renderReport({ time, mode, opts, rt, runs, durability, replans }
   for (const r of runs) {
     lines.push(`## ${r.type}`);
     lines.push('');
-    if (r.status !== 'ok') {
-      lines.push(`- 실행 실패: ${r.status}${r.rc !== null && r.rc !== undefined ? ` (rc ${r.rc})` : ''}${r.error ? ` — ${r.error}` : ''}`);
+    if (r.status !== 'ok' && r.status !== 'judge-unavailable') {
+      lines.push(`- 실행 실패: ${r.status}${r.rc !== null && r.rc !== undefined ? ` (rc ${r.rc})` : ''}${r.error ? `. ${r.error}` : ''}`);
       lines.push('');
       continue;
+    }
+    if (r.status === 'judge-unavailable') {
+      // Partial week: some batches never got a verdict. The batches that did are still real decisions (dry-run) or real
+      // changes (apply) and must stay in the report — hiding them would lose review targets or applied deletions.
+      lines.push(`- 판정기 미도달 배치가 있어 이 주는 부분 결과다. ${r.error || ''} 아래 표·목록은 판정이 끝난 배치만 담는다.`);
+      lines.push('');
     }
     lines.push('| 항목 | 값 |');
     lines.push('|---|---|');

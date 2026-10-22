@@ -147,6 +147,14 @@ describe('resolve-weekly run summary and arguments', () => {
     expect(md).toContain('dry-run');
     expect(md).toContain('재적용 예정 (--replan 미리보기');
     expect(md).toContain('"delete":261');
+    // 부분 실패(judge-unavailable)여도 판정이 끝난 배치의 계획·목록은 보고서에 남아야 한다
+    const partial = summarizeRun('contradicts', { status: 'ok', rc: 0, summary: { examined: 10, judged: 8, unavailableBatches: 1, planned: { keep: 7, delete: 1 }, applied: {},
+      pairs: [{ planned: 'delete', verdict: 'UNRELATED', confidence: 0.8, relationId: 'kept-visible' }] } });
+    const md2 = renderReport({ time: 't', mode: 'dry-run', opts: { limit: 10, votes: 3, model: null, types: ['contradicts'] }, rt: { root: '/x', node: '/n' },
+      runs: [partial], durability: { available: false, note: 'n/a' }, replans: null });
+    expect(md2).toContain('부분 결과');
+    expect(md2).toContain('relation `kept-visible`');
+    expect(md2).toContain('| 계획: delete | 1 |');
     expect(md).toContain('MEMORY_BANK_RESOLVE_APPLY=1');
     expect(md).toContain('relation `abc`');
     expect(md).toContain('실행 실패: error (rc 1)');
