@@ -115,7 +115,14 @@ describe('resolve-weekly run summary and arguments', () => {
     expect(parseArgs(['--db', '/tmp/x.sqlite']).dbExplicit).toBe(true);
     expect(path.isAbsolute(parseArgs(['--db', 'rel.sqlite']).db)).toBe(true);
     expect(path.isAbsolute(parseArgs(['--out', 'reports']).out)).toBe(true);
-    expect(parseArgs([]).dbExplicit).toBeUndefined();
+    const saved = process.env.MEMORY_BANK_DB_PATH;
+    delete process.env.MEMORY_BANK_DB_PATH;
+    expect(parseArgs([]).dbExplicit).toBe(false);
+    process.env.MEMORY_BANK_DB_PATH = 'rel-env.sqlite';
+    const viaEnv = parseArgs([]);
+    expect(viaEnv.dbExplicit).toBe(true);
+    expect(path.isAbsolute(viaEnv.db)).toBe(true);
+    if (saved === undefined) delete process.env.MEMORY_BANK_DB_PATH; else process.env.MEMORY_BANK_DB_PATH = saved;
     expect(parseArgs(['--limit', '50', '--votes', '1', '--types', 'contradicts']).types).toEqual(['contradicts']);
     expect(() => parseArgs(['--votes', '9'])).toThrow();
     expect(() => parseArgs(['--limit', '1e3'])).toThrow();

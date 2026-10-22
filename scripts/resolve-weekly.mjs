@@ -56,7 +56,10 @@ export function parseArgs(argv) {
     node: process.env.MEMORY_BANK_RESOLVE_NODE || null,
     out: process.env.MEMORY_BANK_RESOLVE_OUT || DEFAULT_OUT,
     jsonl: process.env.MEMORY_BANK_RESOLVE_JSONL || DEFAULT_JSONL,
-    db: process.env.MEMORY_BANK_DB_PATH || DEFAULT_DB,
+    // An env-given DB path is absolutized and forwarded like --db: the child runs in the report folder, so a relative
+    // MEMORY_BANK_DB_PATH would otherwise resolve to a different file there.
+    db: process.env.MEMORY_BANK_DB_PATH ? path.resolve(process.env.MEMORY_BANK_DB_PATH) : DEFAULT_DB,
+    dbExplicit: Boolean(process.env.MEMORY_BANK_DB_PATH),
     json: false,
     durabilityOnly: false,
   };
