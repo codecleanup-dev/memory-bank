@@ -142,9 +142,11 @@ describe('resolve-weekly run summary and arguments', () => {
       runs: [summarizeRun('contradicts', { status: 'ok', rc: 0, summary: { examined: 3, judged: 3, planned: { keep: 2, delete: 1 }, applied: {}, pairs: [{ planned: 'delete', verdict: 'UNRELATED', confidence: 0.7, relationId: 'abc' }] } }),
         summarizeRun('supersedes', { status: 'error', rc: 1, error: 'resolve failed: judge unavailable' })],
       durability: { available: true, judged_total: 264, held: 38, revived: 226, rate_pct: 14.4, by_action: { delete: { held: 38, revived: 226 } } },
-      replans: null,
+      replans: [{ type: 'contradicts', status: 'ok', examined: 264, planned: { delete: 261, keep: 3 }, applied: {} }],
     });
     expect(md).toContain('dry-run');
+    expect(md).toContain('재적용 예정 (--replan 미리보기');
+    expect(md).toContain('"delete":261');
     expect(md).toContain('MEMORY_BANK_RESOLVE_APPLY=1');
     expect(md).toContain('relation `abc`');
     expect(md).toContain('실행 실패: error (rc 1)');

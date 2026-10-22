@@ -274,11 +274,13 @@ export function renderReport({ time, mode, opts, rt, runs, durability, replans }
     : '- 모드: dry-run — 읽기 전용 연결. 아래 "적용 예정" 은 제안이며 그래프는 바뀌지 않았다. 적용은 사람의 결정(MEMORY_BANK_RESOLVE_APPLY=1 재등록 또는 수동 --apply).');
   lines.push('');
   if (replans && replans.length) {
-    lines.push('## 기록된 판정 재적용 (--replan --apply, 유형별)');
+    lines.push(mode === 'apply' ? '## 기록된 판정 재적용 (--replan --apply, 유형별)' : '## 기록된 판정 재적용 예정 (--replan 미리보기, 유형별)');
     lines.push('');
     for (const r of replans) {
-      lines.push(`- ${r.type}: ${r.status}${r.error ? `: ${r.error}` : ''} · 검사 ${r.examined} · 적용 ${JSON.stringify(r.applied)}`);
+      const planned = JSON.stringify(r.planned || {});
+      lines.push(`- ${r.type}: ${r.status}${r.error ? `: ${r.error}` : ''} · 검사 ${r.examined} · 계획 ${planned}${mode === 'apply' ? ` · 적용 ${JSON.stringify(r.applied)}` : ''}`);
     }
+    lines.push('- 되살아난 간선(같은 id 로 복원)은 일반 판정 런이 "이미 판정됨"으로 건너뛰므로 이 절에만 나타난다. 적용 결정은 두 절을 함께 본다.');
     lines.push('');
   }
   for (const r of runs) {
@@ -366,16 +368,18 @@ export async function main(argv) {
   // Replan per selected type: replanFromLog only re-applies recorded verdicts of the type it is given, and a later plain
   // supersedes run skips pairs whose judged input is unchanged — so a revived SUPERSEDES edge would survive forever if
   // only contradicts were replanned.
-  let replans = null;
-  if (opts.apply) {
-    replans = [];
-    record.runs.replan = {};
-    for (const type of opts.types) {
-      const r = runCli(rt, [type, '--replan', '--apply', '--json', '--limit', String(opts.limit)], opts.out, opts);
-      const s = { ...summarizeRun('replan', r), type };
-      replans.push(s);
-      record.runs.replan[type] = { status: s.status, examined: s.examined, applied: s.applied, error: s.error ?? null };
-    }
+  // The replan runs in BOTH modes. In dry-run it previews (no --apply) what the recorded verdicts would re-do, because
+  // a revived edge with its old id is skipped by the plain judge run as previouslyJudged — without the preview the
+  // person deciding on --apply would see "0 planned" and then the apply would delete it anyway.
+  const replans = [];
+  record.runs.replan = {};
+  for (const type of opts.types) {
+    const args = [type, '--replan', '--json', '--limit', String(opts.limit)];
+    if (opts.apply) args.push('--apply');
+    const r = runCli(rt, args, opts.out, opts);
+    const s = { ...summarizeRun('replan', r), type };
+    replans.push(s);
+    record.runs.replan[type] = { status: s.status, examined: s.examined, planned: s.planned, applied: s.applied, error: s.error ?? null };
   }
   const runs = [];
   for (const type of opts.types) {
