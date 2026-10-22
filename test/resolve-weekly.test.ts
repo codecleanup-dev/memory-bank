@@ -80,7 +80,7 @@ describe('resolve-weekly run summary and arguments', () => {
   it('reduces a CLI --json summary and excludes keep from actionable', () => {
     const s = summarizeRun('contradicts', {
       status: 'ok', rc: 0,
-      summary: { mode: 'dry-run', examined: 100, judged: 90, spoiledPairs: 2, unavailableBatches: 1, previouslyJudged: 10, judgeFailures: 0,
+      summary: { mode: 'dry-run', examined: 100, judged: 90, spoiledPairs: 2, unavailableBatches: 0, previouslyJudged: 10, judgeFailures: 0,
         planned: { keep: 70, delete: 15, retype: 5 }, applied: {},
         pairs: [{ planned: 'keep', verdict: 'TRUE_CONFLICT', confidence: 0.8, relationId: 'k' }, { planned: 'delete', verdict: 'UNRELATED', confidence: 0.9, relationId: 'd', judgeReasoning: 'different subjects' }] },
     });
@@ -93,11 +93,21 @@ describe('resolve-weekly run summary and arguments', () => {
     expect(f.actionable).toBe(0);
   });
 
-  it('marks the week partial when the replan failed even if both judge runs succeeded', () => {
+  it('treats a judge that never answered as judge-unavailable, not ok (CLI exits 0 with unavailableBatches)', () => {
+    const u = summarizeRun('contradicts', { status: 'ok', rc: 0, summary: { examined: 10, judged: 0, unavailableBatches: 1, judgeFailures: 3, planned: {}, applied: {}, pairs: [] } });
+    expect(u.status).toBe('judge-unavailable');
+    expect(laneStatus([u, { status: 'ok' }], null)).toBe('partial');
+    const partial = summarizeRun('contradicts', { status: 'ok', rc: 0, summary: { examined: 10, judged: 8, unavailableBatches: 1, planned: { keep: 8 }, applied: {}, pairs: [] } });
+    expect(partial.status).toBe('judge-unavailable');
+    const fine = summarizeRun('contradicts', { status: 'ok', rc: 0, summary: { examined: 0, judged: 0, unavailableBatches: 0, planned: {}, applied: {}, pairs: [] } });
+    expect(fine.status).toBe('ok');
+  });
+
+  it('marks the week partial when any replan failed even if both judge runs succeeded', () => {
     const ok = { status: 'ok' };
     expect(laneStatus([ok, ok], null)).toBe('ok');
-    expect(laneStatus([ok, ok], { status: 'ok' })).toBe('ok');
-    expect(laneStatus([ok, ok], { status: 'timeout' })).toBe('partial');
+    expect(laneStatus([ok, ok], [{ status: 'ok' }, { status: 'ok' }])).toBe('ok');
+    expect(laneStatus([ok, ok], [{ status: 'ok' }, { status: 'timeout' }])).toBe('partial');
     expect(laneStatus([ok, { status: 'error' }], null)).toBe('partial');
   });
 
@@ -123,7 +133,7 @@ describe('resolve-weekly run summary and arguments', () => {
       runs: [summarizeRun('contradicts', { status: 'ok', rc: 0, summary: { examined: 3, judged: 3, planned: { keep: 2, delete: 1 }, applied: {}, pairs: [{ planned: 'delete', verdict: 'UNRELATED', confidence: 0.7, relationId: 'abc' }] } }),
         summarizeRun('supersedes', { status: 'error', rc: 1, error: 'resolve failed: judge unavailable' })],
       durability: { available: true, judged_total: 264, held: 38, revived: 226, rate_pct: 14.4, by_action: { delete: { held: 38, revived: 226 } } },
-      replan: null,
+      replans: null,
     });
     expect(md).toContain('dry-run');
     expect(md).toContain('MEMORY_BANK_RESOLVE_APPLY=1');

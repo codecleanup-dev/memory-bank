@@ -203,7 +203,7 @@ export function summarizeRun(type, result) {
   const s = result.summary || {};
   const planned = s.planned || {};
   const actionable = Object.entries(planned).filter(([k]) => k !== 'keep').reduce((n, [, v]) => n + (Number(v) || 0), 0);
-  return {
+  const out = {
     ...base,
     examined: Number(s.examined) || 0,
     judged: Number(s.judged) || 0,
@@ -220,6 +220,13 @@ export function summarizeRun(type, result) {
       planned: p.planned, applied: p.applied ?? null, verdict: p.verdict, confidence: p.confidence, relationId: p.relationId, reasoning: p.judgeReasoning ?? null,
     })),
   };
+  // The CLI exits 0 when the judge never answered: it just counts unavailableBatches and leaves those pairs for a later
+  // run. For the lane that is not a successful week — nothing was judged. Record it as its own status.
+  if (type !== 'replan' && (out.unavailable > 0 || (out.examined > 0 && out.judged === 0))) {
+    out.status = 'judge-unavailable';
+    out.error = `judge did not answer: unavailable batches ${out.unavailable}, judged ${out.judged}/${out.examined}`;
+  }
+  return out;
 }
 
 /** The judge/apply child must look at the same database the durability pass measures: an explicit --db is
@@ -228,11 +235,11 @@ function childEnv(opts) {
   return opts.dbExplicit ? { ...process.env, MEMORY_BANK_DB_PATH: opts.db } : process.env;
 }
 
-/** Lane status: every judge run AND the replan (when it ran) must be ok. A failed replan means revived edges were
- *  not re-cleaned even if the two judge runs succeeded, so the week is partial, not ok. */
-export function laneStatus(runs, replan) {
+/** Lane status: every judge run AND every replan (when they ran) must be ok. A failed replan means revived edges were
+ *  not re-cleaned even if the judge runs succeeded; a judge that never answered is not a successful week either. */
+export function laneStatus(runs, replans) {
   const judgeOk = runs.every((r) => r.status === 'ok');
-  const replanOk = !replan || replan.status === 'ok';
+  const replanOk = !replans || replans.every((r) => r.status === 'ok');
   return judgeOk && replanOk ? 'ok' : 'partial';
 }
 
@@ -250,7 +257,7 @@ function runCli(rt, args, cwd, opts) {
 
 /* ------------------------------------------------------------------ report */
 
-export function renderReport({ time, mode, opts, rt, runs, durability, replan }) {
+export function renderReport({ time, mode, opts, rt, runs, durability, replans }) {
   const lines = [];
   lines.push(`# memory-bank resolve 주간 레인 (${mode === 'apply' ? 'APPLY' : 'dry-run'}) · ${time}`);
   lines.push('');
@@ -260,10 +267,12 @@ export function renderReport({ time, mode, opts, rt, runs, durability, replan })
     ? '- 모드: APPLY — 기록된 판정 재적용(--replan) 뒤 두 축을 적용했다. 모든 변경은 relation_resolution_log 에 같은 트랜잭션으로 남는다.'
     : '- 모드: dry-run — 읽기 전용 연결. 아래 "적용 예정" 은 제안이며 그래프는 바뀌지 않았다. 적용은 사람의 결정(MEMORY_BANK_RESOLVE_APPLY=1 재등록 또는 수동 --apply).');
   lines.push('');
-  if (replan) {
-    lines.push('## 기록된 판정 재적용 (--replan --apply)');
+  if (replans && replans.length) {
+    lines.push('## 기록된 판정 재적용 (--replan --apply, 유형별)');
     lines.push('');
-    lines.push(`- ${replan.status}${replan.error ? `: ${replan.error}` : ''} · 검사 ${replan.examined} · 적용 ${JSON.stringify(replan.applied)}`);
+    for (const r of replans) {
+      lines.push(`- ${r.type}: ${r.status}${r.error ? `: ${r.error}` : ''} · 검사 ${r.examined} · 적용 ${JSON.stringify(r.applied)}`);
+    }
     lines.push('');
   }
   for (const r of runs) {
@@ -348,12 +357,19 @@ export async function main(argv) {
     return 0;
   }
 
-  let replan = null;
+  // Replan per selected type: replanFromLog only re-applies recorded verdicts of the type it is given, and a later plain
+  // supersedes run skips pairs whose judged input is unchanged — so a revived SUPERSEDES edge would survive forever if
+  // only contradicts were replanned.
+  let replans = null;
   if (opts.apply) {
-    const r = runCli(rt, ['contradicts', '--replan', '--apply', '--json', '--limit', String(opts.limit)], opts.out, opts);
-    const s = summarizeRun('replan', r);
-    replan = s;
-    record.runs.replan = { status: s.status, examined: s.examined, applied: s.applied, error: s.error ?? null };
+    replans = [];
+    record.runs.replan = {};
+    for (const type of opts.types) {
+      const r = runCli(rt, [type, '--replan', '--apply', '--json', '--limit', String(opts.limit)], opts.out, opts);
+      const s = { ...summarizeRun('replan', r), type };
+      replans.push(s);
+      record.runs.replan[type] = { status: s.status, examined: s.examined, applied: s.applied, error: s.error ?? null };
+    }
   }
   const runs = [];
   for (const type of opts.types) {
@@ -371,9 +387,9 @@ export async function main(argv) {
   record.durability = { available: durability.available, judged_total: durability.judged_total, held: durability.held, revived: durability.revived, rate_pct: durability.rate_pct, by_action: durability.by_action, note: durability.note ?? null };
 
   const reportPath = path.join(opts.out, `${time.slice(0, 10)}-${mode}.md`);
-  fs.writeFileSync(reportPath, renderReport({ time, mode, opts, rt, runs, durability, replan }), 'utf8');
+  fs.writeFileSync(reportPath, renderReport({ time, mode, opts, rt, runs, durability, replans }), 'utf8');
   record.report = reportPath;
-  record.status = laneStatus(runs, replan);
+  record.status = laneStatus(runs, replans);
   appendJsonl(opts.jsonl, record);
   if (opts.json) console.log(JSON.stringify(record, null, 2));
   else console.log(`resolve-weekly: ${record.status} · report ${reportPath} · ` + runs.map((r) => `${r.type} ${r.status} judged ${r.judged} actionable ${r.actionable}`).join(' · '));
