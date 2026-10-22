@@ -36,6 +36,10 @@ for v in "$WEEKDAY:0:7" "$HOUR:0:23" "$MINUTE:0:59"; do
 done
 
 if [ "$UNREG" = "1" ]; then
+  if [ "$DRY" = "1" ]; then                      # --dry-run never changes anything, whatever else is passed
+    echo "[dry-run] would bootout gui/$(id -u)/$LABEL and remove $PLIST"
+    exit 0
+  fi
   launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
   rm -f "$PLIST"
   echo "unregistered $LABEL"
