@@ -48,3 +48,14 @@
 - haiku 단일 판정으로 팩트를 비활성화하는 것. 측정상 노이즈 라벨을 추인한다.
 - 기존 간선의 일괄 DELETE. 삭제는 판정 쌍 단위로만, 아카이브와 함께.
 - 원칙 레지스트리 자동 채우기. `principles add/import` 는 그대로 human-gate 다.
+
+## 주간 레인 (2026-10-22, keystone AKM C5·H4)
+
+10/5 의 적용 1회 뒤 아무도 큐를 다시 재지 않았고(keystone 10/19 재평가: 큐 소비 1회·비귀속), 되살아난 간선도 다시 정리하지 않았다. 그래서 resolve 를 주간 레인으로 만든다. `scripts/resolve-weekly.mjs` 가 본체, `scripts/resolve-weekly.sh` 가 launchd 진입점, `scripts/register-resolve-weekly-launchd.sh` 가 등록기다 (라벨 `com.codecleanup.memory-bank-resolve-weekly`, 일요일 08:33. keystone 주간 리뷰 09:30 의 3o 절이 이 레인의 jsonl 을 읽는다).
+
+- **기본은 dry-run** 이다. `contradicts`·`supersedes` 를 `--json --limit 100 --votes 3` 으로 읽기 전용 연결에서 판정하고, 유형별 `--replan` 미리보기(기록된 판정이 다시 적용할 것 — 같은 id 로 되살아난 간선은 일반 판정 런이 "이미 판정됨"으로 건너뛰므로 여기에만 나타난다)와 함께 "적용 예정" 목록을 `~/.claude/logs/memory-bank-resolve/<날짜>-dry-run.md` 에 쓰고, 요약 1줄을 `~/.claude/logs/memory-bank-resolve.jsonl` 에 남긴다. 그래프는 바뀌지 않는다. 판정 모델 호출은 추출과 같은 경로(로컬 구독)다. 판정기가 한 번도 답하지 않은 런은 `judge-unavailable` 로 집계돼 그 주는 ok 가 아니다.
+- **적용은 사람의 결정**이다. 이 문서의 계약("dry-run 목록을 보고 `--apply` 를 내리는 것")은 그대로다. 결정이 나면 `register-resolve-weekly-launchd.sh --apply-mode` 로 재등록한다(`MEMORY_BANK_RESOLVE_APPLY=1`). 그때 레인은 `--replan --apply`(기록된 판정 재적용, 되살아난 간선 포함) → `contradicts --apply` → `supersedes --apply` 순서로 돈다.
+- **내구성(히트율)**: 레인은 매번 `relation_resolution_log` 의 delete/retype/deactivate 행이 지금도 유효한지 센다. delete 는 같은 쌍에 같은 유형의 간선이 다시 없을 때(CONTRADICTS 는 양방향), retype 은 옛 유형으로 돌아오지 않았을 때, deactivate 는 팩트가 여전히 비활성일 때 "유지"다. 2026-10-22 첫 실측: 기록 1,158건 중 유지 819 / 되살아남 339 (70.7%). 행동별로는 delete 3 / 261 되살아남, retype 814 / 78, deactivate 2 / 0. 10/5 에 지운 간선은 거의 전부 peer import 가 되살렸고(이 문서의 226/264 와 같은 현상, 1.12.6 tombstone 이전 사본), 아직 다시 정리되지 않았다. 이 수치가 `--replan --apply` 가 필요한 이유이고, 적용 여부는 위 결정 사항이다.
+- 판정기가 닿지 않으면(런치 환경에서 구독 세션 불가 등) 런은 `status: error|timeout` 으로 기록되고 레인은 종료 코드 0 으로 끝난다. 감시 레인이 자기 부분 실패를 성공으로 숨기지도, 그 실패로 죽지도 않는다. 플러그인 루트를 못 찾으면 종료 코드 3 이고 jsonl 에 `no-cli` 로 남는다.
+- 실행 환경: 플러그인 루트·node 는 `~/.claude/memory-bank.env`(MEMORY_BANK_ROOT·MEMORY_BANK_NODE)에서 읽는다(소싱하지 않고 값만 읽는다). `better-sqlite3` 는 그 루트의 것을 쓴다(ABI 가 핀 node 와 맞다). 판정 런의 cwd 는 리포트 폴더라 agent SDK 가 남기는 transcript 가 프로젝트를 오염시키지 않는다.
+- 시험: `npx vitest run test/resolve-weekly.test.ts` (내구성 계산·요약 축약·인자 검증·리포트 렌더), `node scripts/resolve-weekly.mjs --durability-only` (읽기 전용 실측), `register-resolve-weekly-launchd.sh --dry-run | plutil -lint -`.
