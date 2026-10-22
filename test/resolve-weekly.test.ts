@@ -3,8 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import Database from 'better-sqlite3';
-// @ts-ignore — plain ESM script, no type declarations on purpose (it must run under the plugin's node, not tsc)
-import { computeDurability, summarizeRun, parseArgs, readEnvFile, renderReport } from '../scripts/resolve-weekly.mjs';
+// @ts-ignore floor-guard-ok: plain ESM lane script without type declarations on purpose (it runs under the plugin's pinned node, not tsc)
+import { computeDurability, summarizeRun, parseArgs, readEnvFile, renderReport, laneStatus } from '../scripts/resolve-weekly.mjs';
 
 function schema(db: Database.Database): void {
   db.exec(`
@@ -93,7 +93,17 @@ describe('resolve-weekly run summary and arguments', () => {
     expect(f.actionable).toBe(0);
   });
 
+  it('marks the week partial when the replan failed even if both judge runs succeeded', () => {
+    const ok = { status: 'ok' };
+    expect(laneStatus([ok, ok], null)).toBe('ok');
+    expect(laneStatus([ok, ok], { status: 'ok' })).toBe('ok');
+    expect(laneStatus([ok, ok], { status: 'timeout' })).toBe('partial');
+    expect(laneStatus([ok, { status: 'error' }], null)).toBe('partial');
+  });
+
   it('parses arguments strictly and reads the env file without executing it', () => {
+    expect(parseArgs(['--db', '/tmp/x.sqlite']).dbExplicit).toBe(true);
+    expect(parseArgs([]).dbExplicit).toBeUndefined();
     expect(parseArgs(['--limit', '50', '--votes', '1', '--types', 'contradicts']).types).toEqual(['contradicts']);
     expect(() => parseArgs(['--votes', '9'])).toThrow();
     expect(() => parseArgs(['--limit', '1e3'])).toThrow();

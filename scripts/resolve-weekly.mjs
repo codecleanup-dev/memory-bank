@@ -80,7 +80,7 @@ export function parseArgs(argv) {
     else if (a === '--node') opts.node = argv[++i];
     else if (a === '--out') opts.out = argv[++i];
     else if (a === '--jsonl') opts.jsonl = argv[++i];
-    else if (a === '--db') opts.db = argv[++i];
+    else if (a === '--db') { opts.db = argv[++i]; opts.dbExplicit = true; }
     else if (a === '--json') opts.json = true;
     else if (a === '--durability-only') opts.durabilityOnly = true;
     else if (a === '--help' || a === '-h') { opts.help = true; }
@@ -222,8 +222,22 @@ export function summarizeRun(type, result) {
   };
 }
 
-function runCli(rt, args, cwd) {
-  const r = spawnSync(rt.node, [rt.cli, ...args], { cwd, encoding: 'utf8', timeout: RUN_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024, env: process.env });
+/** The judge/apply child must look at the same database the durability pass measures: an explicit --db is
+ *  handed down as MEMORY_BANK_DB_PATH (what paths.ts reads). Without --db the child keeps its own resolution. */
+function childEnv(opts) {
+  return opts.dbExplicit ? { ...process.env, MEMORY_BANK_DB_PATH: opts.db } : process.env;
+}
+
+/** Lane status: every judge run AND the replan (when it ran) must be ok. A failed replan means revived edges were
+ *  not re-cleaned even if the two judge runs succeeded, so the week is partial, not ok. */
+export function laneStatus(runs, replan) {
+  const judgeOk = runs.every((r) => r.status === 'ok');
+  const replanOk = !replan || replan.status === 'ok';
+  return judgeOk && replanOk ? 'ok' : 'partial';
+}
+
+function runCli(rt, args, cwd, opts) {
+  const r = spawnSync(rt.node, [rt.cli, ...args], { cwd, encoding: 'utf8', timeout: RUN_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024, env: childEnv(opts) });
   if (r.error && r.error.code === 'ETIMEDOUT') return { status: 'timeout', rc: null, error: `timeout after ${RUN_TIMEOUT_MS / 60000} min`, stderr: r.stderr };
   if (r.error) return { status: 'error', rc: null, error: r.error.message, stderr: r.stderr };
   if (r.status !== 0) return { status: 'error', rc: r.status, error: (r.stderr || '').trim().split('\n').slice(-3).join(' | ').slice(0, 400), stderr: r.stderr };
@@ -336,7 +350,7 @@ export async function main(argv) {
 
   let replan = null;
   if (opts.apply) {
-    const r = runCli(rt, ['contradicts', '--replan', '--apply', '--json', '--limit', String(opts.limit)], opts.out);
+    const r = runCli(rt, ['contradicts', '--replan', '--apply', '--json', '--limit', String(opts.limit)], opts.out, opts);
     const s = summarizeRun('replan', r);
     replan = s;
     record.runs.replan = { status: s.status, examined: s.examined, applied: s.applied, error: s.error ?? null };
@@ -346,7 +360,7 @@ export async function main(argv) {
     const args = [type, '--json', '--limit', String(opts.limit), '--votes', String(opts.votes)];
     if (opts.model) args.push('--model', opts.model);
     if (opts.apply) args.push('--apply');
-    const s = summarizeRun(type, runCli(rt, args, opts.out));
+    const s = summarizeRun(type, runCli(rt, args, opts.out, opts));
     runs.push(s);
     record.runs[type] = {
       status: s.status, rc: s.rc ?? 0, examined: s.examined, judged: s.judged, actionable: s.actionable,
@@ -359,7 +373,7 @@ export async function main(argv) {
   const reportPath = path.join(opts.out, `${time.slice(0, 10)}-${mode}.md`);
   fs.writeFileSync(reportPath, renderReport({ time, mode, opts, rt, runs, durability, replan }), 'utf8');
   record.report = reportPath;
-  record.status = runs.every((r) => r.status === 'ok') ? 'ok' : 'partial';
+  record.status = laneStatus(runs, replan);
   appendJsonl(opts.jsonl, record);
   if (opts.json) console.log(JSON.stringify(record, null, 2));
   else console.log(`resolve-weekly: ${record.status} · report ${reportPath} · ` + runs.map((r) => `${r.type} ${r.status} judged ${r.judged} actionable ${r.actionable}`).join(' · '));
