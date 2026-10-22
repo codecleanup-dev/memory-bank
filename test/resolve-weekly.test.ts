@@ -113,6 +113,8 @@ describe('resolve-weekly run summary and arguments', () => {
 
   it('parses arguments strictly and reads the env file without executing it', () => {
     expect(parseArgs(['--db', '/tmp/x.sqlite']).dbExplicit).toBe(true);
+    expect(path.isAbsolute(parseArgs(['--db', 'rel.sqlite']).db)).toBe(true);
+    expect(path.isAbsolute(parseArgs(['--out', 'reports']).out)).toBe(true);
     expect(parseArgs([]).dbExplicit).toBeUndefined();
     expect(parseArgs(['--limit', '50', '--votes', '1', '--types', 'contradicts']).types).toEqual(['contradicts']);
     expect(() => parseArgs(['--votes', '9'])).toThrow();

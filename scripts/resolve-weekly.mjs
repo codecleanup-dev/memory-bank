@@ -76,11 +76,14 @@ export function parseArgs(argv) {
       const list = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean);
       if (!list.length || list.some((t) => t !== 'contradicts' && t !== 'supersedes')) throw new Error('--types: contradicts,supersedes only');
       opts.types = list;
-    } else if (a === '--root') opts.root = argv[++i];
-    else if (a === '--node') opts.node = argv[++i];
-    else if (a === '--out') opts.out = argv[++i];
-    else if (a === '--jsonl') opts.jsonl = argv[++i];
-    else if (a === '--db') { opts.db = argv[++i]; opts.dbExplicit = true; }
+    }
+    // Paths are fixed to absolute at parse time: the judge child runs with cwd = report folder, so a relative --db
+    // would point the parent (durability) and the child (apply) at two different files.
+    else if (a === '--root') opts.root = path.resolve(argv[++i]);
+    else if (a === '--node') opts.node = path.resolve(argv[++i]);
+    else if (a === '--out') opts.out = path.resolve(argv[++i]);
+    else if (a === '--jsonl') opts.jsonl = path.resolve(argv[++i]);
+    else if (a === '--db') { opts.db = path.resolve(argv[++i]); opts.dbExplicit = true; }
     else if (a === '--json') opts.json = true;
     else if (a === '--durability-only') opts.durabilityOnly = true;
     else if (a === '--help' || a === '-h') { opts.help = true; }
