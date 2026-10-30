@@ -165,8 +165,12 @@ function __installLock(): boolean {
     fs.mkdirSync(__lockDir, { recursive: false });
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
-    if (code !== 'EEXIST') console.error(`Cannot create sync lock ${__lockDir}: ${code ?? (e as Error).message}`);
-    return false; // someone else holds (or just won) the lock
+    if (code === 'EEXIST') return false; // someone else holds (or just won) the lock
+    // Any other failure (EACCES, EROFS, ENOSPC, a file at run-locks) means no
+    // sync can ever run here. Exit non-zero instead of the "already running"
+    // skip, so a scheduler keyed on exit status sees the failure.
+    console.error(`Cannot create sync lock ${__lockDir}: ${code ?? (e as Error).message}`);
+    process.exit(1);
   }
   try {
     fs.writeFileSync(__pidFile, JSON.stringify({ pid: process.pid, version: __myVersion, startedAt: Date.now(), script: process.argv[1] ?? null }));

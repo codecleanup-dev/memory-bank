@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'child_process';
-import { mkdtempSync, existsSync, rmSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -39,5 +39,22 @@ describe.skipIf(process.platform === 'win32')('sync singleton lock parent direct
     expect(existsSync(path.join(home, '.claude', 'run-locks'))).toBe(true);
     // The lock itself is released on exit.
     expect(existsSync(path.join(home, '.claude', 'run-locks', 'memory-bank-sync.lock'))).toBe(false);
+  });
+
+  it('fails non-zero instead of reporting "already running" when the lock cannot be created', () => {
+    // A plain file where the run-locks directory should be: mkdir can never succeed.
+    mkdirSync(path.join(home, '.claude'), { recursive: true });
+    writeFileSync(path.join(home, '.claude', 'run-locks'), 'not a directory');
+
+    const res = spawnSync(process.execPath, [SYNC_CLI], {
+      env: { PATH: process.env.PATH, HOME: home },
+      timeout: 60000,
+      encoding: 'utf8',
+    });
+
+    expect(res.error).toBeUndefined();
+    expect(res.status).not.toBe(0);
+    expect(res.stdout).not.toContain('Sync already running');
+    expect(res.stderr).toContain('Cannot create sync lock');
   });
 });
