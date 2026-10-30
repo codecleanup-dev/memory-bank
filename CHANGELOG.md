@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.12.9] - 2026-10-30
+
+_MacBook Air 의 대화 색인이 2026-07-04 부터 10-30 까지 멈춰 있었다. 그동안 sync 는 매번 exit 0 으로 끝났고 로그에는
+`Sync already running - skip (singleton lock)` 한 줄만 남았다. 실제로는 잠금을 잡은 프로세스가 없었다. 잠금 디렉토리의
+부모 `~/.claude/run-locks` 가 그 머신에 없어서 비재귀 mkdir 가 ENOENT 로 실패했고, 잠금 코드는 모든 mkdir 실패를 "다른
+sync 가 잡고 있음"으로 읽었다. MacBook Pro 는 다른 도구(bs-qa-in-dev 루프)가 같은 디렉토리를 `mkdir -p` 로 만들어 둔
+덕에 우연히 정상이었다. 색인이 멈추니 세션 종료 시 fact 추출도 매번 0건이었다(추출 대상 exchange 가 없음)._
+
+### Fixed
+- **`src/sync-cli.ts`**: `__installLock` 이 잠금 디렉토리의 부모를 먼저 재귀 생성한다. 잠금 자체의 배타 mkdir 는 그대로다.
+  EEXIST 가 아닌 mkdir 실패(EACCES·EROFS·ENOSPC, `run-locks` 자리에 파일이 있는 경우)는 stderr 에 원인 코드를 남기고
+  exit 1 로 끝난다. 예전에는 이런 실패도 "already running" 으로 exit 0 이 되어, 종료 코드를 보는 스케줄러가 알아채지 못했다.
+
+### Tests
+- **`test/sync-lock-parent-dir.test.ts`**: (1) `~/.claude` 가 없는 HOME 에서 `dist/sync-cli.js` 를 실행해, "already running" 없이
+  sync 가 끝나고 `run-locks` 가 생기며 잠금이 해제되는지 확인한다. (2) `run-locks` 자리에 파일이 있으면 "already running" 없이
+  non-zero 로 끝나고 stderr 에 원인이 남는지 확인한다. 두 테스트 모두 수정 전 빌드에서 실패함을 확인했다.
+
 ## [1.12.8] - 2026-10-16
 
 _1.12.7 설치 뒤 Claude Code 가 캐시의 1.12.5·1.12.6 디렉토리를 지웠는데(in-use sweep, 10/14), 그 전에 시작한 세션 5개는
