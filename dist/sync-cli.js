@@ -165,10 +165,21 @@ async function __killAndConfirm(pid, expectedScript) {
  * crash inside the gap simply ages past the grace and is reclaimed as
  * garbage. */
 function __installLock() {
+    // The parent is created recursively; only the lock dir itself must be an
+    // exclusive mkdir. Without this, a missing ~/.claude/run-locks made every
+    // mkdir fail with ENOENT, read below as "held" — sync skipped forever while
+    // reporting success (one Mac froze indexing 2026-07-04 → 2026-10-30).
+    try {
+        fs.mkdirSync(path.dirname(__lockDir), { recursive: true });
+    }
+    catch { /* surfaced by the exclusive mkdir below */ }
     try {
         fs.mkdirSync(__lockDir, { recursive: false });
     }
-    catch {
+    catch (e) {
+        const code = e.code;
+        if (code !== 'EEXIST')
+            console.error(`Cannot create sync lock ${__lockDir}: ${code ?? e.message}`);
         return false; // someone else holds (or just won) the lock
     }
     try {
